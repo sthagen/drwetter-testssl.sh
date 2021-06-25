@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 
 # no early data, but TLS 1.3 with debian:buster (sid simlar in Feb 2019)
 
@@ -29,4 +30,4 @@ echo "You may now run \"testssl.sh $(docker inspect $ID --format '{{.NetworkSett
 exit 0
 
 
-
+#  vim:ts=5:sw=5:expandtab

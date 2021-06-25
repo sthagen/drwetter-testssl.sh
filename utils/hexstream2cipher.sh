@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 hs="$1"
 len=${#hs}
@@ -34,3 +34,5 @@ echo
 # remove leading : because of GREASE, and trailing because of TLS_EMPTY_RENEGOTIATION_INFO_SCSV
 ciphers="${ciphers%:}"
 echo ${ciphers#:}
+
+#  vim:ts=5:sw=5:expandtab

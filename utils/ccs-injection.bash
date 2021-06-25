@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/usr/bin/env bash
 
 # POC bash socket implementation of CCS Injection vulnerability in OpenSSL (CVE-2014-0224), 
 # see https://www.openssl.org/news/secadv_20140605.txt
@@ -352,5 +352,5 @@ fi
 echo
 exit $ret
 
-#  vim:tw=100:ts=5:sw=5:expandtab
+#  vim:ts=5:sw=5:expandtab
 #  $Id: ccs-injection.bash,v 1.9 2015/07/06 20:01:49 dirkw Exp $ 

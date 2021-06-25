@@ -1,4 +1,6 @@
-#/bin/sh -e
+#!/usr/bin/env bash
+
+set -e
 
 # utility which converts grepable nmap outout to testssl's file input
 
@@ -38,5 +40,5 @@ done < "$FNAME"
 awk '/\<open\>/ { print "'"${OPT2ADD}"' " $2":"$5 }' "$FNAME" | sed 's/\/open.*$//g' >"$TARGET_FNAME"
 exit $?
 
-#  vim:ts=5:sw=5
+#  vim:ts=5:sw=5:expandtab
 

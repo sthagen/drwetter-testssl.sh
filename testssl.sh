@@ -9,7 +9,7 @@
 #
 # Development version       https://github.com/drwetter/testssl.sh
 # Stable version            https://testssl.sh
-# File bugs at github       https://github.com/drwetter/testssl.sh/issues
+# File bugs at GitHub       https://github.com/drwetter/testssl.sh/issues
 #
 # Project lead and initiator: Dirk Wetter, copyleft: 2007-today, contributions so far see CREDITS.md
 # Main contributions from David Cooper
@@ -208,7 +208,7 @@ STARTTLS_SLEEP=${STARTTLS_SLEEP:-10}    # max time wait on a socket for STARTTLS
 FAST_STARTTLS=${FAST_STARTTLS:-true}    # at the cost of reliability decrease the handshakes for STARTTLS
 USLEEP_SND=${USLEEP_SND:-0.1}           # sleep time for general socket send
 USLEEP_REC=${USLEEP_REC:-0.2}           # sleep time for general socket receive
-HSTS_MIN=${HSTS_MIN:-179}               # >179 days is ok for HSTS
+HSTS_MIN=${HSTS_MIN:-180}               # >=180 days is ok for HSTS
      HSTS_MIN=$((HSTS_MIN * 86400))     # correct to seconds
 HPKP_MIN=${HPKP_MIN:-30}                # >=30 days should be ok for HPKP_MIN, practical hints?
      HPKP_MIN=$((HPKP_MIN * 86400))     # correct to seconds
@@ -239,8 +239,8 @@ SYSTEM2=""                              # currently only being used for WSL = ba
 PRINTF=""                               # which external printf to use. Empty presets the internal one, see #1130
 CIPHERS_BY_STRENGTH_FILE=""
 TLS_DATA_FILE=""                        # mandatory file for socket-based handshakes
-OPENSSL=""                              # If you run this from github it's ~/bin/openssl.$(uname).$(uname -m) otherwise /usr/bin/openssl
-OPENSSL2=""                             # When running from github, this will be openssl version >=1.1.1 (auto determined)
+OPENSSL=""                              # If you run this from GitHub it's ~/bin/openssl.$(uname).$(uname -m) otherwise /usr/bin/openssl
+OPENSSL2=""                             # When running from GitHub, this will be openssl version >=1.1.1 (auto determined)
 OPENSSL_LOCATION=""
 IKNOW_FNAME=false
 FIRST_FINDING=true                      # is this the first finding we are outputting to file?
@@ -1335,7 +1335,7 @@ json_header() {
      local filename_provided=false
 
      if [[ -n "$PARENT_JSONFILE" ]]; then
-          [[ -n "$JSONFILE" ]] && fatal "Can't write to both $PARENT_JSONFILE and $JSONFILE"
+          [[ -n "$JSONFILE" ]] && fatal "Can't write to both $PARENT_JSONFILE and $JSONFILE" $ERR_CMDLINE
           JSONFILE="$PARENT_JSONFILE"
      fi
      [[ -n "$JSONFILE" ]] && [[ ! -d "$JSONFILE" ]] && filename_provided=true
@@ -1386,7 +1386,7 @@ csv_header() {
      local filename_provided=false
 
      if [[ -n "$PARENT_CSVFILE" ]]; then
-          [[ -n "$CSVFILE" ]] && fatal "Can't write to both $PARENT_CSVFILE and $CSVFILE"
+          [[ -n "$CSVFILE" ]] && fatal "Can't write to both $PARENT_CSVFILE and $CSVFILE" $ERR_CMDLINE
           CSVFILE="$PARENT_CSVFILE"
      fi
      [[ -n "$CSVFILE" ]] && [[ ! -d "$CSVFILE" ]] && filename_provided=true
@@ -1440,7 +1440,7 @@ html_header() {
      local filename_provided=false
 
      if [[ -n "$PARENT_HTMLFILE" ]]; then
-          [[ -n "$HTMLFILE" ]] && fatal "Can't write to both $PARENT_HTMLFILE and $HTMLFILE"
+          [[ -n "$HTMLFILE" ]] && fatal "Can't write to both $PARENT_HTMLFILE and $HTMLFILE" $ERR_CMDLINE
           HTMLFILE="$PARENT_HTMLFILE"
      fi
      [[ -n "$HTMLFILE" ]] && [[ ! -d "$HTMLFILE" ]] && filename_provided=true
@@ -1519,7 +1519,7 @@ prepare_logging() {
      local filename_provided=false
 
      if [[ -n "$PARENT_LOGFILE" ]]; then
-          [[ -n "$LOGFILE" ]] && fatal "Can't write to both $PARENT_LOGFILE and $LOGFILE"
+          [[ -n "$LOGFILE" ]] && fatal "Can't write to both $PARENT_LOGFILE and $LOGFILE" $ERR_CMDLINE
           LOGFILE="$PARENT_LOGFILE"
      fi
      [[ -n "$LOGFILE" ]] && [[ ! -d "$LOGFILE" ]] && filename_provided=true
@@ -1633,7 +1633,7 @@ out_row_aligned_max_width_by_entry() {
           fi
           out " "
           prev_entry="$entry"
-    done <<< "$resp"
+     done <<< "$resp"
 }
 
 print_fixed_width() {
@@ -2032,10 +2032,12 @@ wait_kill(){
      return 3                 # means killed
 }
 
-# parse_date date format input-format
+# Convert date formats -- we always use GMT=UTC here
+# argv1: source date string
+# argv2: dest date sting
 if "$HAS_GNUDATE"; then            # Linux and NetBSD
      parse_date() {
-          LC_ALL=C date -d "$1" "$2"
+          LC_ALL=C TZ=GMT date -d "$1" "$2"
      }
 elif "$HAS_FREEBSDDATE"; then      # FreeBSD, OS X and newer (~6.6) OpenBSD versions
      parse_date() {
@@ -2057,7 +2059,7 @@ elif "$HAS_OPENBSDDATE"; then
      }
 else
      parse_date() {
-          LC_ALL=C date -j "$2" "$1"
+          LC_ALL=C TZ=GMT date -j "$2" "$1"
      }
 fi
 
@@ -2619,12 +2621,12 @@ run_hsts() {
                pr_svrty_low "HSTS max-age is set to 0. HSTS is disabled"
                fileout "${jsonID}_time" "LOW" "0. HSTS is disabled"
                set_grade_cap "A" "HSTS is disabled"
-          elif [[ $hsts_age_sec -gt $HSTS_MIN ]]; then
+          elif [[ $hsts_age_sec -ge $HSTS_MIN ]]; then
                pr_svrty_good "$hsts_age_days days" ; out "=$hsts_age_sec s"
                fileout "${jsonID}_time" "OK" "$hsts_age_days days (=$hsts_age_sec seconds) > $HSTS_MIN seconds"
           else
-               pr_svrty_medium "$hsts_age_sec s = $hsts_age_days days is too short ( > $HSTS_MIN seconds recommended)"
-               fileout "${jsonID}_time" "MEDIUM" "max-age too short. $hsts_age_days days (=$hsts_age_sec seconds) <= $HSTS_MIN seconds"
+               pr_svrty_medium "$hsts_age_sec s = $hsts_age_days days is too short ( >= $HSTS_MIN seconds recommended)"
+               fileout "${jsonID}_time" "MEDIUM" "max-age too short. $hsts_age_days days (=$hsts_age_sec seconds) < $HSTS_MIN seconds"
                set_grade_cap "A" "HSTS max-age is too short"
           fi
           if includeSubDomains "$TMPFILE"; then
@@ -5434,7 +5436,7 @@ run_protocols() {
                add_proto_offered tls1_1 no
                if [[ -z $latest_supported ]]; then
                     outln
-                    fileout "$jsonID" "INFO" "is not offered"    # neither good or bad
+                    fileout "$jsonID" "INFO" "not offered"    # neither good or bad
                else
                     prln_svrty_critical " -- connection failed rather than downgrading to $latest_supported_string"
                     fileout "$jsonID" "CRITICAL" "connection failed rather than downgrading to $latest_supported_string"
@@ -5470,7 +5472,7 @@ run_protocols() {
                fileout "$jsonID" "WARN" "TLS downgraded to STARTTLS plaintext"
                ;;
           4)   out "likely not offered, "
-               fileout "$jsonID" "INFO" "is not offered"
+               fileout "$jsonID" "INFO" "not offered"
                add_proto_offered tls1_1 no
                pr_warning "received 4xx/5xx after STARTTLS handshake"; outln "$debug_recomm"
                fileout "$jsonID" "WARN" "received 4xx/5xx after STARTTLS handshake${debug_recomm}"
@@ -6808,7 +6810,7 @@ run_server_preference() {
                     ( [[ $proto_ossl != tls1_3 ]] && ! "$has_cipher_order" ]] ) || \
                     ( [[ $proto_ossl == tls1_3 ]] && ! "$has_tls13_cipher_order" ]] ); then
                if [[ $proto_ossl == ssl2 ]]; then
-                   outln " (listed by strength)"
+                    outln " (listed by strength)"
                elif [[ $proto_ossl == tls1_3 ]]; then
                     outln " (no server order, thus listed by strength)"
                else
@@ -6939,12 +6941,12 @@ cipher_pref_check() {
                while true; do
                     if [[ $proto != tls1_3 ]]; then
                          if [[ -n "$ciphers_found" ]]; then
-                                  ciphers_to_test=""
-                                  for cipher in $ciphers_found; do
-                                       [[ ! "$tested_cipher:" =~ :-$cipher: ]] && ciphers_to_test+=":$cipher"
-                                  done
-                                  [[ -z "$ciphers_to_test" ]] && break
-                                  ciphers_to_test="-cipher ${ciphers_to_test:1}"
+                              ciphers_to_test=""
+                              for cipher in $ciphers_found; do
+                                   [[ ! "$tested_cipher:" =~ :-$cipher: ]] && ciphers_to_test+=":$cipher"
+                              done
+                              [[ -z "$ciphers_to_test" ]] && break
+                              ciphers_to_test="-cipher ${ciphers_to_test:1}"
                          else
                               ciphers_to_test="-cipher ALL:COMPLEMENTOFALL${tested_cipher}"
                          fi
@@ -14166,10 +14168,10 @@ parse_tls_serverhello() {
                          len1=2*$(hex2dec "${tls_serverkeyexchange_ascii:6:2}")
                          offset=$((len1+8))
                          if [[ $tls_serverkeyexchange_ascii_len -ge $((offset+4)) ]]; then
-                             # The SignatureAndHashAlgorithm won't be present in an anonymous
-                             # key exhange.
-                             peering_signing_digest="${tls_serverkeyexchange_ascii:offset:2}"
-                             peer_signature_type="${tls_serverkeyexchange_ascii:$((offset+2)):2}"
+                              # The SignatureAndHashAlgorithm won't be present in an anonymous
+                              # key exhange.
+                              peering_signing_digest="${tls_serverkeyexchange_ascii:offset:2}"
+                              peer_signature_type="${tls_serverkeyexchange_ascii:$((offset+2)):2}"
                          fi
                     fi
                fi
@@ -14239,9 +14241,9 @@ parse_tls_serverhello() {
                          rfc7919_param="${rfc7919_param%,}"
                          [[ "$ephemeral_param" =~ $rfc7919_param ]] || named_curve_str=""
                     else
-                       ephemeral_param="$(grep -EA 1000 "prime:|P:" <<< "$ephemeral_param")"
-                       rfc7919_param="$($OPENSSL pkey -text_pub -noout 2>>$ERRFILE <<< "${TLS13_KEY_SHARES[named_curve]}" | grep -EA 1000 "prime:|P:")"
-                       [[ "$ephemeral_param" != "$rfc7919_param" ]] && named_curve_str=""
+                         ephemeral_param="$(grep -EA 1000 "prime:|P:" <<< "$ephemeral_param")"
+                         rfc7919_param="$($OPENSSL pkey -text_pub -noout 2>>$ERRFILE <<< "${TLS13_KEY_SHARES[named_curve]}" | grep -EA 1000 "prime:|P:")"
+                         [[ "$ephemeral_param" != "$rfc7919_param" ]] && named_curve_str=""
                     fi
                fi
 
@@ -14266,8 +14268,8 @@ parse_tls_serverhello() {
                     len1=2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")
                     offset+=$((len1+4))
                     if [[ $tls_serverkeyexchange_ascii_len -ge $((offset+4)) ]]; then
-                        # The SignatureAndHashAlgorithm won't be present in an anonymous
-                        # key exhange.
+                         # The SignatureAndHashAlgorithm won't be present in an anonymous
+                         # key exhange.
                          peering_signing_digest="${tls_serverkeyexchange_ascii:offset:2}"
                          peer_signature_type="${tls_serverkeyexchange_ascii:$((offset+2)):2}"
                     fi
@@ -14320,53 +14322,53 @@ parse_tls_serverhello() {
 
 # ASCII-HEX encoded session ticket
 parse_tls13_new_session_ticket() {
-    local tls_version="$1"
-    local new_session_ticket="$2"
-    local -i len ticket_lifetime ticket_age_add min_len remainder
-    local ticket_nonce ticket extensions
-    local has_nonce=true
+     local tls_version="$1"
+     local new_session_ticket="$2"
+     local -i len ticket_lifetime ticket_age_add min_len remainder
+     local ticket_nonce ticket extensions
+     local has_nonce=true
 
-    [[ "${new_session_ticket:0:2}" == 04 ]] || return 7
-    # Prior to draft 21 the NewSessionTicket did not include a ticket_nonce.
-    [[ "${tls_version:0:2}" == 7F ]] && [[ 0x${tls_version:2:2} -le 20 ]] && has_nonce=false
+     [[ "${new_session_ticket:0:2}" == 04 ]] || return 7
+     # Prior to draft 21 the NewSessionTicket did not include a ticket_nonce.
+     [[ "${tls_version:0:2}" == 7F ]] && [[ 0x${tls_version:2:2} -le 20 ]] && has_nonce=false
 
-    # Set min_len to the minimum length that a session ticket can be.
-    min_len=28
-    "$has_nonce" || min_len=$((min_len-2))
+     # Set min_len to the minimum length that a session ticket can be.
+     min_len=28
+     "$has_nonce" || min_len=$((min_len-2))
 
-    remainder=$((2*0x${new_session_ticket:2:6}))
-    [[ $remainder -ge $min_len ]] || return 7
-    [[ ${#new_session_ticket} -ge $((remainder + 8)) ]] || return 7
+     remainder=$((2*0x${new_session_ticket:2:6}))
+     [[ $remainder -ge $min_len ]] || return 7
+     [[ ${#new_session_ticket} -ge $((remainder + 8)) ]] || return 7
 
-    ticket_lifetime=0x${new_session_ticket:8:8}
-    ticket_age_add=0x${new_session_ticket:16:8}
-    new_session_ticket="${new_session_ticket:24}"
-    remainder=$((remainder-16))
+     ticket_lifetime=0x${new_session_ticket:8:8}
+     ticket_age_add=0x${new_session_ticket:16:8}
+     new_session_ticket="${new_session_ticket:24}"
+     remainder=$((remainder-16))
 
-    if "$has_nonce"; then
-         len=$((2*0x${new_session_ticket:0:2}))
-         new_session_ticket="${new_session_ticket:2}"
-         [[ $remainder -ge $((len + 12)) ]] || return 7
-         ticket_nonce="${new_session_ticket:0:len}"
-         new_session_ticket="${new_session_ticket:len}"
-         remainder=$((remainder-len-2))
-    fi
+     if "$has_nonce"; then
+          len=$((2*0x${new_session_ticket:0:2}))
+          new_session_ticket="${new_session_ticket:2}"
+          [[ $remainder -ge $((len + 12)) ]] || return 7
+          ticket_nonce="${new_session_ticket:0:len}"
+          new_session_ticket="${new_session_ticket:len}"
+          remainder=$((remainder-len-2))
+     fi
 
-    len=$((2*0x${new_session_ticket:0:4}))
-    new_session_ticket="${new_session_ticket:4}"
-    [[ $remainder -ge $((len + 8)) ]] || return 7
-    ticket="${new_session_ticket:0:len}"
-    new_session_ticket="${new_session_ticket:len}"
-    remainder=$((remainder-len-4))
+     len=$((2*0x${new_session_ticket:0:4}))
+     new_session_ticket="${new_session_ticket:4}"
+     [[ $remainder -ge $((len + 8)) ]] || return 7
+     ticket="${new_session_ticket:0:len}"
+     new_session_ticket="${new_session_ticket:len}"
+     remainder=$((remainder-len-4))
 
-    len=$((2*0x${new_session_ticket:0:4}))
-    new_session_ticket="${new_session_ticket:4}"
-    [[ $remainder -eq $((len + 4)) ]] || return 7
-    extensions="${new_session_ticket:0:len}"
+     len=$((2*0x${new_session_ticket:0:4}))
+     new_session_ticket="${new_session_ticket:4}"
+     [[ $remainder -eq $((len + 4)) ]] || return 7
+     extensions="${new_session_ticket:0:len}"
 
-    echo "    TLS session ticket lifetime hint: $ticket_lifetime (seconds)" > $TMPFILE
-    tmpfile_handle ${FUNCNAME[0]}.txt $TMPFILE
-    return 0
+     echo "    TLS session ticket lifetime hint: $ticket_lifetime (seconds)" > $TMPFILE
+     tmpfile_handle ${FUNCNAME[0]}.txt $TMPFILE
+     return 0
 }
 
 #arg1 (optional): list of ciphers suites or empty
@@ -16397,8 +16399,9 @@ run_breach() {
      [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for BREACH (HTTP compression) vulnerability " && outln
      pr_bold " BREACH"; out " ($cve)                    "
      if [[ "$CLIENT_AUTH" == required ]]; then
-          outln "cannot be tested (server side requires x509 authentication)"
-          fileout "$jsonID" "INFO" "was not tested, server side requires x509 authentication" "$cve" "$cwe"
+          prln_warning "client x509-based authentication prevents this from being tested"
+          fileout "$jsonID" "WARN" "client x509-based authentication prevents this from being tested" "$cve" "$cwe"
+          return 7
      fi
 
      [[ -z "$url" ]] && url="/"
@@ -16446,7 +16449,7 @@ run_breach() {
                     elif [[ "$detected_compression" =~ no_compression ]]; then
                          has_compression+=("$c:no")
                          debugme echo "has_compression: $c: no"
-                    elif [[ -n "detected_compression" ]]; then
+                    elif [[ -n "$detected_compression" ]]; then
                          has_compression+=("$c:yes")
                          debugme echo "has_compression: $c: yes"
                     else
@@ -16915,7 +16918,7 @@ run_freak() {
      [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for FREAK attack " && outln
      pr_bold " FREAK"; out " ($cve)                     "
 
-    if "$TLS13_ONLY"; then
+     if "$TLS13_ONLY"; then
           pr_svrty_best "not vulnerable (OK)"
           [[ $DEBUG -ge 1 ]] && out ", TLS 1.3 only server"
           outln
@@ -17786,9 +17789,9 @@ run_winshock() {
           for tls_ext in $TLS_EXTENSIONS; do
                # We use the whole array, got to be careful when the array becomes bigger (unintented match)
                if [[ ${forbidden_tls_ext[@]} =~ $tls_ext ]]; then
-                  pr_svrty_best "not vulnerable (OK)"; outln " - TLS extension $tls_ext detected"
-                  fileout "$jsonID" "OK" "not vulnerable  - TLS extension $tls_ext detected" "$cve" "$cwe"
-                  return 0
+                    pr_svrty_best "not vulnerable (OK)"; outln " - TLS extension $tls_ext detected"
+                    fileout "$jsonID" "OK" "not vulnerable  - TLS extension $tls_ext detected" "$cve" "$cwe"
+                    return 0
                fi
           done
      fi
@@ -20484,11 +20487,11 @@ extract_calist() {
                type=$(hex2dec "${certreq:0:4}")
                len=2*$(hex2dec "${certreq:4:4}")
                if [[ $type -eq 47 ]]; then
-                  # This is the certificate_authorities extension
-                  calist="${certreq:8:len}"
-                  len=2*$(hex2dec "${calist:0:4}")
-                  calist="${calist:4:len}"
-                  break
+                    # This is the certificate_authorities extension
+                    calist="${certreq:8:len}"
+                    len=2*$(hex2dec "${calist:0:4}")
+                    calist="${calist:4:len}"
+                    break
                fi
                certreq="${certreq:$((len+8))}"
           done
@@ -22072,7 +22075,7 @@ parse_cmd_line() {
      while [[ $# -gt 0 ]]; do
           case $1 in
                --help|-b|--banner|-v|--version)
-                    fatal "$1 is a standalone command line option"
+                    fatal "$1 is a standalone command line option" $ERR_CMDLINE
                     ;;
                --mx)
                     do_mx_all_ips=true
@@ -22328,7 +22331,7 @@ parse_cmd_line() {
                     [[ $? -eq 0 ]] && shift
                     case "$MASS_TESTING_MODE" in
                          serial|parallel) ;;
-                         *)   tmln_magenta "\nmass testing mode can be either \"serial\" or \"parallel\""
+                         *)   tmln_magenta "\nmass testing mode can be either \"serial\" or \"parallel\"" 1>&2
                               help 1
                     esac
                     ;;
@@ -22343,7 +22346,7 @@ parse_cmd_line() {
                     [[ $? -eq 0 ]] && shift
                     case "$WARNINGS" in
                          batch|off) ;;
-                         *)   tmln_magenta "\nwarnings can be either \"batch\", or \"off\""
+                         *)   tmln_magenta "\nwarnings can be either \"batch\", or \"off\"" 1>&2
                               help 1
                     esac
                     ;;
@@ -22361,7 +22364,7 @@ parse_cmd_line() {
                     [[ $? -eq 0 ]] && shift
                     case $DEBUG in
                          [0-6]) ;;
-                         *)   tmln_magenta_term "\nunrecognized debug value \"$1\", must be between 0..6" 1>&2
+                         *)   tmln_magenta "\nunrecognized debug value \"$1\", must be between 0..6" 1>&2
                               help 1
                     esac
                     ;;
@@ -22584,7 +22587,7 @@ parse_cmd_line() {
                          no-rfc|no-iana) DISPLAY_CIPHERNAMES="openssl-only" ;;
                          openssl) DISPLAY_CIPHERNAMES="openssl" ;;
                          rfc|iana) DISPLAY_CIPHERNAMES="rfc" ;;
-                         *)   tmln_warning "\nmapping can only be \"no-openssl\", \"no-iana\"(\"no-rfc\"), \"openssl\" or \"iana\"(\"rfc\")"
+                         *)   tmln_warning "\nmapping can only be \"no-openssl\", \"no-iana\"(\"no-rfc\"), \"openssl\" or \"iana\"(\"rfc\")" 1>&2;
                               help 1 ;;
                     esac
                     ;;
@@ -22774,7 +22777,7 @@ lets_roll() {
                fileout_section_header $section_number true && ((section_number++))
                "$do_cipherlists" && { run_cipherlists; ret=$(($? + ret)); stopwatch run_cipherlists; }
 
-              fileout_section_header $section_number true && ((section_number++))
+               fileout_section_header $section_number true && ((section_number++))
                "$do_server_preference" && { run_server_preference; ret=$(($? + ret)); stopwatch run_server_preference; }
 
                fileout_section_header $section_number true && ((section_number++))
