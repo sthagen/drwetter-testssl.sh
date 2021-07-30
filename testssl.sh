@@ -1555,6 +1555,14 @@ prepare_logging() {
 
 ################### END all file output functions #########################
 
+# prints a string of n spaces (n < 80)
+print_n_spaces() {
+     local -i n="$1"
+     local spaces="                                                                                "
+
+     out "${spaces:0:n}"
+}
+
 # prints out multiple lines in $1, left aligned by spaces in $2
 out_row_aligned() {
      local first=true
@@ -1638,14 +1646,12 @@ out_row_aligned_max_width_by_entry() {
 
 print_fixed_width() {
      local text="$1"
-     local -i i len width="$2"
+     local -i len width="$2"
      local print_function="$3"
 
      len=${#text}
      $print_function "$text"
-     for (( i=len; i <= width; i++ )); do
-          out " "
-     done
+     print_n_spaces "$((width-len+1))"
 }
 
 # saves $TMPFILE or file supplied in $2 under name "$TEMPDIR/$NODEIP.$1".
@@ -3570,9 +3576,7 @@ neat_list(){
           fi
      fi
      len=${#kx}
-     for (( i=len; i<10; i++ )); do
-          out " "
-     done
+     print_n_spaces "$((10-len))"
      out "$(printf -- " %-12s%-8s " "$enc" "$strength")"
      if [[ "$COLOR" -le 2 ]]; then
           if [[ "$DISPLAY_CIPHERNAMES" == rfc ]]; then
@@ -4984,13 +4988,9 @@ run_client_simulation() {
                               pr_cipher_quality "$cipher"
                          fi
                          if [[ "$DISPLAY_CIPHERNAMES" =~ openssl ]]; then
-                              for (( j=${#cipher}; j < 34; j++ )); do
-                                   out " "
-                              done
+                              print_n_spaces "$((34-${#cipher}))"
                          else
-                              for (( j=${#cipher}; j < 50; j++ )); do
-                                   out " "
-                              done
+                              print_n_spaces "$((50-${#cipher}))"
                          fi
                          if [[ -n "$what_dh" ]]; then
                               [[ -n "$curve" ]] && curve="($curve)"
@@ -21353,7 +21353,7 @@ nmap_to_plain_file() {
      local target_fname=""
      local oneline=""
      local ip hostdontcare round_brackets ports_specs starttls
-     local tmp port host_spec protocol dontcare dontcare1
+     local tmp port host_spec protocol ssl_hint dontcare dontcare1
      #FIXME: IPv6 is missing here
 
      # Ok, since we are here we are sure to have an nmap file. To avoid questions we make sure it's the right format too
@@ -21394,11 +21394,15 @@ nmap_to_plain_file() {
           while read -r oneline; do
                # 25/open/tcp//smtp//<banner>/,
                [[ "$oneline" =~ '/open/tcp/' ]] || continue                # no open tcp for this port on this IP --> move on
-               IFS=/ read -r port dontcare protocol dontcare1 <<< "$oneline"
-               starttls="$(ports2starttls $port)"
-               [[ $? -eq 1 ]] && continue                                  # nmap got a port but we don't know how to speak to
-               [[ "$DEBUG" -ge 1 ]] && echo "${starttls}$host_spec:$port"
-               echo "${starttls}${host_spec}:${port}" >>"$target_fname"
+               IFS=/ read -r port dontcare protocol ssl_hint dontcare1 <<< "$oneline"
+               if [[ "$ssl_hint" =~ ^(ssl|https) ]] || [[ "$dontcare1" =~ ^(ssl|https) ]]; then
+                    echo "${host_spec}:${port}" >>"$target_fname"
+               else
+                    starttls="$(ports2starttls $port)"
+                    [[ $? -eq 1 ]] && continue                             # nmap got a port but we don't know how to speak to
+                    [[ "$DEBUG" -ge 1 ]] && echo "${starttls}$host_spec:$port"
+                    echo "${starttls}${host_spec}:${port}" >>"$target_fname"
+               fi
           done < <(tr ',' '\n' <<< "$ports_specs")
      done < "$FNAME"
      [[ "$DEBUG" -ge 1 ]] && echo
