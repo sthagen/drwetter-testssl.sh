@@ -780,11 +780,11 @@ get_last_char() {
 }
                          # Checking for last char. If already a separator supplied, we don't need an additional one
 debugme() {
-     [[ "$DEBUG" -ge 2 ]] && "$@"
+     [[ "$DEBUG" -ge 2 ]] && "$@" >&2
      return 0
 }
 
-debugme1() { [[ "$DEBUG" -ge 2 ]] && "$@"; }
+debugme1() { [[ "$DEBUG" -ge 1 ]] && "$@" >&2; }
 
 hex2dec() {
      echo $((16#$1))
@@ -7505,11 +7505,54 @@ determine_tls_extensions() {
      fi
 
      # Keep it "on file" for debugging purposes
-     debugme1 safe_echo "$TLS_EXTENSIONS" >"$TEMPDIR/$NODE.$NODEIP.tls_extensions.txt"
+     debugme1 safe_echo "$TLS_EXTENSIONS" 2>&1 >"$TEMPDIR/$NODE.$NODEIP.tls_extensions.txt"
 
      return $success
 }
 
+# Return a list of the certificate compression methods supported (RFC 8879)
+determine_cert_compression() {
+     #                                          1=zlib, 2=brotli, 3=zstd
+     local -a supported_compression_methods=("" "false" "false" "false")
+     local -i i len nr_compression_methods=3
+     local len1 len2 methods_to_test method_found method_nr methods_found=""
+
+     # Certificate compression is only supported by TLS 1.3.
+     [[ $(has_server_protocol "tls1_3") -eq 1 ]] && tm_out "" && return 1
+     while true; do
+          methods_to_test=""
+          for (( i=1; i <= nr_compression_methods; i++ )); do
+               ! "${supported_compression_methods[i]}" && methods_to_test+=" ,00,$(printf "%02x" $i)"
+          done
+          len=$((2*${#methods_to_test}/7))
+          # If there are no more compression methods remaining to be tested, then quit.
+          [[ $len -eq 0 ]] && break
+          len1=$(printf "%02x" "$len")
+          len2=$(printf "%02x" "$((len+1))")
+          tls_sockets "04" "$TLS13_CIPHER" "all+" "00,1b, 00,$len2, $len1$methods_to_test"
+          if [[ $? -ne 0 ]]; then
+               add_proto_offered tls1_3 no
+               tm_out ""
+               return 1
+          fi
+          add_proto_offered tls1_3 yes
+          method_found="$(awk '/Certificate Compression Algorithm: / { print $4 $5 }' "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")"
+          [[ -z "$method_found" ]] && break
+          [[ -z "$methods_found" ]] && tmpfile_handle ${FUNCNAME[0]}.txt "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt"
+          method_found="${method_found//(//}"
+          method_found="${method_found//)/}"
+          method_nr="${method_found%%/*}"
+          supported_compression_methods[method_nr]=true
+          methods_found+=" $method_found"
+     done
+     if [[ -n "$methods_found" ]]; then
+          methods_found="${methods_found:1}"
+     else
+          methods_found="none"
+     fi
+     tm_out "$methods_found"
+     return 0
+}
 
 extract_certificates() {
      local version="$1"
@@ -7668,11 +7711,11 @@ get_server_certificate() {
                if ( [[ "$STARTTLS" =~ ldap ]] || [[ "$STARTTLS" =~ irc ]] ); then
                     return 1
                elif [[ "$1" =~ tls1_3_RSA ]]; then
-                    tls_sockets "04" "$TLS13_CIPHER" "all" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,10,00,0e,08,04,08,05,08,06,04,01,05,01,06,01,02,01"
+                    tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,10,00,0e,08,04,08,05,08,06,04,01,05,01,06,01,02,01"
                elif [[ "$1" =~ tls1_3_ECDSA ]]; then
-                    tls_sockets "04" "$TLS13_CIPHER" "all" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,0a,00,08,04,03,05,03,06,03,02,03"
+                    tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,0a,00,08,04,03,05,03,06,03,02,03"
                elif [[ "$1" =~ tls1_3_EdDSA ]]; then
-                    tls_sockets "04" "$TLS13_CIPHER" "all" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,06,00,04,08,07,08,08"
+                    tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,06,00,04,08,07,08,08"
                else
                     return 1
                fi
@@ -9081,7 +9124,7 @@ certificate_info() {
           out "no "
           fileout "${jsonID}${json_postfix}" "INFO" "no"
      fi
-     debugme1 echo -n "($(newline_to_spaces "$policy_oid"))"
+     debugme echo -n "($(newline_to_spaces "$policy_oid"))"
      outln
 #TODO: check browser OIDs:
 #         https://dxr.mozilla.org/mozilla-central/source/security/certverifier/ExtendedValidation.cpp
@@ -9181,7 +9224,7 @@ certificate_info() {
      else
           # All is fine with validity period
           # We ignore for now certificates < 2018/03/01. On the screen we only show debug info
-          debugme1 echo "${spaces}DEBUG: all is fine with total certificate life time"
+          debugme echo "${spaces}DEBUG: all is fine with total certificate life time"
           fileout "cert_extlifeSpan${json_postfix}" "OK" "certificate has no extended life time according to browser forum"
      fi
 
@@ -9500,6 +9543,7 @@ run_server_defaults() {
      local -a ciphers_to_test certificate_type
      local -a -i success
      local cn_nosni cn_sni sans_nosni sans_sni san tls_extensions client_auth_ca
+     local cert_compression_methods=""
      local using_sockets=true
 
      "$SSL_NATIVE" && using_sockets=false
@@ -9707,6 +9751,9 @@ run_server_defaults() {
      done
 
      determine_tls_extensions
+     "$using_sockets" && cert_compression_methods="$(determine_cert_compression)"
+     [[ -n "$cert_compression_methods" ]] && [[ "$cert_compression_methods" != "none" ]] && \
+          extract_new_tls_extensions "$TEMPDIR/$NODEIP.determine_cert_compression.txt"
 
      if [[ $? -eq 0 ]] && [[ "$OPTIMAL_PROTO" != -ssl2 ]]; then
           cp "$TEMPDIR/$NODEIP.determine_tls_extensions.txt" $TMPFILE
@@ -9846,6 +9893,20 @@ run_server_defaults() {
      fi
 
      tls_time
+
+     jsonID="cert_compression"
+     if ! "$using_sockets"; then
+          # At the moment support for certificate compression can only be
+          # tested using tls_sockets().
+          :
+     elif [[ $(has_server_protocol "tls1_3") -eq 0 ]]; then
+          jsonID="certificate_compression"
+          pr_bold " Certificate Compression      "
+          outln "$cert_compression_methods"
+          fileout "$jsonID" "INFO" "$cert_compression_methods"
+     else
+         fileout "$jsonID" "INFO" "N/A"
+     fi
 
      jsonID="clientAuth"
      pr_bold " Client Authentication        "
@@ -10321,7 +10382,7 @@ run_fs() {
      CURVES_OFFERED="$curves_offered"
      CURVES_OFFERED=$(strip_trailing_space "$CURVES_OFFERED")
      # Keep it "on file" for debugging purposes
-     debugme1 safe_echo "$CURVES_OFFERED" >"$TEMPDIR/$NODE.$NODEIP.curves_offered.txt"
+     debugme1 safe_echo "$CURVES_OFFERED" 2>&1 >"$TEMPDIR/$NODE.$NODEIP.curves_offered.txt"
 
      # find out what groups are supported.
      if "$using_sockets" && ( "$fs_tls13_offered" || "$ffdhe_offered" ); then
@@ -13137,6 +13198,7 @@ parse_tls_serverhello() {
      local tls_msg_type tls_content_type tls_protocol tls_protocol2 tls_hello_time
      local tls_err_level tls_err_descr_no tls_cipher_suite rfc_cipher_suite tls_compression_method
      local tls_extensions="" extension_type named_curve_str="" named_curve_oid
+     local cert_compression_method="" cert_compression_method_str=""
      local -i i j extension_len extn_len tls_extensions_len ocsp_response_len=0 ocsp_response_list_len ocsp_resp_offset
      local -i certificate_list_len certificate_len cipherlist_len
      local -i curve_type named_curve
@@ -13401,18 +13463,20 @@ parse_tls_serverhello() {
                     [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
                     return 1
                fi
+               cert_compression_method="${tls_handshake_ascii:i:4}"
+               case $cert_compression_method in
+                    0001) cert_compression_method_str="ZLIB" ;;
+                    0002) cert_compression_method_str="Brotli" ;;
+                    0003) cert_compression_method_str="Zstandard" ;;
+                    *)    cert_compression_method_str="unrecognized" ;;
+               esac
                if [[ $DEBUG -ge 3 ]]; then
-                    tm_out "          Certificate Compression Algorithm: ${tls_handshake_ascii:i:4}"
-                    case ${tls_handshake_ascii:i:4} in
-                         0001) tmln_out " (ZLIB)" ;;
-                         0002) tmln_out " (Brotli)" ;;
-                         0003) tmln_out " (Zstandard)" ;;
-                         *)    tmln_out ;;
-                    esac
+                    tmln_out "          Certificate Compression Algorithm: $cert_compression_method ($cert_compression_method_str)"
                     offset=$((i+4))
                     tmln_out "          Uncompressed certificate length:   $(printf "%d" 0x${tls_handshake_ascii:offset:6})"
                     tmln_out
                fi
+               tls_extensions+="TLS server extension \"compress_certificate\" (id=27), len=0\n"
                if [[ "$process_full" =~ all ]] && "$HAS_ZLIB" && [[ "${tls_handshake_ascii:i:4}" == 0001 ]]; then
                     offset=$((i+4))
                     tls_certificate_ascii_len=2*0x${tls_handshake_ascii:offset:6}
@@ -13871,6 +13935,9 @@ parse_tls_serverhello() {
                 *) echo "Compression: unrecognized compression method" >> $TMPFILE ;;
           esac
           echo "===============================================================================" >> $TMPFILE
+     fi
+     if [[ -n "$cert_compression_method" ]]; then
+          echo "Certificate Compression Algorithm: $cert_compression_method ($cert_compression_method_str)" >> $TMPFILE
      fi
      [[ -n "$tls_extensions" ]] && echo -e "$tls_extensions" >> $TMPFILE
 
@@ -14825,6 +14892,23 @@ prepare_tls_clienthello() {
           if [[ -n "$extension_supported_point_formats" ]] && [[ ! "$extra_extensions_list" =~ " 000b " ]]; then
                [[ -n "$all_extensions" ]] && all_extensions+=","
                all_extensions+="$extension_supported_point_formats"
+          fi
+
+          if [[ "0x$tls_low_byte" -ge 0x04 ]] && [[ ! "$extra_extensions_list" =~ " 001b " ]]; then
+               # If the response needs to be decrypted, then indicate support
+               # for ZLIB certificate compression if $OPENSSL can decompress
+               # the result. If the response does not need to be decrypted,
+               # then indicate support for all certificate compression methods,
+               # as the response does not need to be decompressed.
+               if [[ "$process_full" =~ all ]]; then
+                    if "$HAS_ZLIB"; then
+                         [[ -n "$all_extensions" ]] && all_extensions+=","
+                         all_extensions+="00,1b,00,03,02,00,01"
+                    fi
+               else
+                    [[ -n "$all_extensions" ]] && all_extensions+=","
+                    all_extensions+="00,1b,00,07,06,00,01,00,02,00,03"
+               fi
           fi
 
           if [[ -n "$extra_extensions" ]]; then
@@ -17716,7 +17800,7 @@ run_winshock() {
      if [[ "$(has_server_protocol "tls1_3")" -eq 0 ]] ; then
           # There's no MS server supporting TLS 1.3. Winshock was way back in time
           pr_svrty_best "not vulnerable (OK)"
-          debugme1 echo " - TLS 1.3 found"
+          debugme echo " - TLS 1.3 found"
           fileout "$jsonID" "OK" "not vulnerable " "$cve" "$cwe"
           outln
           return 0
@@ -18233,14 +18317,15 @@ run_tls_truncation() {
      :
 }
 
-
+# see https://nostarttls.secvuln.info/
+#
 run_starttls_injection() {
      local uds=""
      local openssl_bin=""
      local -i socat_pid
      local -i openssl_pid
      local vuln=false
-     local cve=""
+     local cve="CVE-2011-0411 CVE-2021-38084 CVE-2021-33515 CVE-2020-15955 CVE-2021-37844 CVE-2021-37845 CVE-2021-37846 CVE-2020-29548 CVE-2020-15955 CVE-2020-29547"
      local cwe="CWE-74"
      local hint=""
      local jsonID="starttls_injection"
@@ -18252,7 +18337,7 @@ run_starttls_injection() {
           pr_headlineln " Checking for STARTTLS injection "
           outln
      fi
-     pr_bold " STARTTLS injection" ; out " (experimental)         "
+     pr_bold " STARTTLS injection" ; out " (CVE-2011-0411, exp.)  "
 
      # We'll do a soft fail here, also no warning, as I do not expect to have everybody have socat installed
      if [[ -z "$SOCAT" ]]; then
