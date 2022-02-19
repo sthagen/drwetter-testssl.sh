@@ -60,14 +60,11 @@ $socket_out = `./testssl.sh $check2run -t pop3 $uri 2>&1`;
 unlike($socket_out, qr/$socket_regex_bl/, "");
 $tests++;
 
-# commented out, bc of travis' limits
-#
-#printf "\n%s\n", "STARTTLS POP3 unit tests via OpenSSL --> $uri ...";
-# unlink "tmp.json";
-#$openssl_out = `./testssl.sh --ssl-native $check2run -t pop3 $uri 2>&1`;
+printf "\n%s\n", "STARTTLS POP3 unit tests via OpenSSL --> $uri ...";
+$openssl_out = `./testssl.sh --ssl-native $check2run -t pop3 $uri 2>&1`;
 # $openssl_json = json('tmp.json');
-#unlike($openssl_out, qr/$openssl_regex_bl/, "");
-#$tests++;
+unlike($openssl_out, qr/$openssl_regex_bl/, "");
+$tests++;
 
 
 $uri="imap.gmx.net:143";
@@ -82,6 +79,16 @@ $tests++;
 printf "\n%s\n", "STARTTLS IMAP unit tests via OpenSSL --> $uri ...";
 $openssl_out = `./testssl.sh --ssl-native $check2run -t imap $uri 2>&1`;
 # $openssl_json = json('tmp.json');
+unlike($openssl_out, qr/$openssl_regex_bl/, "");
+$tests++;
+
+
+$uri="mail.tigertech.net:4190";
+
+# unlink "tmp.json";
+printf "\n%s\n", "STARTTLS MANAGE(SIEVE) unit tests via sockets --> $uri ...";
+$socket_out = `./testssl.sh $check2run -t sieve $uri 2>&1`;
+# $socket_json = json('tmp.json');
 unlike($openssl_out, qr/$openssl_regex_bl/, "");
 $tests++;
 
@@ -136,11 +143,18 @@ $tests++;
 # https://ldapwiki.com/wiki/Public%20LDAP%20Servers
 $uri="db.debian.org:389";
 
+printf "\n%s\n", "STARTTLS LDAP unit tests via sockets --> $uri ...";
+$socket_out = `./testssl.sh $check2run -t ldap $uri 2>&1`;
+# $socket_json = json('tmp.json');
+unlike($socket_out, qr/$socket_regex_bl/, "");
+$tests++;
+
 printf "\n%s\n", "STARTTLS LDAP unit tests via OpenSSL --> $uri ...";
 $openssl_out = `./testssl.sh --ssl-native $check2run -t ldap $uri 2>&1`;
 # $openssl_json = json('tmp.json');
 unlike($openssl_out, qr/$openssl_regex_bl/, "");
 $tests++;
+
 
 
 $uri="140.238.219.117:119";
