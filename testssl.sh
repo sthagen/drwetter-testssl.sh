@@ -6682,7 +6682,7 @@ run_server_preference() {
                fi
           fi
      fi
-     default_proto=$(get_protocol $TMPFILE)
+     [[ $ret -eq 0 ]] && default_proto=$(get_protocol $TMPFILE)
      [[ "$default_proto" == TLSv1.0 ]] && default_proto="TLSv1"
      # debugme tm_out " --> $default_proto\n"
 
@@ -9972,10 +9972,6 @@ run_server_defaults() {
      done
 
      determine_tls_extensions
-     "$using_sockets" && cert_compression_methods="$(determine_cert_compression)"
-     [[ -n "$cert_compression_methods" ]] && [[ "$cert_compression_methods" != "none" ]] && \
-          extract_new_tls_extensions "$TEMPDIR/$NODEIP.determine_cert_compression.txt"
-
      if [[ $? -eq 0 ]] && [[ "$OPTIMAL_PROTO" != -ssl2 ]]; then
           cp "$TEMPDIR/$NODEIP.determine_tls_extensions.txt" $TMPFILE
           >$ERRFILE
@@ -9984,6 +9980,10 @@ run_server_defaults() {
                sessticket_proto="$(get_protocol "$TMPFILE")"
           fi
      fi
+     "$using_sockets" && cert_compression_methods="$(determine_cert_compression)"
+     [[ -n "$cert_compression_methods" ]] && [[ "$cert_compression_methods" != "none" ]] && \
+          extract_new_tls_extensions "$TEMPDIR/$NODEIP.determine_cert_compression.txt"
+
      if "$using_sockets" && ! "$TLS13_ONLY" && [[ -z "$sessticket_lifetime_hint" ]] && [[ "$OPTIMAL_PROTO" != -ssl2 ]]; then
           if "$HAS_TLS13" && ( [[ -z "$OPTIMAL_PROTO" ]] || [[ "$OPTIMAL_PROTO" == -tls1_3 ]] ) ; then
                # If a session ticket were sent in response to a TLSv1.3 ClientHello, then a session ticket
@@ -10250,6 +10250,7 @@ run_fs() {
      local -a supported_curve
      local -i nr_supported_ciphers=0 nr_curves=0 nr_ossl_curves=0 i j low high
      local fs_ciphers curves_offered="" curves_to_test temp
+     local curves_option="" curves_list1="" curves_list2=""
      local len1 len2 curve_found
      local key_bitstring quality_str
      local -i len_dh_p quality
@@ -10318,6 +10319,12 @@ run_fs() {
           tls_sockets "04" "${fs_hex_cipher_list:2}, 00,ff"
           sclient_success=$?
           [[ $sclient_success -eq 2 ]] && sclient_success=0
+          # Sometimes a TLS 1.3 ClientHello will fail, but a TLS 1.2 ClientHello will succeed. See #2131.
+          if [[ $sclient_success -ne 0 ]]; then
+               tls_sockets "03" "${fs_hex_cipher_list:2}, 00,ff"
+               sclient_success=$?
+               [[ $sclient_success -eq 2 ]] && sclient_success=0
+          fi
      else
           debugme echo $nr_supported_ciphers
           debugme echo $(actually_supported_osslciphers $fs_cipher_list "ALL")
@@ -10327,10 +10334,39 @@ run_fs() {
                fileout "$jsonID" "WARN" "tests skipped as you only have $nr_supported_ciphers FS ciphers on the client site. ($CLIENT_MIN_FS are required)"
                return 1
           fi
+          # By default, OpenSSL 1.1.1 and above only include a few curves in the ClientHello, so in order
+          # to test all curves, the -curves option must be added. In addition, OpenSSL limits the number of
+          # curves that can be specified to 28. So, if more than 28 curves are supported, then the curves must
+          # be tested in batches.
+          curves_list1="$(strip_trailing_space "$(strip_leading_space "$OSSL_SUPPORTED_CURVES")")"
+          curves_list1="${curves_list1//  / }"
+          if [[ "$(count_words "$OSSL_SUPPORTED_CURVES")" -gt 28 ]]; then
+               # Place the first 28 supported curves in curves_list1 and the remainder in curves_list2.
+               curves_list2="${curves_list1#* * * * * * * * * * * * * * * * * * * * * * * * * * * * }"
+               curves_list1="${curves_list1%$curves_list2}"
+               curves_list1="$(strip_trailing_space "$curves_list1")"
+               curves_list2="${curves_list2// /:}"
+          fi
+          curves_list1="${curves_list1// /:}"
           $OPENSSL s_client $(s_client_options "-cipher $fs_cipher_list -ciphersuites ALL $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>$ERRFILE </dev/null
           sclient_connect_successful $? $TMPFILE
           sclient_success=$?
           [[ $sclient_success -eq 0 ]] && [[ $(grep -ac "BEGIN CERTIFICATE" $TMPFILE) -eq 0 ]] && sclient_success=1
+          # Sometimes a TLS 1.3 ClientHello will fail, but a TLS 1.2 ClientHello will succeed. See #2131.
+          if [[ $sclient_success -ne 0 ]]; then
+               curves_option="-curves $curves_list1"
+               $OPENSSL s_client $(s_client_options "-cipher $fs_cipher_list $curves_option $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>$ERRFILE </dev/null
+               sclient_connect_successful $? $TMPFILE
+               sclient_success=$?
+               [[ $sclient_success -eq 0 ]] && [[ $(grep -ac "BEGIN CERTIFICATE" $TMPFILE) -eq 0 ]] && sclient_success=1
+               if [[ $sclient_success -ne 0 ]] && [[ -n "$curves_list2" ]]; then
+                    curves_option="-curves $curves_list2"
+                    $OPENSSL s_client $(s_client_options "-cipher $fs_cipher_list $curves_option $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>$ERRFILE </dev/null
+                    sclient_connect_successful $? $TMPFILE
+                    sclient_success=$?
+                    [[ $sclient_success -eq 0 ]] && [[ $(grep -ac "BEGIN CERTIFICATE" $TMPFILE) -eq 0 ]] && sclient_success=1
+               fi
+          fi
      fi
 
      if [[ $sclient_success -ne 0 ]]; then
@@ -10352,11 +10388,19 @@ run_fs() {
           fi
           if "$HAS_TLS13"; then
                protos_to_try="-no_ssl2 -no_tls1_3"
+               ! "$using_sockets" && [[ -z "$curves_option" ]] && protos_to_try+=" curves1-no_tls1_3"
+               ! "$using_sockets" && [[ -z "$curves_option" ]] && [[ -n "$curves_list2" ]] && protos_to_try+=" curves2-no_tls1_3"
           else
                protos_to_try="-no_ssl2"
+               ! "$using_sockets" && [[ -z "$curves_option" ]] && protos_to_try+=" curves1-no_ssl2"
+               ! "$using_sockets" && [[ -z "$curves_option" ]] && [[ -n "$curves_list2" ]] && protos_to_try+=" curves2-no_ssl2"
           fi
 
           for proto in $protos_to_try; do
+               # If ECDHE ciphers were already found, then no need to try
+               # again with a different "-curves" option.
+               [[ "$proto" =~ curves1 ]] && "$ecdhe_offered" && break
+               [[ "$proto" =~ curves2 ]] && "$ecdhe_offered" && break
                while true; do
                     ciphers_to_test=""
                     tls13_ciphers_to_test=""
@@ -10370,7 +10414,12 @@ run_fs() {
                          fi
                     done
                     [[ -z "$ciphers_to_test" ]] && [[ -z "$tls13_ciphers_to_test" ]] && break
-                    $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ciphers_to_test:1}\'" -ciphersuites "\'${tls13_ciphers_to_test:1}\'" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
+                    if [[ "$proto" =~ curves1 ]]; then
+                         curves_option="-curves $curves_list1"
+                    elif [[ "$proto" =~ curves2 ]]; then
+                         curves_option="-curves $curves_list2"
+                    fi
+                    $OPENSSL s_client $(s_client_options "-${proto#*-} -cipher "\'${ciphers_to_test:1}\'" -ciphersuites "\'${tls13_ciphers_to_test:1}\'" $curves_option $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                     sclient_connect_successful $? $TMPFILE || break
                     fs_cipher=$(get_cipher $TMPFILE)
                     [[ -z "$fs_cipher" ]] && break
@@ -10382,6 +10431,8 @@ run_fs() {
                     if [[ "$fs_cipher" == TLS13* ]] || [[ "$fs_cipher" == TLS_* ]] || [[ "$fs_cipher" == AEAD-* ]]; then
                          fs_tls13_offered=true
                          "$WIDE" && kx[i]="$(read_dhtype_from_file $TMPFILE)"
+                    elif [[ "$fs_cipher" == ECDHE-* ]]; then
+                         ecdhe_offered=true
                     fi
                     if "$WIDE"; then
                          dhlen=$(read_dhbits_from_file "$TMPFILE" quiet)
