@@ -122,7 +122,7 @@ trap "child_error" USR1
 
 ########### Internal definitions
 #
-declare -r VERSION="3.1dev"
+declare -r VERSION="3.2rc1"
 declare -r SWCONTACT="dirk aet testssl dot sh"
 [[ "$VERSION" =~ dev|rc|beta ]] && \
      SWURL="https://testssl.sh/dev/" ||
@@ -1233,6 +1233,8 @@ fileout_json_finding() {
           if [[ "$1" == service ]]; then
                if [[ $SERVER_COUNTER -gt 1 ]]; then
                     echo "          ," >> "$JSONFILE"
+               elif ! "$FIRST_FINDING"; then
+                    echo -n "," >> "$JSONFILE"
                fi
                target="$NODE"
                $do_mx_all_ips && target="$URI"
@@ -3555,7 +3557,6 @@ neat_header(){
 #       "true" : if the cipher's "quality" should be highlighted
 #       "false": if the line should be printed in light grey
 #       ""     : if line should be returned as a string
-#       "available" / "not a/v" when SHOW_EACH_C is set
 
 neat_list(){
      local hexcode="$1"
@@ -3578,10 +3579,8 @@ neat_list(){
      enc="${enc//POLY1305/}"            # remove POLY1305
      enc="${enc//\//}"                  # remove "/"
 
-     # For rating set bit size but only when we're not on all display mode (global var SHOW_EACH_C)
-     if [[ $how2show != "not a/v" ]] && "$SHOW_EACH_C" ]]; then
-          :
-     else
+     # For rating set bit size but only when cipher is supported by server.
+     if [[ $how2show == true ]]; then
           set_ciph_str_score $strength
      fi
 
