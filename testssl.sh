@@ -274,6 +274,8 @@ APP_TRAF_KEY_INFO=""                    # Information about the application traf
 TLS13_ONLY=false                        # Does the server support TLS 1.3 ONLY?
 OSSL_SHORTCUT=${OSSL_SHORTCUT:-false}   # Hack: if during the scan turns out the OpenSSL binary supports TLS 1.3 would be a better choice, this enables it.
 TLS_EXTENSIONS=""
+TLS13_CERT_COMPRESS_METHODS=""
+CERTIFICATE_TRANSPARENCY_SOURCE=""
 V2_HELLO_CIPHERSPEC_LENGTH=0
 declare -r NPN_PROTOs="spdy/4a2,spdy/3,spdy/3.1,spdy/2,spdy/1,http/1.1"
 # alpn_protos needs to be space-separated, not comma-separated, including odd ones observed @ facebook and others, old ones like h2-17 omitted as they could not be found
@@ -7745,7 +7747,7 @@ determine_cert_compression() {
      local len1 len2 methods_to_test method_found method_nr methods_found=""
 
      # Certificate compression is only supported by TLS 1.3.
-     [[ $(has_server_protocol "tls1_3") -eq 1 ]] && tm_out "" && return 1
+     [[ $(has_server_protocol "tls1_3") -eq 1 ]] && return 1
      while true; do
           methods_to_test=""
           for (( i=1; i <= nr_compression_methods; i++ )); do
@@ -7759,7 +7761,6 @@ determine_cert_compression() {
           tls_sockets "04" "$TLS13_CIPHER" "all+" "00,1b, 00,$len2, $len1$methods_to_test"
           if [[ $? -ne 0 ]]; then
                add_proto_offered tls1_3 no
-               tm_out ""
                return 1
           fi
           add_proto_offered tls1_3 yes
@@ -7773,11 +7774,10 @@ determine_cert_compression() {
           methods_found+=" $method_found"
      done
      if [[ -n "$methods_found" ]]; then
-          methods_found="${methods_found:1}"
+          TLS13_CERT_COMPRESS_METHODS="${methods_found:1}"
      else
-          methods_found="none"
+          TLS13_CERT_COMPRESS_METHODS="none"
      fi
-     tm_out "$methods_found"
      return 0
 }
 
@@ -8585,16 +8585,18 @@ certificate_transparency() {
      # Cipher suites that use a certificate with a GOST public key
      local -r a_gost="00,80, 00,81, 00,82, 00,83"
 
+     CERTIFICATE_TRANSPARENCY_SOURCE=""
+
      # First check whether signed certificate timestamps (SCT) are included in the
      # server's certificate. If they aren't, check whether the server provided
      # a stapled OCSP response with SCTs. If no SCTs were found in the certificate
      # or OCSP response, check for an SCT TLS extension.
      if [[ "$cert_txt" =~ CT\ Precertificate\ SCTs ]] || [[ "$cert_txt" =~ '1.3.6.1.4.1.11129.2.4.2' ]]; then
-          tm_out "certificate extension"
+          CERTIFICATE_TRANSPARENCY_SOURCE="certificate extension"
           return 0
      fi
      if [[ "$ocsp_response" =~ CT\ Certificate\ SCTs ]] || [[ "$ocsp_response" =~ '1.3.6.1.4.1.11129.2.4.5' ]]; then
-          tm_out "OCSP extension"
+          CERTIFICATE_TRANSPARENCY_SOURCE="OCSP extension"
           return 0
      fi
 
@@ -8603,7 +8605,7 @@ certificate_transparency() {
      # one certificate, then it is possible that an SCT TLS extension is returned for some
      # certificates, but not for all of them.
      if [[ $number_of_certificates -eq 1 ]] && [[ "$TLS_EXTENSIONS" =~ signed\ certificate\ timestamps ]]; then
-          tm_out "TLS extension"
+          CERTIFICATE_TRANSPARENCY_SOURCE="TLS extension"
           return 0
      fi
 
@@ -8636,16 +8638,16 @@ certificate_transparency() {
           if ( [[ $success -eq 0 ]] || [[ $success -eq 2 ]] ) && \
              grep -a 'TLS server extension ' "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt" | \
              grep -aq "signed certificate timestamps"; then
-               tm_out "TLS extension"
+               CERTIFICATE_TRANSPARENCY_SOURCE="TLS extension"
                return 0
           fi
      fi
 
      if [[ $SERVICE != HTTP ]] && [[ "$CLIENT_AUTH" != required ]]; then
           # At the moment Certificate Transparency only applies to HTTPS.
-          tm_out "N/A"
+          CERTIFICATE_TRANSPARENCY_SOURCE="N/A"
      else
-          tm_out "--"
+          CERTIFICATE_TRANSPARENCY_SOURCE="--"
      fi
      return 0
 }
@@ -9799,7 +9801,6 @@ run_server_defaults() {
      local -a ciphers_to_test certificate_type
      local -a -i success
      local cn_nosni cn_sni sans_nosni sans_sni san tls_extensions client_auth_ca
-     local cert_compression_methods=""
      local using_sockets=true
 
      "$SSL_NATIVE" && using_sockets=false
@@ -10015,8 +10016,9 @@ run_server_defaults() {
                sessticket_proto="$(get_protocol "$TMPFILE")"
           fi
      fi
-     "$using_sockets" && cert_compression_methods="$(determine_cert_compression)"
-     [[ -n "$cert_compression_methods" ]] && [[ "$cert_compression_methods" != "none" ]] && \
+     TLS13_CERT_COMPRESS_METHODS=""
+     "$using_sockets" && determine_cert_compression
+     [[ -n "$TLS13_CERT_COMPRESS_METHODS" ]] && [[ "$TLS13_CERT_COMPRESS_METHODS" != "none" ]] && \
           extract_new_tls_extensions "$TEMPDIR/$NODEIP.determine_cert_compression.txt"
 
      if "$using_sockets" && ! "$TLS13_ONLY" && [[ -z "$sessticket_lifetime_hint" ]] && [[ "$OPTIMAL_PROTO" != -ssl2 ]]; then
@@ -10038,7 +10040,8 @@ run_server_defaults() {
      # Now that all of the server's certificates have been found, determine for
      # each certificate whether certificate transparency information is provided.
      for (( i=1; i <= certs_found; i++ )); do
-          ct[i]="$(certificate_transparency "${previous_hostcert_txt[i]}" "${ocsp_response[i]}" "$certs_found" "${tested_cipher[i]}" "${sni_used[i]}" "${tls_version[i]}")"
+          certificate_transparency "${previous_hostcert_txt[i]}" "${ocsp_response[i]}" "$certs_found" "${tested_cipher[i]}" "${sni_used[i]}" "${tls_version[i]}"
+          ct[i]="$CERTIFICATE_TRANSPARENCY_SOURCE"
           # If certificate_transparency() called tls_sockets() and found a "signed certificate timestamps" extension,
           # then add it to $TLS_EXTENSIONS, since it may not have been found by determine_tls_extensions().
           [[ $certs_found -gt 1 ]] && [[ "${ct[i]}" == TLS\ extension ]] && extract_new_tls_extensions "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt"
@@ -10158,8 +10161,8 @@ run_server_defaults() {
      elif [[ $(has_server_protocol "tls1_3") -eq 0 ]]; then
           jsonID="certificate_compression"
           pr_bold " Certificate Compression      "
-          outln "$cert_compression_methods"
-          fileout "$jsonID" "INFO" "$cert_compression_methods"
+          outln "$TLS13_CERT_COMPRESS_METHODS"
+          fileout "$jsonID" "INFO" "$TLS13_CERT_COMPRESS_METHODS"
      else
          fileout "$jsonID" "INFO" "N/A"
      fi
@@ -11106,7 +11109,7 @@ starttls_smtp_dialog() {
      [[ -n "$2" ]] && starttls="$starttls\r\n$2"            # this adds a payload if supplied
      if [[ "$1" == lmtp ]]; then
           proto="lmtp"
-          greet_str="LHLO"
+          greet_str="LHLO testssl.sh"
      fi
      debugme echo "=== starting $proto STARTTLS dialog ==="
 
@@ -13359,6 +13362,7 @@ check_tls_serverhellodone() {
      local tls_content_type tls_protocol tls_msg_type extension_type
      local tls_err_level
      local hash_fn handshake_traffic_keys key="" iv="" finished_key=""
+     local post_finished_msg=""
      local -i seq_num=0 plaintext_len
      local plaintext decrypted_response="" additional_data
      local include_headers=true
@@ -13465,7 +13469,13 @@ check_tls_serverhellodone() {
                decrypted_response+="${tls_content_type}0301$(printf "%04X" $((plaintext_len/2)))${plaintext:0:plaintext_len}"
                case "$tls_content_type" in
                     15) tls_alert_ascii+="${plaintext:0:plaintext_len}" ;;
-                    16) tls_handshake_ascii+="${plaintext:0:plaintext_len}" ;;
+                    16) tls_handshake_ascii+="${plaintext:0:plaintext_len}"
+                        # Data after the Finished message is encrypted under a different key.
+                        if [[ "${plaintext:0:2}" == 14 ]]; then
+                             [[ "$process_full" == all+ ]] && post_finished_msg="${tls_hello_ascii:$((i+msg_len))}"
+                             break
+                        fi
+                        ;;
                     *) return 2 ;;
                esac
           fi
@@ -13514,7 +13524,7 @@ check_tls_serverhellodone() {
           # For SSLv3 - TLS1.2 look for a ServerHelloDone message.
           # For TLS 1.3 look for a Finished message.
           [[ $tls_msg_type == 0E ]] && tm_out "" && return 0
-          [[ $tls_msg_type == 14 ]] && tm_out "$msg_transcript $decrypted_response" && return 0
+          [[ $tls_msg_type == 14 ]] && tm_out "$msg_transcript $decrypted_response $post_finished_msg" && return 0
      done
      # If the response is TLSv1.3 and the full response is to be processed, but the
      # key and IV have not been provided to decrypt the response, then return 3 if
@@ -13818,6 +13828,8 @@ parse_tls_serverhello() {
                fi
                tls_serverhello_ascii="${tls_handshake_ascii:i:msg_len}"
                tls_serverhello_ascii_len=$msg_len
+          elif [[ "$tls_msg_type" == 04 ]]; then
+               parse_tls13_new_session_ticket "${APP_TRAF_KEY_INFO%% *}" "${tls_handshake_ascii:$((i-8)):$((msg_len+8))}"
           elif [[ "$process_full" =~ all ]] && [[ "$tls_msg_type" == 08 ]]; then
                # Add excrypted extensions (now decrypted) to end of extensions in ServerHello
                tls_encryptedextensions_ascii="${tls_handshake_ascii:i:msg_len}"
@@ -15662,18 +15674,22 @@ tls_sockets() {
      local tls_low_byte
      local cipher_list_2send
      local sock_reply_file2 sock_reply_file3
-     local tls_hello_ascii next_packet
+     local tls_hello_ascii next_packet post_finished_msg=""
      local clienthello1 original_clienthello hrr=""
      local process_full="$3" offer_compression=false skip=false
      local close_connection=true include_headers=true
-     local -i i len tag_len hello_done=0
+     local -i i len msg_len tag_len hello_done=0 seq_num=0
      local cipher="" tls_version handshake_secret="" res
-     local initial_msg_transcript msg_transcript finished_msg aad="" data=""
+     local initial_msg_transcript msg_transcript finished_msg aad="" data="" plaintext
      local handshake_traffic_keys key iv finished_key
      local master_secret master_traffic_keys
 
+     APP_TRAF_KEY_INFO=""
      [[ "$5" == true ]] && offer_compression=true
      [[ "$6" == false ]] && close_connection=false
+     if [[ "$process_full" == all+ ]] && [[ -s "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt" ]]; then
+          rm "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt"
+     fi
      tls_low_byte="$1"
      if [[ -n "$2" ]]; then             # use supplied string in arg2 if there is one
           cipher_list_2send="$2"
@@ -15762,7 +15778,44 @@ tls_sockets() {
                     res="$(check_tls_serverhellodone "$tls_hello_ascii" "$process_full" "$cipher" "$handshake_secret" "$initial_msg_transcript")"
                     hello_done=$?
                     if [[ "$hello_done" -eq 0 ]] && [[ -n "$res" ]]; then
-                         read -r msg_transcript tls_hello_ascii <<< "$res"
+                         read -r msg_transcript tls_hello_ascii post_finished_msg <<< "$res"
+                         if [[ -n "$post_finished_msg" ]]; then
+                              # Determine TLS version
+                              tls_version="$DETECTED_TLS_VERSION"
+                              if [[ "${TLS_SERVER_HELLO:8:3}" == 7F1 ]]; then
+                                   tls_version="${TLS_SERVER_HELLO:8:4}"
+                              elif [[ "$TLS_SERVER_HELLO" =~ 002B00027F1[0-9A-F] ]]; then
+                                   tls_version="${BASH_REMATCH:8:4}"
+                              fi
+                              [[ "${tls_version:0:2}" == 7F ]] && [[ 0x${tls_version:2:2} -lt 25 ]] && include_headers=false
+
+                              # Compute application traffic keys and IVs.
+                              master_secret="$(derive-master-secret "$cipher" "$handshake_secret")"
+                              master_traffic_keys="$(derive-application-traffic-keys "$cipher" "$master_secret" "$msg_transcript" client)"
+                              APP_TRAF_KEY_INFO="$master_traffic_keys 0"
+                              master_traffic_keys="$(derive-application-traffic-keys "$cipher" "$master_secret" "$msg_transcript" server)"
+                              read -r key iv finished_key <<< "$master_traffic_keys"
+                              while true; do
+                                   len=${#post_finished_msg}
+                                   [[ $len -ge 10 ]] || break
+                                   [[ "${post_finished_msg:0:5}" == 17030 ]] || break
+                                   msg_len=$((2*0x${post_finished_msg:6:4}))
+                                   [[ $len -ge $((msg_len+10)) ]] || break
+                                   aad="${post_finished_msg:0:10}"
+                                   "$include_headers" || aad=""
+                                   plaintext="$(sym-decrypt "$cipher" "$key" "$(get-nonce "$iv" "$seq_num")" "${post_finished_msg:10:msg_len}" "$aad")"
+
+                                   # Remove zeros from end of plaintext, if any
+                                   len=${#plaintext}-2
+                                   while [[ "${plaintext:len:2}" == 00 ]]; do
+                                        len=$((len-2))
+                                   done
+                                   tls_hello_ascii+="${plaintext:len:2}0301$(printf "%04X" $((len/2)))${plaintext:0:len}"
+                                   post_finished_msg="${post_finished_msg:$((msg_len+10))}"
+                                   seq_num+=1
+                              done
+                              APP_TRAF_KEY_INFO="$tls_version $cipher $master_traffic_keys $seq_num $APP_TRAF_KEY_INFO"
+                         fi
                          tls_hello_ascii="$(toupper "$tls_hello_ascii")"
                     fi
                     if [[ "$hello_done" -eq 3 ]]; then
@@ -15839,22 +15892,23 @@ tls_sockets() {
                socksend_clienthello "${data}"
                sleep $USLEEP_SND
 
-               # Compute application traffic keys and IVs.
-               master_secret="$(derive-master-secret "$cipher" "$handshake_secret")"
-               master_traffic_keys="$(derive-application-traffic-keys "$cipher" "$master_secret" "$msg_transcript" server)"
-               APP_TRAF_KEY_INFO="$tls_version $cipher $master_traffic_keys 0 "
-               master_traffic_keys="$(derive-application-traffic-keys "$cipher" "$master_secret" "$msg_transcript" client)"
-               APP_TRAF_KEY_INFO+="$master_traffic_keys 0"
+               if [[ -z "$APP_TRAF_KEY_INFO" ]]; then
+                    # Compute application traffic keys and IVs.
+                    master_secret="$(derive-master-secret "$cipher" "$handshake_secret")"
+                    master_traffic_keys="$(derive-application-traffic-keys "$cipher" "$master_secret" "$msg_transcript" server)"
+                    APP_TRAF_KEY_INFO="$tls_version $cipher $master_traffic_keys 0 "
+                    master_traffic_keys="$(derive-application-traffic-keys "$cipher" "$master_secret" "$msg_transcript" client)"
+                    APP_TRAF_KEY_INFO+="$master_traffic_keys 0"
+               fi
 
                # Some servers send new session tickets as soon as the handshake is complete.
-               [[ -s "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt" ]] && \
-                    rm "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt"
                receive_app_data
                if [[ $? -eq 0 ]] && [[ $DEBUG -ge 2 ]]; then
-                    [[ -s "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt" ]] && \
-                         echo -n "Ticket: " && cat "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt"
                     [[ -s $TMPFILE ]] && echo -n "Unexpected response: " && cat "$TMPFILE"
                fi
+          fi
+          if [[ $DEBUG -ge 2 ]] &&[[ "$process_full" == all+ ]] && [[ -s "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt" ]]; then
+               echo -en "\nTicket: " && cat "$TEMPDIR/$NODEIP.parse_tls13_new_session_ticket.txt"
           fi
 
           # determine the return value for higher level, so that they can tell what the result is
@@ -19762,8 +19816,9 @@ find_openssl_binary() {
 
      grep -qw '\-fallback_scsv' $s_client_has && HAS_FALLBACK_SCSV=true
 
+     # the output from 1.0.2 and 1.1.1/3.0.x is quite different
      grep -q 'xmpp' $s_client_starttls_has && HAS_XMPP=true
-     grep -q 'xmpp-server' $s_client_starttls_has && HAS_XMPP_SERVER=true
+     grep -Eq 'xmpp-server|xmpp\[-server\]' $s_client_starttls_has && HAS_XMPP_SERVER=true
 
      grep -q 'postgres' $s_client_starttls_has && HAS_POSTGRES=true
      grep -q 'mysql' $s_client_starttls_has && HAS_MYSQL=true
@@ -22500,7 +22555,7 @@ run_rating() {
                   fileout "overall_grade" "MEDIUM" "$final_grade"
                     ;;
                C) prln_svrty_medium $final_grade
-                  fileout "grade" "MEDIUM" "$final_grade"
+                  fileout "overall_grade" "MEDIUM" "$final_grade"
                     ;;
                D) prln_svrty_high $final_grade
                   fileout "overall_grade" "HIGH" "$final_grade"
@@ -23401,6 +23456,8 @@ reset_hostdepended_vars() {
      NR_STARTTLS_FAIL=0
      NR_HEADER_FAIL=0
      TLS_EXTENSIONS=""
+     TLS13_CERT_COMPRESS_METHODS=""
+     CERTIFICATE_TRANSPARENCY_SOURCE=""
      PROTOS_OFFERED=""
      TLS12_CIPHER_OFFERED=""
      CURVES_OFFERED=""
