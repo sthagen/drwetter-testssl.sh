@@ -74,7 +74,7 @@ datebanner() {
 
 dns() {
 	ip4=`host -t a $1 | grep -v alias | sed 's/^.*address //'`
-	which getent 2>&1 >/dev/null && getent ahostsv4 $1 2>&1 >/dev/null && ip4=`getent ahostsv4 $1 | awk '{ print $1}' | uniq`
+	command -v getent 2>&1 >/dev/null && getent ahostsv4 $1 2>&1 >/dev/null && ip4=`getent ahostsv4 $1 | awk '{ print $1}' | uniq`
 	NODEIP=`echo "$ip4" | head -1`
 	rDNS=`host -t PTR $NODEIP | sed -e 's/^.*pointer //' -e 's/\.$//'`
 	echo $rDNS | grep -q NXDOMAIN  && rDNS=""
@@ -297,8 +297,8 @@ check_revocation() {
 	openssl ocsp $CA_BUNDLE_CMD $addissuer -cert $TMPDIR/level$1.crt -url $ocsp_uri -header HOST $ocsp_hostheader &>$TMPDIR/ocsp-response$1.txt
 
 #tmpdir_escaped=`echo $TMPDIR | sed 's/\//\\\//g'`
-#cat $TMPDIR/ocsp-response.txt | egrep -v "^WARNING: no nonce|^Response Verify Failure|OCSP_basic_verify" | sed 's/'"${tmpdir_escaped}"'//'
-	cat $TMPDIR/ocsp-response$1.txt | egrep -v "^WARNING: no nonce|^Response Verify Failure|OCSP_basic_verify" | sed 's/^.*level/level/'
+#cat $TMPDIR/ocsp-response.txt | grep -Ev "^WARNING: no nonce|^Response Verify Failure|OCSP_basic_verify" | sed 's/'"${tmpdir_escaped}"'//'
+	cat $TMPDIR/ocsp-response$1.txt | grep -Ev "^WARNING: no nonce|^Response Verify Failure|OCSP_basic_verify" | sed 's/^.*level/level/'
 	if grep -q "level$1.crt.*good" $TMPDIR/ocsp-response$1.txt ; then
 		green "not revoked (OK)\c" 
 	else
