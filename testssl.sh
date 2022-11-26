@@ -872,6 +872,26 @@ strip_quote() (
      )"
 )
 
+# Converts a string containing PEM encoded data to one line.
+pem_to_one_line() {
+     local pem="$1"
+     local header="" footer=""
+
+     if [[ "$pem" =~ .*-+BEGIN\ [A-Za-z0-9]+-+ ]]; then
+          header="$BASH_REMATCH"
+          pem="${pem/$header/}"
+     fi
+     if [[ "$pem" =~ -+END\ [A-Za-z0-9]+-+.* ]]; then
+          footer="$BASH_REMATCH"
+          pem="${pem/$footer/}"
+     fi
+     pem="$(strip_spaces "$(newline_to_spaces "$pem")")"
+     [[ -n "$header" ]] && pem="$header\\\n$pem"
+     [[ -n "$footer" ]] && pem+="\\\n$footer"
+     printf -- "%s" "$pem"
+     return 0
+}
+
 is_ipv4addr() {
      local octet="(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])"
      local ipv4address="$octet\\.$octet\\.$octet\\.$octet"
@@ -1355,7 +1375,6 @@ fileout() {
 
      if { "$do_pretty_json" && [[ "$1" == service ]]; } || show_finding "$severity"; then
           local finding=$(strip_lf "$(newline_to_spaces "$(strip_quote "$3")")")           # additional quotes will mess up screen output
-          finding="${finding//\\n/ }"
           [[ -e "$JSONFILE" ]] && [[ ! -d "$JSONFILE" ]] && fileout_json_finding "$1" "$severity" "$finding" "$cve" "$cwe" "$hint"
           "$do_csv" && [[ -n "$CSVFILE" ]] && [[ ! -d "$CSVFILE" ]] && \
                fileout_csv_finding "$1" "$NODE/$NODEIP" "$PORT" "$severity" "$finding" "$cve" "$cwe" "$hint"
@@ -4543,7 +4562,7 @@ ciphers_by_strength() {
                               ;;
                     esac
                fi
-               
+
                [[ $difference_rating -lt $NO_CIPHER_ORDER_LEVEL ]] && NO_CIPHER_ORDER_LEVEL=$difference_rating
                id="cipher_order${proto}"
                case $difference_rating in
@@ -4554,7 +4573,7 @@ ciphers_by_strength() {
                     4)
                          prln_svrty_low " (no server order, thus listed by strength)"
                          fileout "$id" "LOW" "NOT a cipher order configured"
-                         ;; 
+                         ;;
                     3)
                          prln_svrty_medium " (no server order, thus listed by strength)"
                          fileout "$id" "MEDIUM" "NOT a cipher order configured"
@@ -6246,6 +6265,19 @@ run_cipherlists() {
      return $ret
 }
 
+pr_sigalg_quality() {
+     local sigalg="$1"
+
+     if [[ "$sigalg" =~ MD5 ]]; then
+          pr_svrty_high "$sigalg"
+     elif [[ "$sigalg" =~ SHA1 ]]; then
+          pr_svrty_low "$sigalg"
+     else
+          out "$sigalg"
+     fi
+}
+
+
 # The return value is an indicator of the quality of the DH key length in $1:
 #   1 = pr_svrty_critical, 2 = pr_svrty_high, 3 = pr_svrty_medium, 4 = pr_svrty_low
 #   5 = neither good nor bad, 6 = pr_svrty_good, 7 = pr_svrty_best
@@ -6912,7 +6944,7 @@ run_server_preference() {
           fi
      elif ! "$has_cipher_order" && "$has_tls13_cipher_order"; then
           case "$fileout_rating" in
-               "INFO") 
+               "INFO")
                     out "only for TLS 1.3"
                     fileout "$jsonID" "INFO" "server -- < TLS 1.3 client determined"
                     ;;
@@ -6961,80 +6993,6 @@ run_server_preference() {
           fileout "$jsonID" "$fileout_rating" "$fileout_msg"
      fi
      outln
-
-     pr_bold " Negotiated protocol          "
-     jsonID="protocol_negotiated"
-
-     case "$default_proto" in
-          *TLSv1.3)
-               prln_svrty_best $default_proto
-               fileout "$jsonID" "OK" "Default protocol TLS1.3"
-               ;;
-          *TLSv1.2)
-               prln_svrty_best $default_proto
-               fileout "$jsonID" "OK" "Default protocol TLS1.2"
-               ;;
-          *TLSv1.1)
-               prln_svrty_low $default_proto
-               fileout "$jsonID" "LOW" "Default protocol TLS1.1"
-               ;;
-          *TLSv1)
-               prln_svrty_low $default_proto
-               fileout "$jsonID" "LOW" "Default protocol TLS1.0"
-               ;;
-          *SSLv2)
-               prln_svrty_critical $default_proto
-               fileout "$jsonID" "CRITICAL" "Default protocol SSLv2"
-               ;;
-          *SSLv3)
-               prln_svrty_critical $default_proto
-               fileout "$jsonID" "CRITICAL" "Default protocol SSLv3"
-               ;;
-          "")
-               pr_warning "default proto empty"
-               if [[ $OSSL_VER == 1.0.2* ]]; then
-                    outln " (Hint: if IIS6 give OpenSSL 1.0.1 a try)"
-                    fileout "$jsonID" "WARN" "Default protocol empty (Hint: if IIS6 give OpenSSL 1.0.1 a try)"
-               else
-                    outln
-                    fileout "$jsonID" "WARN" "Default protocol empty"
-               fi
-               ret=1
-               ;;
-          *)
-               pr_warning "FIXME line $LINENO: $default_proto"
-               fileout "$jsonID" "WARN" "FIXME line $LINENO: $default_proto"
-               ret=1
-               ;;
-     esac
-
-     pr_bold " Negotiated cipher            "
-     jsonID="cipher_negotiated"
-     pr_cipher_quality "$default_cipher"
-     case $? in
-          1)   fileout "$jsonID" "CRITICAL" "$default_cipher$(read_dhbits_from_file "$TEMPDIR/$NODEIP.run_server_preference.txt" "string") $limitedsense"
-               ;;
-          2)   fileout "$jsonID" "HIGH" "$default_cipher$(read_dhbits_from_file "$TEMPDIR/$NODEIP.run_server_preference.txt" "string") $limitedsense"
-               ;;
-          3)   fileout "$jsonID" "MEDIUM" "$default_cipher$(read_dhbits_from_file "$TEMPDIR/$NODEIP.run_server_preference.txt" "string") $limitedsense"
-               ;;
-          6|7) fileout "$jsonID" "OK" "$default_cipher$(read_dhbits_from_file "$TEMPDIR/$NODEIP.run_server_preference.txt" "string") $limitedsense"
-               ;;   # best ones
-          4)   fileout "$jsonID" "LOW" "$default_cipher$(read_dhbits_from_file "$TEMPDIR/$NODEIP.run_server_preference.txt" "string") (cbc) $limitedsense"
-               ;;  # it's CBC. --> lucky13
-          0)   pr_warning "default cipher empty" ;
-               if [[ $OSSL_VER == 1.0.2* ]]; then
-                    out " (Hint: if IIS6 give OpenSSL 1.0.1 a try)"
-                    fileout "$jsonID" "WARN" "Default cipher empty  (if IIS6 give OpenSSL 1.0.1 a try) $limitedsense"
-               else
-                    fileout "$jsonID" "WARN" "Default cipher empty $limitedsense"
-               fi
-               ret=1
-               ;;
-          *)   fileout "$jsonID" "INFO" "$default_cipher$(read_dhbits_from_file "$TEMPDIR/$NODEIP.run_server_preference.txt" "string") $limitedsense"
-               ;;
-     esac
-     [[ -n "$default_cipher" ]] && read_dhbits_from_file "$TEMPDIR/$NODEIP.run_server_preference.txt"
 
      if [[ "$cipher0" != $cipher1 ]]; then
           pr_warning " -- inconclusive test, matching cipher in list missing"
@@ -9255,8 +9213,7 @@ certificate_info() {
      fileout "cert_fingerprintSHA256${json_postfix}" "INFO" "${cert_fingerprint_sha2}"
      outln "${spaces}SHA256 ${cert_fingerprint_sha2}"
 
-     # " " needs to be converted back to lf in JSON/CSV output. watch out leading/ending line containing "CERTIFICATE"
-     fileout "cert${json_postfix}" "INFO" "$hostcert"
+     fileout "cert${json_postfix}" "INFO" "$(pem_to_one_line "$hostcert")"
 
      [[ -z $CERT_FINGERPRINT_SHA2 ]] && \
           CERT_FINGERPRINT_SHA2="$cert_fingerprint_sha2" ||
@@ -9831,7 +9788,7 @@ certificate_info() {
           intermediates="${intermediates#${cert}-----END CERTIFICATE-----}"
           cert="-----BEGIN CERTIFICATE-----${cert}-----END CERTIFICATE-----"
 
-          fileout "intermediate_cert <#${i}>${json_postfix}" "INFO" "$cert"
+          fileout "intermediate_cert <#${i}>${json_postfix}" "INFO" "$(pem_to_one_line "$cert")"
           fileout "intermediate_cert_fingerprintSHA256 <#${i}>${json_postfix}" "INFO" "$(determine_cert_fingerprint_serial "$cert" "-fingerprint -sha256")"
 
           intermediate_certs_txt[i]="$($OPENSSL x509 -text -noout 2>/dev/null <<< "$cert")"
@@ -10375,7 +10332,7 @@ get_san_dns_from_cert() {
 run_fs() {
      local -i sclient_success
      local fs_offered=false ecdhe_offered=false ffdhe_offered=false
-     local fs_tls13_offered=false
+     local fs_tls13_offered=false fs_tls12_offered=false
      local protos_to_try proto hexc dash fs_cipher sslvers auth mac export curve dhlen
      local -a hexcode normalized_hexcode ciph rfc_ciph kx enc ciphers_found sigalg ossl_supported
      # generated from 'kEECDH:kEDH:!aNULL:!eNULL:!DES:!3DES:!RC4' with openssl 1.0.2i and openssl 1.1.0
@@ -10392,10 +10349,16 @@ run_fs() {
      local -a ffdhe_groups_hex=("01,00" "01,01" "01,02" "01,03" "01,04")
      local -a ffdhe_groups_output=("ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
      local -a supported_curve
+     local -a sigalgs_hex=("01,01" "01,02" "01,03" "02,01" "02,02" "02,03" "03,01" "03,02" "03,03" "04,01" "04,02" "04,03" "04,20" "05,01" "05,02" "05,03" "05,20" "06,01" "06,02" "06,03" "06,20" "07,08" "08,04" "08,05" "08,06" "08,07" "08,08" "08,09" "08,0a" "08,0b" "08,1a" "08,1b" "08,1c")
+     local -a sigalgs_strings=("RSA+MD5" "DSA+MD5" "ECDSA+MD5" "RSA+SHA1" "DSA+SHA1" "ECDSA+SHA1" "RSA+SHA224" "DSA+SHA224" "ECDSA+SHA224" "RSA+SHA256" "DSA+SHA256" "ECDSA+SHA256" "RSA+SHA256" "RSA+SHA384" "DSA+SHA384" "ECDSA+SHA384" "RSA+SHA384" "RSA+SHA512" "DSA+SHA512" "ECDSA+SHA512" "RSA+SHA512" "SM2+SM3" "RSA-PSS+SHA256" "RSA-PSS+SHA384" "RSA-PSS+SHA512" "Ed25519" "Ed448" "RSA-PSS+SHA256" "RSA-PSS+SHA384" "RSA-PSS+SHA512" "ECDSA+SHA256" "ECDSA+SHA384" "ECDSA+SHA512")
+     local -a tls13_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
+     local -a tls12_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
+     local rsa_cipher="" ecdsa_cipher="" dss_cipher=""
+     local sigalgs_to_test tls12_supported_sigalg_list="" tls13_supported_sigalg_list=""
      local -i nr_supported_ciphers=0 nr_curves=0 nr_ossl_curves=0 i j low high
      local fs_ciphers curves_offered="" curves_to_test temp
      local curves_option="" curves_list1="" curves_list2=""
-     local len1 len2 curve_found
+     local len1 len2 curve_found sigalg_found
      local key_bitstring quality_str
      local -i len_dh_p quality
      local has_dh_bits="$HAS_DH_BITS"
@@ -10582,6 +10545,9 @@ run_fs() {
                          "$WIDE" && kx[i]="$(read_dhtype_from_file $TMPFILE)"
                     elif [[ "$fs_cipher" == ECDHE-* ]]; then
                          ecdhe_offered=true
+                         ! "$fs_tls12_offered" && [[ "$(get_protocol "$TMPFILE")" == TLSv1.2 ]] && fs_tls12_offered=true
+                    else
+                         ! "$fs_tls12_offered" && [[ "$(get_protocol "$TMPFILE")" == TLSv1.2 ]] && fs_tls12_offered=true
                     fi
                     if "$WIDE"; then
                          dhlen=$(read_dhbits_from_file "$TMPFILE" quiet)
@@ -10625,6 +10591,12 @@ run_fs() {
                          fi
                          "$WIDE" && "$SHOW_SIGALGO" && [[ -r "$HOSTCERT" ]] && \
                               sigalg[i]="$(read_sigalg_from_file "$HOSTCERT")"
+                         if [[ "$proto" == 03 ]]; then
+                              [[ $sclient_success -eq 0 ]] && fs_tls12_offered=true
+                         elif ! "$fs_tls12_offered" && [[ $sclient_success -eq 2 ]] && \
+                              [[ "$(get_protocol "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")" == TLSv1.2 ]]; then
+                              fs_tls12_offered=true
+                         fi
                     done
                done
           fi
@@ -10917,9 +10889,131 @@ run_fs() {
                else
                     fileout "DH_groups" "$quality_str" "$curves_offered"
                fi
+               outln
           fi
      fi
-     outln
+     if "$using_sockets"; then
+          protos_to_try=""
+          "$fs_tls13_offered" && protos_to_try="04-01 04-02"
+          # For TLS 1.2, find a supported cipher suite corresponding to each of the key types (RSA, ECDSA, DSS).
+          # Need to try each key type separately, otherwise not all supported signature algorithms will be found.
+          if "$fs_tls12_offered"; then
+               for (( i=0; i < nr_supported_ciphers; i++ )); do
+                    ! "${ciphers_found[i]}" && continue
+                    if [[ -z "$rsa_cipher" ]] && { [[ "${rfc_ciph[i]}" == TLS_DHE_RSA* ]] ||
+                       [[ "${rfc_ciph[i]}" == TLS_ECDHE_RSA* ]] || [[ "${ciph[i]}" == DHE-RSA-* ]] ||
+                       [[ "${ciph[i]}" == ECDHE-RSA-* ]]; }; then
+                         rsa_cipher="${hexcode[i]}"
+                    elif [[ -z "$ecdsa_cipher" ]] && { [[ "${rfc_ciph[i]}" == TLS_ECDHE_ECDSA* ]] || [[ "${ciph[i]}" == ECDHE-ECDSA-* ]]; }; then
+                         ecdsa_cipher="${hexcode[i]}"
+                    elif [[ -z "$dss_cipher" ]] && { [[ "${rfc_ciph[i]}" == TLS_DHE_DSS* ]] || [[ "${ciph[i]}" == DHE-DSS-* ]]; }; then
+                         dss_cipher="${hexcode[i]}"
+                    fi
+               done
+               [[ -n "$rsa_cipher" ]] && protos_to_try+=" 03-rsa-$rsa_cipher"
+               [[ -n "$ecdsa_cipher" ]] && protos_to_try+=" 03-ecdsa-$ecdsa_cipher"
+               [[ -n "$dss_cipher" ]] && protos_to_try+=" 03-dss-$dss_cipher"
+          fi
+          for proto in $protos_to_try; do
+               while true; do
+                    i=0
+                    sigalgs_to_test=""
+                    # A few servers get confused if the signature_algorithms extension contains too many entries. So:
+                    # * For TLS 1.3, break the list into two and test each half separately.
+                    # * For TLS 1.2, generally limit the signature_algorithms extension to algorithms that are consistent with the key type.
+                    for hexc in "${sigalgs_hex[@]}"; do
+                         if [[ "$proto" == 04* ]]; then
+                              if ! "${tls13_supported_sigalgs[i]}"; then
+                                   if [[ "${proto##*-}" == 01 ]]; then
+                                        [[ $i -le 16 ]] && sigalgs_to_test+=", $hexc"
+                                   else
+                                        [[ $i -gt 16 ]] && sigalgs_to_test+=", $hexc"
+                                   fi
+                              fi
+                         elif ! "${tls12_supported_sigalgs[i]}"; then
+                              if [[ "$proto" =~ rsa ]]; then
+                                   if [[ "${hexc:3:2}" == 01 ]] || [[ "${hexc:0:2}" == 08 ]]; then
+                                        sigalgs_to_test+=", $hexc"
+                                   fi
+                              elif [[ "$proto" =~ dss ]]; then
+                                   [[ "${hexc:3:2}" == 02 ]] && sigalgs_to_test+=", $hexc"
+                              else
+                                   if [[ "${hexc:3:2}" == 03 ]] || [[ "${hexc:0:2}" == 08 ]]; then
+                                        sigalgs_to_test+=", $hexc"
+                                   fi
+                              fi
+                         fi
+                         i+=1
+                    done
+                    [[ -z "$sigalgs_to_test" ]] && break
+                    len1=$(printf "%02x" "$((2*${#sigalgs_to_test}/7))")
+                    len2=$(printf "%02x" "$((2*${#sigalgs_to_test}/7+2))")
+                    if [[ "$proto" == 04* ]]; then
+                         tls_sockets "${proto%%-*}" "$TLS13_CIPHER" "all+" "00,0d, 00,$len2, 00,$len1, ${sigalgs_to_test:2}"
+                    else
+                         tls_sockets "${proto%%-*}" "${proto##*-}, 00,ff" "ephemeralkey" "00,0d, 00,$len2, 00,$len1, ${sigalgs_to_test:2}"
+                    fi
+                    [[ $? -eq 0 ]] || break
+                    sigalg_found="$(awk -F ': ' '/^Peer signing digest/  { print $2 } ' "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")"
+                    [[ -n "$sigalg_found" ]] && sigalg_found="+$sigalg_found"
+                    sigalg_found="$(awk -F ': ' '/^Peer signature type/  { print $2 } ' "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")$sigalg_found"
+                    i=0
+                    for hexc in "${sigalgs_hex[@]}"; do
+                         [[ "${sigalgs_strings[i]}" == $sigalg_found ]] && break
+                         i+=1
+                    done
+                    [[ -z "${sigalgs_hex[i]}" ]] && break
+                    if [[ "$proto" == 04* ]]; then
+                         "${tls13_supported_sigalgs[i]}" && break
+                         tls13_supported_sigalgs[i]=true
+                         tls13_supported_sigalg_list+=" $sigalg_found"
+                    else
+                         "${tls12_supported_sigalgs[i]}" && break
+                         tls12_supported_sigalgs[i]=true
+                         tls12_supported_sigalg_list+=" $sigalg_found"
+                    fi
+               done
+          done
+          tls12_supported_sigalg_list="${tls12_supported_sigalg_list:1}"
+          tls13_supported_sigalg_list="${tls13_supported_sigalg_list:1}"
+          if "$fs_tls12_offered"; then
+               pr_bold " TLS 1.2 sig_algs offered:    "
+               if [[ -z "$(sed -e 's/[A-Za-z\-]*+SHA1//g' -e 's/[A-Za-z\-]*+MD5//g' -e 's/ //g' <<< "$tls12_supported_sigalg_list")" ]]; then
+                    prln_svrty_critical "$(out_row_aligned_max_width "$tls12_supported_sigalg_list " "                              " $TERM_WIDTH)"
+                    fileout "${jsonID}_TLS12_sig_algs" "CRITICAL" "$tls12_supported_sigalg_list"
+               else
+                    out_row_aligned_max_width_by_entry "$tls12_supported_sigalg_list " "                              " $TERM_WIDTH pr_sigalg_quality
+                    outln
+                    if [[ "$tls12_supported_sigalg_list" =~ MD5 ]]; then
+                         fileout "${jsonID}_TLS12_sig_algs" "HIGH" "$tls12_supported_sigalg_list"
+                    elif [[ "$tls12_supported_sigalg_list" =~ SHA1 ]]; then
+                         fileout "${jsonID}_TLS12_sig_algs" "LOW" "$tls12_supported_sigalg_list"
+                    else
+                         fileout "${jsonID}_TLS12_sig_algs" "INFO" "$tls12_supported_sigalg_list"
+                    fi
+               fi
+          fi
+          if "$fs_tls13_offered"; then
+               pr_bold " TLS 1.3 sig_algs offered:    "
+               # If only SHA1 and MD5 signature algorithms are supported, this is a critical finding.
+               # If SHA1 and/or MD5 are supported, but stronger algorithms are also supported, the
+               # severity is less.
+               if [[ -z "$(sed -e 's/[A-Za-z\-]*+SHA1//g' -e 's/[A-Za-z\-]*+MD5//g' -e 's/ //g' <<< "$tls13_supported_sigalg_list")" ]]; then
+                    prln_svrty_critical "$(out_row_aligned_max_width "$tls13_supported_sigalg_list " "                              " $TERM_WIDTH)"
+                    fileout "${jsonID}_TLS13_sig_algs" "CRITICAL" "$tls13_supported_sigalg_list"
+               else
+                    out_row_aligned_max_width_by_entry "$tls13_supported_sigalg_list " "                              " $TERM_WIDTH pr_sigalg_quality
+                    outln
+                    if [[ "$tls13_supported_sigalg_list" =~ MD5 ]]; then
+                         fileout "${jsonID}_TLS13_sig_algs" "HIGH" "$tls13_supported_sigalg_list"
+                    elif [[ "$tls13_supported_sigalg_list" =~ SHA1 ]]; then
+                         fileout "${jsonID}_TLS13_sig_algs" "LOW" "$tls13_supported_sigalg_list"
+                    else
+                         fileout "${jsonID}_TLS13_sig_algs" "INFO" "$tls13_supported_sigalg_list"
+                    fi
+               fi
+          fi
+     fi
 
      tmpfile_handle ${FUNCNAME[0]}.txt
      "$using_sockets" && HAS_DH_BITS="$has_dh_bits"
@@ -20517,7 +20611,7 @@ fatal() {
      fi
      # Make sure we don't try to write into files when not created yet.
      # No shorthand expression to avoid errors when $CMDLINE_PARSED haven't been filled yet.
-     [[ $CMDLINE_PARSED == true ]] && fileout "scanProblem" "FATAL" "$1"
+     [[ $CMDLINE_PARSED == true ]] && fileout "scanProblem" "FATAL" "${1//\\n/ }" # See issue #2049.
      exit $2
 }
 
@@ -21205,14 +21299,19 @@ print_dn() {
 # distinguished names that are in the CA list.
 extract_calist() {
      local response="$1"
-     local is_tls13=false
+     local is_tls12=false is_tls13=false
      local certreq calist="" certtypes sigalgs dn
      local calist_string=""
      local -i len type
 
-     # Determine whether this is a TLS 1.3 response, since the information
-     # is encoded in a different place for TLS 1.3.
-     [[ "$response" =~ \<\<\<\ TLS\ 1.3[\,]?\ Handshake\ \[length\ [0-9a-fA-F]*\]\,\ CertificateRequest ]] && is_tls13=true
+     # Determine whether this is a TLS 1.2 or TLS 1.3 response, since the information
+     # is encoded in a different place for TLS 1.3 and the CertificateRequest message
+     # differs between TLS 1.2 and TLS 1.1 and earlier.
+     if [[ "$response" =~ \<\<\<\ TLS\ 1.3[\,]?\ Handshake\ \[length\ [0-9a-fA-F]*\]\,\ CertificateRequest ]]; then
+          is_tls13=true
+     elif [[ "$response" =~ \<\<\<\ TLS\ 1.2[\,]?\ Handshake\ \[length\ [0-9a-fA-F]*\]\,\ CertificateRequest ]]; then
+          is_tls12=true
+     fi
 
      # Extract just the CertificateRequest message as an ASCII-HEX string.
      certreq="${response##*CertificateRequest}"
@@ -21248,15 +21347,17 @@ extract_calist() {
           # struct {
           #     ClientCertificateType certificate_types<1..2^8-1>;
           #     SignatureAndHashAlgorithm
-          #     supported_signature_algorithms<2^16-1>;
+          #     supported_signature_algorithms<2^16-1>; - only present in TLS 1.2
           #     DistinguishedName certificate_authorities<0..2^16-1>;
           # } CertificateRequest;
           len=2*$(hex2dec "${certreq:0:2}")
           certtypes="${certreq:2:len}"
           certreq="${certreq:$((len+2))}"
-          len=2*$(hex2dec "${certreq:0:4}")
-          sigalgs="${certreq:4:len}"
-          certreq="${certreq:$((len+4))}"
+          if "$is_tls12"; then
+               len=2*$(hex2dec "${certreq:0:4}")
+               sigalgs="${certreq:4:len}"
+               certreq="${certreq:$((len+4))}"
+          fi
           len=2*$(hex2dec "${certreq:0:4}")
           calist="${certreq:4:len}"
      fi
