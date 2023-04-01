@@ -6396,9 +6396,9 @@ pr_ecdh_curve_quality() {
           "prime256v1") bits=256  ;;
           "secp384r1") bits=384  ;;
           "secp521r1") bits=521  ;;
-          "brainpoolP256r1") bits=256  ;;
-          "brainpoolP384r1") bits=384  ;;
-          "brainpoolP512r1") bits=512  ;;
+          "brainpoolP256r1"*) bits=256  ;;
+          "brainpoolP384r1"*) bits=384  ;;
+          "brainpoolP512r1"*) bits=512  ;;
           "X25519") bits=253  ;;
           "X448") bits=448  ;;
      esac
@@ -8015,9 +8015,9 @@ get_server_certificate() {
           [[ $(has_server_protocol "tls1_3") -eq 1 ]] && return 1
           if "$HAS_TLS13" && "$HAS_SIGALGS" && [[ ! "$1" =~ tls1_3_EdDSA ]]; then
                if [[ "$1" =~ tls1_3_RSA ]]; then
-                    $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -showcerts -connect $NODEIP:$PORT $PROXY $SNI -tls1_3 -tlsextdebug -status -msg -sigalgs PSS+SHA256:PSS+SHA384") </dev/null 2>$ERRFILE >$TMPFILE
+                    $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -showcerts -connect $NODEIP:$PORT $PROXY $SNI -tls1_3 -tlsextdebug -status -msg -sigalgs PSS+SHA256:PSS+SHA384:PSS+SHA512:rsa_pss_pss_sha256:rsa_pss_pss_sha384:rsa_pss_pss_sha512") </dev/null 2>$ERRFILE >$TMPFILE
                elif [[ "$1" =~ tls1_3_ECDSA ]]; then
-                    $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -showcerts -connect $NODEIP:$PORT $PROXY $SNI -tls1_3 -tlsextdebug -status -msg -sigalgs ECDSA+SHA256:ECDSA+SHA384") </dev/null 2>$ERRFILE >$TMPFILE
+                    $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -showcerts -connect $NODEIP:$PORT $PROXY $SNI -tls1_3 -tlsextdebug -status -msg -sigalgs ECDSA+SHA256:ECDSA+SHA384:ECDSA+SHA512") </dev/null 2>$ERRFILE >$TMPFILE
                else
                     return 1
                fi
@@ -8031,7 +8031,7 @@ get_server_certificate() {
                if [[ "$STARTTLS" =~ irc ]]; then
                     return 1
                elif [[ "$1" =~ tls1_3_RSA ]]; then
-                    tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,10,00,0e,08,04,08,05,08,06,04,01,05,01,06,01,02,01"
+                    tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,16,00,14,08,04,08,05,08,06,04,01,05,01,06,01,02,01,08,09,08,0a,08,0b"
                elif [[ "$1" =~ tls1_3_ECDSA ]]; then
                     tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,0a,00,08,04,03,05,03,06,03,02,03"
                elif [[ "$1" =~ tls1_3_EdDSA ]]; then
@@ -10374,18 +10374,18 @@ run_fs() {
      local fs_cipher_list="DHE-DSS-AES128-GCM-SHA256:DHE-DSS-AES128-SHA256:DHE-DSS-AES128-SHA:DHE-DSS-AES256-GCM-SHA384:DHE-DSS-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-DSS-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA:DHE-DSS-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA:DHE-DSS-SEED-SHA:DHE-RSA-AES128-CCM8:DHE-RSA-AES128-CCM:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-CCM8:DHE-RSA-AES256-CCM:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA:DHE-RSA-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-RSA-CHACHA20-POLY1305-OLD:DHE-RSA-CHACHA20-POLY1305:DHE-RSA-SEED-SHA:ECDHE-ECDSA-AES128-CCM8:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-CCM8:ECDHE-ECDSA-AES256-CCM:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-ECDSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305-OLD:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-RSA-CHACHA20-POLY1305-OLD:ECDHE-RSA-CHACHA20-POLY1305"
      local fs_hex_cipher_list="" ciphers_to_test tls13_ciphers_to_test
      local ecdhe_cipher_list="" tls13_cipher_list="" ecdhe_cipher_list_hex="" ffdhe_cipher_list_hex=""
-     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e")
-     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448")
-     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448")
-     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448)
+     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e" "00,1f" "00,20" "00,21")
+     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13")
+     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13")
+     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448 256 384 512)
      # Many curves have been deprecated, and RFC 8446, Appendix B.3.1.4, states
      # that these curves MUST NOT be offered in a TLS 1.3 ClientHello.
-     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false")
+     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false" "false" "false" "false")
      local -a ffdhe_groups_hex=("01,00" "01,01" "01,02" "01,03" "01,04")
      local -a ffdhe_groups_output=("ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
      local -a supported_curve
      local -a sigalgs_hex=("01,01" "01,02" "01,03" "02,01" "02,02" "02,03" "03,01" "03,02" "03,03" "04,01" "04,02" "04,03" "04,20" "05,01" "05,02" "05,03" "05,20" "06,01" "06,02" "06,03" "06,20" "07,08" "08,04" "08,05" "08,06" "08,07" "08,08" "08,09" "08,0a" "08,0b" "08,1a" "08,1b" "08,1c")
-     local -a sigalgs_strings=("RSA+MD5" "DSA+MD5" "ECDSA+MD5" "RSA+SHA1" "DSA+SHA1" "ECDSA+SHA1" "RSA+SHA224" "DSA+SHA224" "ECDSA+SHA224" "RSA+SHA256" "DSA+SHA256" "ECDSA+SHA256" "RSA+SHA256" "RSA+SHA384" "DSA+SHA384" "ECDSA+SHA384" "RSA+SHA384" "RSA+SHA512" "DSA+SHA512" "ECDSA+SHA512" "RSA+SHA512" "SM2+SM3" "RSA-PSS+SHA256" "RSA-PSS+SHA384" "RSA-PSS+SHA512" "Ed25519" "Ed448" "RSA-PSS+SHA256" "RSA-PSS+SHA384" "RSA-PSS+SHA512" "ECDSA+SHA256" "ECDSA+SHA384" "ECDSA+SHA512")
+     local -a sigalgs_strings=("RSA+MD5" "DSA+MD5" "ECDSA+MD5" "RSA+SHA1" "DSA+SHA1" "ECDSA+SHA1" "RSA+SHA224" "DSA+SHA224" "ECDSA+SHA224" "RSA+SHA256" "DSA+SHA256" "ECDSA+SHA256" "RSA+SHA256" "RSA+SHA384" "DSA+SHA384" "ECDSA+SHA384" "RSA+SHA384" "RSA+SHA512" "DSA+SHA512" "ECDSA+SHA512" "RSA+SHA512" "SM2+SM3" "RSA-PSS-RSAE+SHA256" "RSA-PSS-RSAE+SHA384" "RSA-PSS-RSAE+SHA512" "Ed25519" "Ed448" "RSA-PSS-PSS+SHA256" "RSA-PSS-PSS+SHA384" "RSA-PSS-PSS+SHA512" "ECDSA+SHA256" "ECDSA+SHA384" "ECDSA+SHA512")
      local -a tls13_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
      local -a tls12_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
      local rsa_cipher="" ecdsa_cipher="" dss_cipher=""
@@ -10740,6 +10740,9 @@ run_fs() {
                          if [[ "$curve_found" == ECDH ]]; then
                               curve_found="${temp#*, }"
                               curve_found="${curve_found%%,*}"
+                              if "$HAS_TLS13" && [[ ! "$proto" == "-no_tls1_3" ]] && [[ "$curve_found" == brainpoolP[235][581][642]r1 ]]; then
+                                   [[ "$(get_protocol "$TMPFILE")" == TLSv1.3 ]] && curve_found+="tls13"
+                              fi
                          fi
                          for (( i=low; i < high; i++ )); do
                               if ! "${supported_curve[i]}"; then
@@ -14403,6 +14406,9 @@ parse_tls_serverhello() {
                                     25) dh_bits=521 ; named_curve_str="P-521" ; named_curve_oid="06052b81040023" ;;
                                     29) dh_bits=253 ; named_curve_str="X25519" ;;
                                     30) dh_bits=448 ; named_curve_str="X448" ;;
+                                    31) dh_bits=256 ; named_curve_str="brainpoolP256r1tls13" ; named_curve_oid="06092B2403030208010107" ;;
+                                    32) dh_bits=384 ; named_curve_str="brainpoolP384r1tls13" ; named_curve_oid="06092B240303020801010B" ;;
+                                    33) dh_bits=512 ; named_curve_str="brainpoolP512r1tls13" ; named_curve_oid="06092B240303020801010D" ;;
                                     256) dh_bits=2048 ; named_curve_str="ffdhe2048" ;;
                                     257) dh_bits=3072 ; named_curve_str="ffdhe3072" ;;
                                     258) dh_bits=4096 ; named_curve_str="ffdhe4096" ;;
@@ -15032,14 +15038,14 @@ parse_tls_serverhello() {
      if [[ 0x$peering_signing_digest -eq 8 ]] && \
         [[ 0x$peer_signature_type -ge 4 ]] && [[ 0x$peer_signature_type -le 11 ]]; then
           case $peer_signature_type in
-               04) peering_signing_digest="SHA256"; peer_signature_type="RSA-PSS" ;;
-               05) peering_signing_digest="SHA384"; peer_signature_type="RSA-PSS" ;;
-               06) peering_signing_digest="SHA512"; peer_signature_type="RSA-PSS" ;;
+               04) peering_signing_digest="SHA256"; peer_signature_type="RSA-PSS-RSAE" ;;
+               05) peering_signing_digest="SHA384"; peer_signature_type="RSA-PSS-RSAE" ;;
+               06) peering_signing_digest="SHA512"; peer_signature_type="RSA-PSS-RSAE" ;;
                07) peering_signing_digest=""; peer_signature_type="Ed25519" ;;
                08) peering_signing_digest=""; peer_signature_type="Ed448" ;;
-               09) peering_signing_digest="SHA256"; peer_signature_type="RSA-PSS" ;;
-               0A) peering_signing_digest="SHA384"; peer_signature_type="RSA-PSS" ;;
-               0B) peering_signing_digest="SHA512"; peer_signature_type="RSA-PSS" ;;
+               09) peering_signing_digest="SHA256"; peer_signature_type="RSA-PSS-PSS" ;;
+               0A) peering_signing_digest="SHA384"; peer_signature_type="RSA-PSS-PSS" ;;
+               0B) peering_signing_digest="SHA512"; peer_signature_type="RSA-PSS-PSS" ;;
           esac
           if [[ -n "$peering_signing_digest" ]]; then
                echo "Peer signing digest: $peering_signing_digest" >> $TMPFILE
@@ -15430,8 +15436,8 @@ prepare_tls_clienthello() {
                if [[ ! "$process_full" =~ all ]] || { "$HAS_X25519" && "$HAS_X448"; }; then
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,10, 00,0e,               # lengths
-                    00,1d, 00,17, 00,1e, 00,18, 00,19,
+                    00,16, 00,14,               # lengths
+                    00,1d, 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01"
                     # OpenSSL prior to 1.1.1 does not support X448, so list it as the least
                     # preferred option if the response needs to be decrypted, and do not
@@ -15439,14 +15445,14 @@ prepare_tls_clienthello() {
                elif "$HAS_X25519" && [[ "$process_full" == all+ ]]; then
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,0e, 00,0c,               # lengths
-                    00,1d, 00,17, 00,18, 00,19,
+                    00,14, 00,12,               # lengths
+                    00,1d, 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01"
                elif "$HAS_X25519"; then
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,10, 00,0e,               # lengths
-                    00,1d, 00,17, 00,18, 00,19,
+                    00,16, 00,14,               # lengths
+                    00,1d, 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01, 00,1e"
                     # OpenSSL prior to 1.1.0 does not support either X25519 or X448,
                     # so list them as the least referred options if the response
@@ -15455,14 +15461,14 @@ prepare_tls_clienthello() {
                elif [[ "$process_full" == all+ ]]; then
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,0c, 00,0a,               # lengths
-                    00,17, 00,18, 00,19,
+                    00,12, 00,10,               # lengths
+                    00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01"
                else
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,10, 00,0e,               # lengths
-                    00,17, 00,18, 00,19,
+                    00,16, 00,14,               # lengths
+                    00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01, 00,1d, 00,1e"
                fi
 
@@ -19911,7 +19917,7 @@ find_openssl_binary() {
      local openssl_location cwd=""
      local ossl_wo_dev_info
      local curve
-     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
+     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
 
      # 0. check environment variable whether it's executable
      if [[ -n "$OPENSSL" ]] && [[ ! -x "$OPENSSL" ]]; then
