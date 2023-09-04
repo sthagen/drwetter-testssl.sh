@@ -244,6 +244,7 @@ CIPHERS_BY_STRENGTH_FILE=""
 TLS_DATA_FILE=""                        # mandatory file for socket-based handshakes
 OPENSSL=""                              # If you run this from GitHub it's ~/bin/openssl.$(uname).$(uname -m) otherwise /usr/bin/openssl
 OPENSSL2=""                             # When running from GitHub, this will be openssl version >=1.1.1 (auto determined)
+OPENSSL2_HAS_TLS_1_3=false              # If we run with supplied binary AND /usr/bin/openssl supports TLS 1.3 this is set to true
 OPENSSL_LOCATION=""
 IKNOW_FNAME=false
 FIRST_FINDING=true                      # is this the first finding we are outputting to file?
@@ -2715,28 +2716,40 @@ run_hsts() {
      match_httpheader_key "Strict-Transport-Security" "HSTS" "$spaces" "true"
      if [[ $? -ne 0 ]]; then
           echo "$HEADERVALUE" >$TMPFILE
-          hsts_age_sec="${HEADERVALUE//[^0-9]/}"
-          debugme echo "hsts_age_sec: $hsts_age_sec"
-          if [[ -n $hsts_age_sec ]]; then
-               hsts_age_days=$(( hsts_age_sec / 86400))
-          else
-               hsts_age_days=-1
+          # strict parsing now as suggested in #2381
+          hsts_age_sec="${HEADERVALUE#*=}"
+          hsts_age_sec=${hsts_age_sec%%;*}
+          if [[ $hsts_age_sec =~ \" ]]; then
+               # remove first an last " in $hsts_age_sec (borrowed from strip_trailing_space/strip_leading_space):
+               hsts_age_sec=$(printf "%s" "${hsts_age_sec#"${hsts_age_sec%%[!\"]*}"}")
+               hsts_age_sec=$(printf "%s" "${hsts_age_sec%"${hsts_age_sec##*[!\"]}"}")
           fi
-          if [[ $hsts_age_days -eq -1 ]]; then
-               pr_svrty_medium "misconfiguration: HSTS max-age (recommended > $HSTS_MIN seconds = $((HSTS_MIN/86400)) days ) is required but missing"
-               fileout "${jsonID}_time" "MEDIUM" "misconfiguration, parameter max-age (recommended > $HSTS_MIN seconds = $((HSTS_MIN/86400)) days) missing"
-               set_grade_cap "A" "HSTS max-age is misconfigured"
-          elif [[ $hsts_age_sec -eq 0 ]]; then
-               pr_svrty_low "HSTS max-age is set to 0. HSTS is disabled"
-               fileout "${jsonID}_time" "LOW" "0. HSTS is disabled"
-               set_grade_cap "A" "HSTS is disabled"
-          elif [[ $hsts_age_sec -ge $HSTS_MIN ]]; then
-               pr_svrty_good "$hsts_age_days days" ; out "=$hsts_age_sec s"
-               fileout "${jsonID}_time" "OK" "$hsts_age_days days (=$hsts_age_sec seconds) > $HSTS_MIN seconds"
+          debugme echo "hsts_age_sec: $hsts_age_sec"
+          if ! is_number "$hsts_age_sec"; then
+               pr_svrty_medium "misconfiguration: \'"$hsts_age_sec"\' is not a valid max-age specification"
+               fileout "${jsonID}_time" "MEDIUM" "misconfiguration, specified not a number for max-age"
           else
-               pr_svrty_medium "$hsts_age_sec s = $hsts_age_days days is too short ( >= $HSTS_MIN seconds recommended)"
-               fileout "${jsonID}_time" "MEDIUM" "max-age too short. $hsts_age_days days (=$hsts_age_sec seconds) < $HSTS_MIN seconds"
-               set_grade_cap "A" "HSTS max-age is too short"
+               if [[ -n $hsts_age_sec ]]; then
+                    hsts_age_days=$(( hsts_age_sec / 86400))
+               else
+                    hsts_age_days=-1
+               fi
+               if [[ $hsts_age_days -eq -1 ]]; then
+                    pr_svrty_medium "misconfiguration: HSTS max-age (recommended > $HSTS_MIN seconds = $((HSTS_MIN/86400)) days ) is required but missing"
+                    fileout "${jsonID}_time" "MEDIUM" "misconfiguration, parameter max-age (recommended > $HSTS_MIN seconds = $((HSTS_MIN/86400)) days) missing"
+                    set_grade_cap "A" "HSTS max-age is misconfigured"
+               elif [[ $hsts_age_sec -eq 0 ]]; then
+                    pr_svrty_low "HSTS max-age is set to 0. HSTS is disabled"
+                    fileout "${jsonID}_time" "LOW" "0. HSTS is disabled"
+                    set_grade_cap "A" "HSTS is disabled"
+               elif [[ $hsts_age_sec -ge $HSTS_MIN ]]; then
+                    pr_svrty_good "$hsts_age_days days" ; out "=$hsts_age_sec s"
+                    fileout "${jsonID}_time" "OK" "$hsts_age_days days (=$hsts_age_sec seconds) > $HSTS_MIN seconds"
+               else
+                    pr_svrty_medium "$hsts_age_sec s = $hsts_age_days days is too short ( >= $HSTS_MIN seconds recommended)"
+                    fileout "${jsonID}_time" "MEDIUM" "max-age too short. $hsts_age_days days (=$hsts_age_sec seconds) < $HSTS_MIN seconds"
+                    set_grade_cap "A" "HSTS max-age is too short"
+               fi
           fi
           if includeSubDomains "$TMPFILE"; then
                fileout "${jsonID}_subdomains" "OK" "includes subdomains"
@@ -3271,7 +3284,7 @@ sub_f5_bigip_check() {
                ip="$(f5_hex2ip6 ${cookievalue:$offset:32})"
                out "${spaces}F5 cookie (IPv6 pool in routed domain "; pr_svrty_medium "$routed_domain"; out "): "; pr_italic "$cookiename "; prln_svrty_medium "${ip}:${port}"
                fileout "cookie_bigip_f5" "MEDIUM" "Information leakage: F5 cookie $cookiename $cookievalue is IPv6 pool member in routed domain $routed_domain ${ip}:${port}" "$cve" "$cwe"
-          elif grep -Eq '^\!.*=$' <<< "$cookievalue"; then
+          elif grep -Eq '^!.*=$' <<< "$cookievalue"; then
                if [[ "${#cookievalue}" -eq 81 ]] ; then
                     savedcookies="${savedcookies}     ${cookiename}=${cookievalue:1:79}"
                     out "${spaces}Encrypted F5 cookie named "; pr_italic "${cookiename}"; outln " detected"
@@ -20109,6 +20122,7 @@ find_openssl_binary() {
      # Now check whether the standard $OPENSSL has Unix-domain socket and xmpp-server support. If
      # not check /usr/bin/openssl -- if available. This is more a kludge which we shouldn't use for
      # every openssl feature. At some point we need to decide which with openssl version we go.
+     # We also check, whether there's /usr/bin/openssl which has TLS 1.3
      OPENSSL2=/usr/bin/openssl
      if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ ! $OSSL_VER_MAJOR =~ 3 ]]; then
           if [[ -x $OPENSSL2 ]]; then
@@ -20116,6 +20130,10 @@ find_openssl_binary() {
                $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
                grep -q 'Unix-domain socket' $s_client_has2 && HAS_UDS2=true
                grep -q 'xmpp-server' $s_client_starttls_has2 && HAS_XMPP_SERVER2=true
+               # Likely we don't need the following second check here, see 6 lines above
+               if grep -wq 'tls1_3' $s_client_has2 && [[ $OPENSSL != /usr/bin/openssl ]]; then
+                    OPENSSL2_HAS_TLS_1_3=true
+               fi
           fi
      fi
 
@@ -20343,7 +20361,6 @@ single check as <options>  ("$PROG_NAME URI" does everything except -E and -g):
      -4, --rc4, --appelbaum        which RC4 ciphers are being offered?
 
 tuning / connect options (most also can be preset via environment variables):
-     --fast                        omits some checks: using openssl for all ciphers (-e), show only first preferred cipher.
      -9, --full                    includes tests for implementation bugs and cipher per protocol (could disappear)
      --bugs                        enables the "-bugs" option of s_client, needed e.g. for some buggy F5s
      --assume-http                 if protocol check fails it assumes HTTP protocol and enforces HTTP checks
@@ -23718,6 +23735,8 @@ parse_cmd_line() {
           [[ -s "$fname" ]] || fatal "CA file \"$fname\" does not exist" $ERR_RESOURCE
           grep -q 'BEGIN CERTIFICATE' "$fname" || fatal "\"$fname\" is not CA file in PEM format" $ERR_RESOURCE
      done
+
+     "$FAST" && pr_warning "\n'--fast' can have some undesired side effects thus it is not recommended to use anymore\n"
 
      if "$do_starttls_injection" && [[ "$STARTTLS_PROTOCOL" =~ smtp ]]; then
           ((VULN_COUNT++))
