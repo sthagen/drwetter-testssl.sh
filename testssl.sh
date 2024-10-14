@@ -5487,7 +5487,8 @@ run_protocols() {
                     fileout "$jsonID" "OK" "not offered"
                     add_proto_offered ssl2 no
                     ;;
-               4)   out "likely "; pr_svrty_best "not offered (OK), "
+               4)   # STARTTLS problem
+                    out "likely "; pr_svrty_best "not offered (OK), "
                     fileout "$jsonID" "OK" "likely not offered"
                     add_proto_offered ssl2 no
                     pr_warning "received 4xx/5xx after STARTTLS handshake"; outln "$debug_recomm"
@@ -5665,7 +5666,7 @@ run_protocols() {
                pr_warning "TLS downgraded to STARTTLS plaintext"; outln
                fileout "$jsonID" "WARN" "TLS downgraded to STARTTLS plaintext"
                ;;
-          4)   out "likely not offered, "
+          4)   out "likely not offered, "                                  # STARTTLS problem
                fileout "$jsonID" "INFO" "likely not offered"
                add_proto_offered tls1 no
                pr_warning "received 4xx/5xx after STARTTLS handshake"; outln "$debug_recomm"
@@ -5750,8 +5751,8 @@ run_protocols() {
                pr_warning "TLS downgraded to STARTTLS plaintext"; outln
                fileout "$jsonID" "WARN" "TLS downgraded to STARTTLS plaintext"
                ;;
-          4)   out "likely not offered, "
-               fileout "$jsonID" "INFO" "not offered"
+          4)   out "likely not offered, "                        # STARTTLS problem
+               fileout "$jsonID" "INFO" "likely not offered"
                add_proto_offered tls1_1 no
                pr_warning "received 4xx/5xx after STARTTLS handshake"; outln "$debug_recomm"
                fileout "$jsonID" "WARN" "received 4xx/5xx after STARTTLS handshake${debug_recomm}"
@@ -6022,8 +6023,8 @@ run_protocols() {
                pr_warning "TLS downgraded to STARTTLS plaintext"; outln
                fileout "$jsonID" "WARN" "TLS downgraded to STARTTLS plaintext"
                ;;
-          4)   out "likely not offered, "
-               fileout "$jsonID" "INFO" "not offered"
+          4)   out "likely not offered, "              # STARTTLS problem
+               fileout "$jsonID" "INFO" "likely not offered"
                add_proto_offered tls1_3 no
                pr_warning "received 4xx/5xx after STARTTLS handshake"; outln "$debug_recomm"
                fileout "$jsonID" "WARN" "received 4xx/5xx after STARTTLS handshake${debug_recomm}"
@@ -22933,15 +22934,18 @@ run_rating() {
      pr_headlineln " Rating (experimental) "
      outln
 
-     [[ -n "$STARTTLS_PROTOCOL" ]] && set_grade_cap "T" "STARTTLS encryption is not mandatory for clients. STARTTLS can only be secured client-side"
+     [[ -n "$STARTTLS_PROTOCOL" ]] && set_grade_cap "T" "STARTTLS is prone to MITM downgrade attacks. A secure TLS upgrade can only be ensured client-side. You should use TLS only (=implicit TLS) rather than STARTTLS as per RFC 8314, for other than SMTP and SIEVE"
 
-     # TL;DR: E-mail transfer via port 25 is broken and the amendments suggested so far are duct tape. So please do not expect testssl.sh to shut up.
+     # TL;DR: STARTTLS connections are inherently insecure. A MITM can always intercept the connection, unless the client checks e.g. the
+     # certificate accordingly. A secure STARTTLS client is the key but we can't test for it. For other than SMTP and SIEVE (there's no implicit TLS port)
+     # you should use implicit TLS as per RFC 8314. Especially e-mail transfer via port 25 is broken and amendments so far are duct tape.
 
-     # Explanation: For other than SMTP you should use TLS as per RFC 8314 . For SMTP however there's this thing named reality: A mail server cannot
-     # just switch to the mail submission port 587 only and continue to receive mail from everyone. Even if you advertise this via SRV record (RFC 6186).
-     # For STARTTLS there's no way to tell for testssl.sh whether it is secure. A MitM can always intercept the connection, unless the client checks
-     # the certificate accordingly (it's getting better but some just don't). TLSA Records/DANE and MTA-STS (RFC-8461) on the server side can help too.
-     # But as said, it's useless unless the client MTA checks all that which no tool can check.
+     # Explanation: There are active MitM attacks possible when using STARTTLS like https://github.com/tintinweb/striptls or
+     # https://github.com/libcrack/starttlsstrip. It depends on the client only whether it can detect such downgrade attack.
+     # As some SMTP servers are still misconfigured with wrong certificates it's is still common practice for SMTP client MTAs to
+     # accept those wrong certificates -- delivering e-mails is more important. There is an e-mail submission port 587 but a mail server
+     # cannot just switch to it and continue to receive mail from everyone. Even if you advertise this via SRV record (RFC 6186).
+     # TLSA Records/DANE and MTA-STS (RFC-8461) on the server side can help too,
 
      pr_bold " Rating specs"; out " (not complete)  "; outln "SSL Labs's 'SSL Server Rating Guide' (version 2009q from 2020-01-30)"
      pr_bold " Specification documentation  "; pr_url "https://github.com/ssllabs/research/wiki/SSL-Server-Rating-Guide"
@@ -23127,9 +23131,11 @@ run_rating() {
      # Pretty print - again, it's just nicer to read
      for reason in "${sorted_reasons[@]}"; do
           if [[ $reason_nr -eq 0 ]]; then
-               pr_bold " Grade cap reasons            "; outln "$reason"
+               pr_bold " Grade cap reasons            "
+               outln "$(out_row_aligned_max_width "$reason" "                                " $TERM_WIDTH)"
           else
-               outln "                              $reason"
+               outln "$(out_row_aligned_max_width "                              $reason" "                                " $TERM_WIDTH)"
+
           fi
           ((reason_nr++))
           fileout "grade_cap_reason_${reason_nr}" "INFO" "$reason"
