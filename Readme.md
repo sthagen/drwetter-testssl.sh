@@ -1,8 +1,7 @@
 
 ## Intro
 
-<!-- [![Travis CI Status](https://img.shields.io/travis/drwetter/testssl.sh)](https://travis-ci.org/drwetter/testssl.sh)  -->
-[![Build Status](https://github.com/drwetter/testssl.sh/actions/workflows/test.yml/badge.svg)](https://github.com/drwetter/testssl.sh/actions/workflows/test.yml)
+[![CI tests](https://github.com/drwetter/testssl.sh/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/drwetter/testssl.sh/actions/workflows/unit_tests.yml)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/drwetter/testssl.sh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![License](https://img.shields.io/github/license/drwetter/testssl.sh)](https://github.com/drwetter/testssl.sh/LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/drwetter/testssl.sh)](https://github.com/drwetter/testssl.sh/blob/3.2/Dockerfile.md)
