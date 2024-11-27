@@ -1371,13 +1371,17 @@ fileout_insert_warning() {
      [[ "$CMDLINE=" =~ -iL ]] && return 0
      # Note we still have the message on screen + in HTML which is not as optimal as it could be
 
-     if "$do_pretty_json" && "$JSONHEADER"; then
+     # See #2599. The "clientProblem" wrapper should only be added if fileout_insert_warning()
+     # is called before fileout_banner(). The only instance in which this function is called
+     # after fileout_banner() is in the case of a TLS 1.3 only server when $OPENSSL does not
+     # support TLS 1.3.
+     if "$do_pretty_json" && "$JSONHEADER" && ! "$TLS13_ONLY"; then
           echo -e "          \"clientProblem${CLIENT_PROB_NO}\" : [" >>"$JSONFILE"
           CLIENT_PROB_NO=$((CLIENT_PROB_NO + 1))
           FIRST_FINDING=true       # make sure we don't have a comma here
      fi
      fileout "$1" "$2" "$3"
-     if "$do_pretty_json"; then
+     if "$do_pretty_json" && ! "$TLS13_ONLY"; then
           if "$JSONHEADER"; then
                echo -e "\n          ]," >>"$JSONFILE"
           else
@@ -17189,7 +17193,7 @@ run_renego() {
                sec_client_renego=1
           else
                # second try in the foreground as we are sure now it won't hang
-               echo R | $OPENSSL s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE
+               (echo R; sleep 1) | $OPENSSL s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE
                sec_client_renego=$?
                # 0 means client is renegotiating & doesn't return an error --> vuln!
                # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
