@@ -5,7 +5,7 @@ is always welcome, here @ github or via e-mail.
 
 Note please the following
 
-* Please read at least the [coding convention](https://github.com/drwetter/testssl.sh/Coding_Convention.md).
+* Please read at least the [coding convention](https://github.com/testssl/testssl.sh/Coding_Convention.md).
 * One PR per feature or bug fix or improvement. Please do not mix issues.
 * Document your PR, both in the PR and/or commit message and in the code.
 * Please test your changes thoroughly as reliability is important for this project. You may want to check different servers with different settings.

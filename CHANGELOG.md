@@ -137,7 +137,7 @@
 * Trust chain check against certificate stores from Apple (OS), Linux (OS),
   Microsoft (OS), Mozilla (Firefox Browser), works for openssl >=1.0.1
 * IPv6 (status: 80% working, details see
-  https://github.com/drwetter/testssl.sh/issues/11
+  https://github.com/testssl/testssl.sh/issues/11
 * works now on servers requiring a x509 certificate for authentication
 * extensive CN <--> hostname check
 * SSL Session ID check
@@ -183,7 +183,7 @@
   * quite some LibreSSL fixes, still not recommended to use though (see https://testssl.sh/)
   * lots of fixes, code improvements, even more robust
 
-Full log @ https://github.com/drwetter/testssl.sh/commits/2.6/testssl.sh
+Full log @ https://github.com/testssl/testssl.sh/commits/2.6/testssl.sh
 
 ### New in 2.4
   * "only one cmd line option at a time" is completely gone
@@ -198,7 +198,7 @@ Full log @ https://github.com/drwetter/testssl.sh/commits/2.6/testssl.sh
   * lots of cosmetic and maintainability code cleanups
   * bugfixing
 
-Full changelog: https://github.com/drwetter/testssl.sh/commits/2.4/testssl.sh
+Full changelog: https://github.com/testssl/testssl.sh/commits/2.4/testssl.sh
 
 ### 2.2. new features:
   * Works fully under FreeBSD (openssl >=1.0)
@@ -214,7 +214,7 @@ Full changelog: https://github.com/drwetter/testssl.sh/commits/2.4/testssl.sh
   * RFC <---> OpenSSL name space mapping of ciphers everywhere
   * includes a lot of fixes
 
-Full changelog @  https://github.com/drwetter/testssl.sh/commits/2.2/testssl.sh
+Full changelog @  https://github.com/testssl/testssl.sh/commits/2.2/testssl.sh
 
 ### 2.0 major release, new features:
   * SNI

@@ -1,10 +1,11 @@
 
 ## Intro
 
-[![CI tests](https://github.com/drwetter/testssl.sh/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/drwetter/testssl.sh/actions/workflows/unit_tests.yml)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/drwetter/testssl.sh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![License](https://img.shields.io/github/license/drwetter/testssl.sh)](https://github.com/drwetter/testssl.sh/LICENSE)
-[![Docker](https://img.shields.io/docker/pulls/drwetter/testssl.sh)](https://github.com/drwetter/testssl.sh/blob/3.2/Dockerfile.md)
+[![CI tests](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests.yml)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/testssl/testssl.sh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![License](https://img.shields.io/github/license/testssl/testssl.sh)](https://github.com/testssl/testssl.sh/LICENSE)
+[![Docker](https://img.shields.io/docker/pulls/testssl/testssl.sh)](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md)
+
 
 `testssl.sh` is a free command line tool which checks a server's service on
 any port for the support of TLS/SSL ciphers, protocols as well as some
@@ -44,16 +45,16 @@ due to bash-socket-based checks. As a result you can also use e.g. LibreSSL or O
 (silent) check for binaries is done when you start testssl.sh . System V needs probably
 to have GNU grep installed. MacOS X and Windows (using MSYS2, Cygwin or WSL) work too.
 
-Update notification here or @ [mastodon](https://infosec.exchange/@testssl) (old: [twitter](https://twitter.com/drwetter))
+Update notification here or @ [mastodon](https://infosec.exchange/@testssl or [bluesky](https://bsky.app/profile/testssl.bsky.social). Please note the [twitter](https://twitter.com/drwetter) account is not being used anymore.
 
 ### Installation
 
 You can download testssl.sh branch 3.2 just by cloning this git repository:
 
-    git clone --depth 1 https://github.com/drwetter/testssl.sh.git
+    git clone --depth 1 https://github.com/testssl/testssl.sh.git
 
-3.2 is now the latest branch which evolved from 3.1dev. It's in the release candidate phase.
-For the former stable version help yourself by downloading the [ZIP](https://codeload.github.com/drwetter/testssl.sh/zip/v3.0.8) or [tar.gz](https://codeload.github.com/drwetter/testssl.sh/tar.gz/v3.0.8) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there.
+3.2 is now the latest branch which evolved from 3.1dev. It's in the release candidate phase and considered as stable.
+For the former stable version named oldstable please help yourself by downloading the [ZIP](https://codeload.github.com/testssl/testssl.sh/zip/v3.0.9) or [tar.gz](https://codeload.github.com/testssl/testssl.sh/tar.gz/v3.0.9) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there.
 
 #### Docker
 
@@ -68,19 +69,19 @@ Or if you have cloned this repo you also can just ``cd`` to the INSTALLDIR and r
 docker build . -t imagefoo && docker run --rm -t imagefoo example.com
 ```
 
-For more please consult [Dockerfile.md](https://github.com/drwetter/testssl.sh/blob/3.2/Dockerfile.md).
+For more please consult [Dockerfile.md](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md).
 
 ### No Warranty
 
-Usage of the program is without any warranty. Use it at your own risk. 
+Usage of the program is without any warranty. Use it at your own risk.
 
 Testssl.sh is intended to be used as a standalone CLI tool. While we tried to apply best practise security measures, we can't guarantee that the program is without any vulnerabilities. Running as a service may pose security risks and you're recommended to apply additional security measures.
 
 ### Status
 
-We're currently in the release candidate phase for version 3.2. Bigger features will be developed in a separate branch before merged into a 3.3dev to avoid hiccups or inconsistencies.
+We're currently in the release candidate phase for version 3.2. You should use it despite the label "RC". Bigger features will be developed in a separate branch before merged into a 3.3dev to avoid hiccups or inconsistencies.
 
-Version 3.0.X receives bugfixes, labeled as 3.0.1, 3.0.2 and so on. This will happen until 3.2 is released.
+Version 3.0.X receives bugfixes, labeled as 3.0.1, 3.0.2 and so on. This will happen until 3.2 is finally released.
 
 Support for 2.9.5 has been dropped. Supported is >= 3.0.x only.
 
@@ -92,16 +93,19 @@ Support for 2.9.5 has been dropped. Supported is >= 3.0.x only.
 
 ### Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](https://github.com/drwetter/testssl.sh/blob/3.2/CONTRIBUTING.md) for details. Please also have a look at the [Coding Convention](https://github.com/drwetter/testssl.sh/blob/3.2/Coding_Convention.md).
+Contributions are welcome! See [CONTRIBUTING.md](https://github.com/testssl/testssl.sh/blob/3.2/CONTRIBUTING.md) for details. Please also have a look at the [Coding Convention](https://github.com/testssl/testssl.sh/blob/3.2/Coding_Convention.md). A lot of contributors already helped to push the project where it currently is, see [CREDITS.md](https://github.com/testssl/testssl.sh/blob/3.2/CREDITS.md). We still you use your help now. A start would be look for issues which are labeled as [good first issue](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), [for grabs](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+grabs%22) or [help wanted](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22). The latter is more advanced.
+
+In general there's some maintenance burden, like maintaining handshakes and CA stores, writing unit tests, improving github actions. If you believe you can contribute, speak up.
+
 
 ### Bug reports
 
 Bug reports are important. It makes this project more robust.
 
 Please file bugs in the issue tracker @ GitHub. Do not forget to provide detailed information, see template for issue, and further details @
-https://github.com/drwetter/testssl.sh/wiki/Bug-reporting. Nobody can read your thoughts -- yet. And only agencies your screen ;-)
+https://github.com/testssl/testssl.sh/wiki/Bug-reporting. Nobody can read your thoughts -- yet. And only agencies your screen ;-)
 
-You can also debug yourself, see [here](https://github.com/drwetter/testssl.sh/wiki/Findings-and-HowTo-Fix-them).
+You can also debug yourself, see [here](https://github.com/testssl/testssl.sh/wiki/Findings-and-HowTo-Fix-them).
 
 ----
 
@@ -128,7 +132,7 @@ Please address questions not specifically to the code of testssl.sh to the respe
 
 #### Brew package
 
-* see [#233](https://github.com/drwetter/testssl.sh/issues/233) and
+* see [#233](https://github.com/testssl/testssl.sh/issues/233) and
   [https://github.com/Homebrew/homebrew](https://github.com/Homebrew/homebrew)
 
 #### Daemon for batch execution of testssl.sh command files

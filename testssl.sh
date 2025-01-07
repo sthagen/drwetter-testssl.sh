@@ -7,9 +7,9 @@
 # vulnerabilities or features. It may or may be not distributed by your distribution.
 # The upstream versions are available (please leave the links intact):
 #
-# Development version       https://github.com/drwetter/testssl.sh
+# Development version       https://github.com/testssl/testssl.sh
 # Stable version            https://testssl.sh
-# File bugs at GitHub       https://github.com/drwetter/testssl.sh/issues
+# File bugs at GitHub       https://github.com/testssl/testssl.sh/issues
 #
 # Project lead and initiator: Dirk Wetter, copyleft: 2007-today, contributions so far see CREDITS.md
 # Main contributions from David Cooper
@@ -399,7 +399,7 @@ RSA_CERT_FINGERPRINT_SHA2=""
 STARTTLS_PROTOCOL=""
 OPTIMAL_PROTO=""                        # Need this for IIS6 (sigh) + OpenSSL 1.0.2, otherwise some handshakes will fail see
                                         # https://github.com/PeterMosmans/openssl/issues/19#issuecomment-100897892
-STARTTLS_OPTIMAL_PROTO=""               # Same for STARTTLS, see https://github.com/drwetter/testssl.sh/issues/188
+STARTTLS_OPTIMAL_PROTO=""               # Same for STARTTLS, see https://github.com/testssl/testssl.sh/issues/188
 OPTIMAL_SOCKETS_PROTO=""                # Same for tls_sockets(). -- not yet used
 ALL_FAILED_SOCKETS=true                 # Set to true if all attempts to connect to server using tls_sockets/sslv2_sockets failed
 TLS_TIME=""                             # To keep the value of TLS server timestamp
@@ -617,7 +617,7 @@ tmln_cyan()     { tm_cyan "$1"; tmln_out; }
 pr_cyan()       { tm_cyan "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#0d7ea2;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
 prln_cyan()     { pr_cyan "$1"; outln; }
 
-tm_litegrey()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[0;37m$1" || tm_out "$1"; tm_off; }                         # ... https://github.com/drwetter/testssl.sh/pull/600#issuecomment-276129876
+tm_litegrey()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[0;37m$1" || tm_out "$1"; tm_off; }                         # ... https://github.com/testssl/testssl.sh/pull/600#issuecomment-276129876
 tmln_litegrey() { tm_litegrey "$1"; tmln_out; }                                                                   # not really usable on a black background, see ..
 prln_litegrey() { pr_litegrey "$1"; outln; }
 pr_litegrey()   { tm_litegrey "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:#71767a;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
@@ -1037,7 +1037,7 @@ get_cipher() {
      # However there seem to be cases where the preferred  $(< "$1")  logic has a problem.
      # Especially with bash 3.2 (Mac OS X) and when on the server side binary chars
      # are returned, see https://stackoverflow.com/questions/7427262/how-to-read-a-file-into-a-variable-in-shell#22607352
-     # and https://github.com/drwetter/testssl.sh/issues/1292
+     # and https://github.com/testssl/testssl.sh/issues/1292
      # Performance measurements showed no to barely measurable penalty (1s displayed in 9 tries).
 
      if [[ "$server_hello" =~ Cipher\ *:\ ([A-Z0-9]+-[A-Za-z0-9\-]+|TLS_[A-Za-z0-9_]+|SSL_[A-Za-z0-9_]+) ]]; then
@@ -4926,9 +4926,9 @@ client_simulation_sockets() {
           data+=", ${clienthello:i:2}"
      done
      # same as above. If a CIPHER_SUITES string was provided, then check that it is in the ServerHello
-     # this appeared 1st in yassl + MySQL (https://github.com/drwetter/testssl.sh/pull/784) but adds
+     # this appeared 1st in yassl + MySQL (https://github.com/testssl/testssl.sh/pull/784) but adds
      # robustness to the implementation
-     # see also https://github.com/drwetter/testssl.sh/pull/797
+     # see also https://github.com/testssl/testssl.sh/pull/797
      if [[ "${1:0:4}" == 1603 ]]; then
           # Extract list of cipher suites from SSLv3 or later ClientHello
           sid_len=4*$(hex2dec "${data:174:2}")
@@ -6475,7 +6475,7 @@ pr_ecdh_quality() {
      elif [[ "$bits" -le 163 ]]; then
           pr_svrty_medium "$string"
      elif [[ "$bits" -le 193 ]]; then   # hmm, according to https://wiki.openssl.org/index.php/Elliptic_Curve_Cryptography it should ok
-          pr_svrty_low "$string"        # but openssl removed it https://github.com/drwetter/testssl.sh/issues/299#issuecomment-220905416
+          pr_svrty_low "$string"        # but openssl removed it https://github.com/testssl/testssl.sh/issues/299#issuecomment-220905416
      elif [[ "$bits" -le 224 ]]; then
           out "$string"
      elif [[ "$bits" -gt 224 ]]; then
@@ -14861,7 +14861,7 @@ parse_tls_serverhello() {
      fi
 
      # If a CIPHER_SUITES string was provided, then check that $tls_cipher_suite is in the string.
-     # this appeared in yassl + MySQL (https://github.com/drwetter/testssl.sh/pull/784) but adds robustness
+     # this appeared in yassl + MySQL (https://github.com/testssl/testssl.sh/pull/784) but adds robustness
      # to the implementation
      if [[ -n "$cipherlist" ]]; then
           tls_cipher_suite="$(tolower "$tls_cipher_suite")"
@@ -15726,7 +15726,7 @@ prepare_tls_clienthello() {
           # There does not seem to be any reason to include this extension. However, it appears that
           # OpenSSL, Firefox, and Chrome include it in TLS 1.3 ClientHello messages, and there is at
           # least one server that will fail the connection if it is absent
-          # (see https://github.com/drwetter/testssl.sh/issues/990).
+          # (see https://github.com/testssl/testssl.sh/issues/990).
           if [[ "0x$tls_low_byte" -ge 0x04 ]] && [[ ! "$extra_extensions_list" =~ \ 002d\  ]]; then
                [[ -n "$all_extensions" ]] && all_extensions+=","
                all_extensions+="$extn_psk_mode"
@@ -17199,7 +17199,7 @@ run_renego() {
                # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
                if tail -5 $TMPFILE| grep -qa '^closed'; then
                     # Exemption from above: server closed the connection but return value was zero
-                    # See https://github.com/drwetter/testssl.sh/issues/1725 and referenced issue @haproxy
+                    # See https://github.com/testssl/testssl.sh/issues/1725 and referenced issue @haproxy
                     sec_client_renego=1
                fi
                case "$sec_client_renego" in
@@ -18008,7 +18008,7 @@ run_tls_fallback_scsv() {
           elif grep -qa "alert handshake failure" "$TMPFILE"; then
                pr_svrty_good "Probably OK. "
                fileout "$jsonID" "OK" "Probably oK"
-               # see RFC 7507, https://github.com/drwetter/testssl.sh/issues/121
+               # see RFC 7507, https://github.com/testssl/testssl.sh/issues/121
                # other case reported by Nicolas was F5 and at customer of mine: the same
                pr_svrty_medium "But received non-RFC-compliant \"handshake failure\" instead of \"inappropriate fallback\""
                fileout "$jsonID" "MEDIUM" "received non-RFC-compliant \"handshake failure\" instead of \"inappropriate fallback\""
@@ -21285,7 +21285,7 @@ get_local_a() {
 check_resolver_bins() {
      local saved_openssl_conf="$OPENSSL_CONF"
 
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      type -p dig   &> /dev/null &&  HAS_DIG=true
      type -p host  &> /dev/null &&  HAS_HOST=true
      type -p drill &> /dev/null &&  HAS_DRILL=true
@@ -21307,7 +21307,7 @@ check_resolver_bins() {
                HAS_DIG_NOIDNOUT=true
           fi
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      return 0
 }
 
@@ -21330,7 +21330,7 @@ get_a_record() {
           echo $1
           return 0
      fi
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      if [[ "$NODE" == *.local ]]; then
           if "$HAS_AVAHIRESOLVE"; then
                ip4=$(filter_ip4_address $(avahi-resolve -4 -n "$1" 2>/dev/null | awk '{ print $2 }'))
@@ -21355,7 +21355,7 @@ get_a_record() {
      if [[ -z "$ip4" ]] && "$HAS_NSLOOKUP"; then
           ip4=$(filter_ip4_address $(strip_lf "$(nslookup -querytype=a "$1" 2>/dev/null | awk '/^Name/ { getline; print $NF }')"))
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      echo "$ip4"
 }
 
@@ -21368,7 +21368,7 @@ get_aaaa_record() {
 
      "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
      [[ "$NODNS" == none ]] && return 0      # if no DNS lookup was instructed, leave here
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      if is_ipv6addr "$1"; then
           # This saves walking through this. Also it avoids hangs e.g. if you run docker locally without reachable DNS
           echo "$1"
@@ -21402,7 +21402,7 @@ get_aaaa_record() {
                ip6=$(filter_ip6_address $(strip_lf "$(nslookup -type=aaaa "$1" 2>/dev/null | awk '/'"^${a}"'.*AAAA/ { print $NF }')"))
           fi
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      echo "$ip6"
 }
 
@@ -21448,7 +21448,7 @@ get_caa_rr_record() {
           return 1
           # No dig, drill, host, or nslookup --> complaint was elsewhere already
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      debugme echo $raw_caa
 
      if [[ "$raw_caa" =~ \#\ [0-9][0-9] ]]; then
@@ -21496,7 +21496,7 @@ get_mx_record() {
      local noidnout=""
 
      "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      # we need the last two columns here
      if "$HAS_HOST"; then
           mx="$(host -t MX "$1" 2>/dev/null | awk '/is handled by/ { print $(NF-1), $NF }')"
@@ -21523,7 +21523,7 @@ get_txt_record() {
      local noidnout=""
 
      "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      # we need the last two columns here and strip any remaining double quotes later
      if "$HAS_HOST"; then
           record="$(host -t TXT "$1" 2>/dev/null | awk -F\" '/descriptive text/ { print $(NF-1) }')"
@@ -21624,7 +21624,7 @@ determine_rdns() {
      [[ "$NODNS" == none ]] && rDNS="(instructed to skip DNS queries)" && return 0        # No DNS lookups at all
      [[ "$NODNS" == min ]] && rDNS="(instructed to minimize DNS queries)" && return 0     # PTR records were not asked for
      local nodeip="$(tr -d '[]' <<< $NODEIP)"               # for DNS we do not need the square brackets of IPv6 addresses
-     OPENSSL_CONF=""                                        # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                                        # see https://github.com/testssl/testssl.sh/issues/134
      if [[ "$NODE" == *.local ]]; then
           if "$HAS_AVAHIRESOLVE"; then
                rDNS=$(avahi-resolve -a $nodeip 2>/dev/null | awk '{ print $2 }')
@@ -21641,7 +21641,7 @@ determine_rdns() {
      elif "$HAS_NSLOOKUP"; then
           rDNS=$(strip_lf "$(nslookup -type=PTR $nodeip 2>/dev/null | grep -v 'canonical name =' | grep 'name = ' | awk '{ print $NF }' | sed 's/\.$//')")
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      # First, rDNS can contain multilines due to multiple PTR DNS records, though this is not recommended.
      # So we use a loop to check for each FQDN returned. There we remove chars which under weird
      # circumstances (see #1506) can show up here. The blacklist is taken from RFC 1912 ("Allowable characters in a
@@ -22037,7 +22037,7 @@ determine_optimal_proto() {
 
      >$ERRFILE
      if [[ -n "$1" ]]; then
-          # STARTTLS workaround needed see https://github.com/drwetter/testssl.sh/issues/188 -- kind of odd
+          # STARTTLS workaround needed see https://github.com/testssl/testssl.sh/issues/188 -- kind of odd
           for STARTTLS_OPTIMAL_PROTO in -tls1_2 -tls1 -ssl3 -tls1_1 -tls1_3 -ssl2; do
                sclient_supported "$STARTTLS_OPTIMAL_PROTO" || continue
                $OPENSSL s_client $(s_client_options "$STARTTLS_OPTIMAL_PROTO $BUGS -connect "$NODEIP:$PORT" $PROXY -msg $STARTTLS $SNI") </dev/null >$TMPFILE 2>>$ERRFILE
