@@ -11079,25 +11079,27 @@ run_fs() {
                     # A few servers get confused if the signature_algorithms extension contains too many entries. So:
                     # * For TLS 1.3, break the list into two and test each half separately.
                     # * For TLS 1.2, generally limit the signature_algorithms extension to algorithms that are consistent with the key type.
+                    # At least one server gets confused if RSA+MD5 is offered first. So, the ordering is reversed so that the strongest
+                    # options appear in $sigalgs_to_test first.
                     for hexc in "${sigalgs_hex[@]}"; do
                          if [[ "$proto" == 04* ]]; then
                               if ! "${tls13_supported_sigalgs[i]}"; then
                                    if [[ "${proto##*-}" == 01 ]]; then
-                                        [[ $i -le 16 ]] && sigalgs_to_test+=", $hexc"
+                                        [[ $i -le 16 ]] && sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    else
-                                        [[ $i -gt 16 ]] && sigalgs_to_test+=", $hexc"
+                                        [[ $i -gt 16 ]] && sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    fi
                               fi
                          elif ! "${tls12_supported_sigalgs[i]}"; then
                               if [[ "$proto" =~ rsa ]]; then
                                    if [[ "${hexc:3:2}" == 01 ]] || [[ "${hexc:0:2}" == 08 ]]; then
-                                        sigalgs_to_test+=", $hexc"
+                                        sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    fi
                               elif [[ "$proto" =~ dss ]]; then
-                                   [[ "${hexc:3:2}" == 02 ]] && sigalgs_to_test+=", $hexc"
+                                   [[ "${hexc:3:2}" == 02 ]] && sigalgs_to_test=", $hexc$sigalgs_to_test"
                               else
                                    if [[ "${hexc:3:2}" == 03 ]] || [[ "${hexc:0:2}" == 08 ]]; then
-                                        sigalgs_to_test+=", $hexc"
+                                        sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    fi
                               fi
                          fi
