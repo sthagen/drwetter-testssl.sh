@@ -8386,12 +8386,14 @@ wildcard_match()
 #    8, if the server name provided is a wildcard match against the CN
 #    9, if the server name provided matches a name in the SAN AND is a wildcard match against the CN
 #   10, if the server name provided is a wildcard match against the CN AND a name in the SAN
+#
+#  Add 128 to the return value if the CN or a DNS name in the SAN is a wildcard.
 
 compare_server_name_to_cert() {
      local cert="$1"
      local servername cns cn dns_sans ip_sans san dercert tag
      local srv_id="" xmppaddr=""
-     local -i i len len1 cn_match=0
+     local -i i len len1 cn_match=0 wildcard_cert=0
      local -i subret=0             # no error condition, passing results
 
      HAS_DNS_SANS=false
@@ -8536,10 +8538,16 @@ compare_server_name_to_cert() {
      fi
 
      # Check whether any of the DNS names in the certificate are wildcard names
-     # that match the servername
+     # and if they match the servername
      if [[ $subret -eq 0 ]]; then
           while read san; do
                [[ -n "$san" ]] || continue
+               is_wildcard "$san"
+               if [[ $? -eq 0 ]]; then
+                     wildcard_cert=128
+               else
+                    continue
+               fi
                wildcard_match "$servername" "$san"
                [[ $? -eq 0 ]] && subret=2 && break
           done <<< "$dns_sans"
@@ -8555,13 +8563,20 @@ compare_server_name_to_cert() {
           # Check whether the CN matches the servername
           [[ $(toupper "$cn") == "$servername" ]] && cn_match=4 && break
 
-          # Check whether the CN is a wildcard name that matches the servername
+          # Check whether the CN is a wildcard name and if it matches the servername
           # NOTE: Don't stop loop on a wildcard match in case there is another CN
           # that is an exact match.
+          is_wildcard "$cn"
+          if [[ $? -eq 0 ]]; then
+                wildcard_cert=128
+          else
+               continue
+          fi
           wildcard_match "$servername" "$cn"
           [[ $? -eq 0 ]] && cn_match=8
      done <<< "$cns"
      subret+=$cn_match
+     subret+=$wildcard_cert
      return $subret
 }
 
@@ -9456,7 +9471,7 @@ certificate_info() {
      #      supported by the client.
      has_dns_sans=$HAS_DNS_SANS
 
-     case $trust_sni in
+     case $((trust_sni%128)) in
           0) trustfinding="certificate does not match supplied URI"
              set_grade_cap "M" "Domain name mismatch"
              ;;
@@ -9483,10 +9498,10 @@ certificate_info() {
              ;;
      esac
 
-     if [[ $trust_sni -eq 0 ]]; then
+     if [[ $((trust_sni%128)) -eq 0 ]]; then
           pr_svrty_high "$trustfinding"
           trust_sni_finding="HIGH"
-     elif [[ $trust_sni -eq 4 ]] || [[ $trust_sni -eq 8 ]]; then
+     elif [[ $((trust_sni%128)) -eq 4 ]] || [[ $((trust_sni%128)) -eq 8 ]]; then
           if [[ $SERVICE == HTTP ]] || "$ASSUME_HTTP"; then
                # https://bugs.chromium.org/p/chromium/issues/detail?id=308330
                # https://bugzilla.mozilla.org/show_bug.cgi?id=1245280
@@ -9513,17 +9528,17 @@ certificate_info() {
      # See issue #733.
      if [[ -z "$sni_used" ]]; then
           trustfinding_nosni=""
-     elif [[ $trust_sni -eq $trust_nosni && "$has_dns_sans" == "$has_dns_sans_nosni" ]] || \
-          [[ $trust_sni -eq 0 && $trust_nosni -eq 0 ]]; then
+     elif [[ $((trust_sni%128)) -eq $((trust_nosni%128)) && "$has_dns_sans" == "$has_dns_sans_nosni" ]] || \
+          [[ $((trust_sni%128)) -eq 0 && $((trust_nosni%128)) -eq 0 ]]; then
           trustfinding_nosni=" (same w/o SNI)"
-     elif [[ $trust_nosni -eq 0 ]]; then
-          if [[ $trust_sni -eq 4 ]] || [[ $trust_sni -eq 8 ]]; then
+     elif [[ $((trust_nosni%128)) -eq 0 ]]; then
+          if [[ $((trust_sni%128)) -eq 4 ]] || [[ $((trust_sni%128)) -eq 8 ]]; then
                trustfinding_nosni=" (w/o SNI: certificate does not match supplied URI)"
           else
                trustfinding_nosni=" (SNI mandatory)"
           fi
-     elif [[ $trust_nosni -eq 4 ]] || [[ $trust_nosni -eq 8 ]] || [[ $trust_sni -eq 4 ]] || [[ $trust_sni -eq 8 ]]; then
-          case $trust_nosni in
+     elif [[ $((trust_nosni%128)) -eq 4 ]] || [[ $((trust_nosni%128)) -eq 8 ]] || [[ $((trust_sni%128)) -eq 4 ]] || [[ $((trust_sni%128)) -eq 8 ]]; then
+          case $((trust_nosni%128)) in
                1) trustfinding_nosni=" (w/o SNI: Ok via SAN)" ;;
                2) trustfinding_nosni=" (w/o SNI: Ok via SAN wildcard)" ;;
                4) if "$has_dns_sans_nosni"; then
@@ -9543,12 +9558,12 @@ certificate_info() {
                9) trustfinding_nosni=" (w/o SNI: Ok via CN wildcard and SAN)" ;;
               10) trustfinding_nosni=" (w/o SNI: Ok via SAN wildcard and CN wildcard)" ;;
           esac
-     elif [[ $trust_sni -ne 0 ]]; then
+     elif [[ $((trust_sni%128)) -ne 0 ]]; then
           trustfinding_nosni=" (works w/o SNI)"
      else
           trustfinding_nosni=" (however, works w/o SNI)"
      fi
-     if [[ -n "$sni_used" ]] || [[ $trust_nosni -eq 0 ]] || [[ $trust_nosni -ne 4 && $trust_nosni -ne 8 ]]; then
+     if [[ -n "$sni_used" ]] || [[ $((trust_nosni%128)) -eq 0 ]] || [[ $((trust_nosni%128)) -ne 4 && $((trust_nosni%128)) -ne 8 ]]; then
           outln "$trustfinding_nosni"
      elif [[ $SERVICE == HTTP ]] || "$ASSUME_HTTP"; then
           prln_svrty_high "$trustfinding_nosni"
@@ -9558,7 +9573,7 @@ certificate_info() {
 
      fileout "cert_trust${json_postfix}" "$trust_sni_finding" "${trustfinding}${trustfinding_nosni}"
 
-     if [[ "$trust_sni" =~ ^(2|6|8|9|10)$ ]] || [[ "$trust_nosni" =~ ^(2|6|8|9|10)$ ]]; then
+     if [[ $((trust_sni&128)) -eq 128 ]] || [[ $((trust_nosni&128)) -eq 128 ]]; then
           out "${spaces}"
           pr_svrty_low "wildcard certificate" ; outln " could be problematic, see other hosts at"
           outln "${spaces}https://search.censys.io/search?resource=hosts&virtual_hosts=INCLUDE&q=$cert_fingerprint_sha2"
@@ -10164,7 +10179,7 @@ run_server_defaults() {
                          # $NODE being tested or if it has the same subject
                          # (CN and SAN) as other certificates for this host.
                          compare_server_name_to_cert "$HOSTCERT"
-                         [[ $? -ne 0 ]] && success[n]=0 || success[n]=1
+                         [[ $(($?%128)) -ne 0 ]] && success[n]=0 || success[n]=1
 
                          if [[ ${success[n]} -ne 0 ]]; then
                               cn_nosni="$(toupper "$(get_cn_from_cert $HOSTCERT)")"
