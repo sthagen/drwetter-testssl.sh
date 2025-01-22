@@ -5286,7 +5286,9 @@ run_client_simulation() {
                          fi
                          if [[ -n "$what_dh" ]]; then
                               [[ -n "$curve" ]] && curve="($curve)"
-                              if [[ "$what_dh" == ECDH ]]; then
+                              if [[ "$what_dh" =~ MLKEM ]] || [[ "$what_dh" =~ Kyber ]]; then
+                                   pr_kem_quality "$bits" "$(printf -- "%-12s" "$what_dh")"
+                              elif [[ "$what_dh" == ECDH ]]; then
                                    pr_ecdh_quality "$bits" "$(printf -- "%-12s" "$bits bit $what_dh") $curve"
                               else
                                    pr_dh_quality "$bits" "$(printf -- "%-12s" "$bits bit $what_dh") $curve"
@@ -6524,6 +6526,30 @@ pr_ecdh_curve_quality() {
      pr_ecdh_quality "$bits" "$curve"
 }
 
+pr_kem_quality() {
+     local bits="$1"
+     local string="$2"
+
+     # At the moment all KEMs offer at least 128 bits of security strength
+     # (comparable to 256-bit elliptic curve key). So, all KEMs should be
+     # considered good.
+     pr_svrty_good "$string"
+}
+
+
+pr_kem_param_set_quality() {
+     kem="$1"
+     local -i bits=0
+
+     case "$kem" in
+          "SecP256r1MLKEM768") bits=192  ;;
+          "X25519MLKEM768") bits=192  ;;
+          "SecP384r1MLKEM1024") bits=256 ;;
+          "X25519Kyber768Draft00") bits=128  ;;
+     esac
+     pr_kem_quality "$bits" "$kem"
+}
+
 # Return a value that is an indicator of the quality of the cipher in $1:
 #   0 = $1 is empty
 #   1 = pr_svrty_critical, 2 = pr_svrty_high, 3 = pr_svrty_medium, 4 = pr_svrty_low
@@ -6676,6 +6702,10 @@ read_dhtype_from_file() {
      kx="Kx=${temp%%,*}"
      [[ "$kx" == "Kx=X25519" ]] && kx="Kx=ECDH"
      [[ "$kx" == "Kx=X448" ]] && kx="Kx=ECDH"
+     [[ "$kx" == "Kx=SecP256r1MLKEM768" ]] && kx="Kx=ECDH/MLKEM"
+     [[ "$kx" == "Kx=X25519MLKEM768" ]] && kx="Kx=ECDH/MLKEM"
+     [[ "$kx" == "Kx=SecP384r1MLKEM1024" ]] && kx="Kx=ECDH/MLKEM"
+     [[ "$kx" == "Kx=X25519Kyber768Draft00" ]] && kx="Kx=ECDH/Kyber"
      tm_out "$kx"
      return 0
 }
@@ -10512,13 +10542,13 @@ run_fs() {
      local fs_cipher_list="DHE-DSS-AES128-GCM-SHA256:DHE-DSS-AES128-SHA256:DHE-DSS-AES128-SHA:DHE-DSS-AES256-GCM-SHA384:DHE-DSS-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-DSS-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA:DHE-DSS-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA:DHE-DSS-SEED-SHA:DHE-RSA-AES128-CCM8:DHE-RSA-AES128-CCM:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-CCM8:DHE-RSA-AES256-CCM:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA:DHE-RSA-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-RSA-CHACHA20-POLY1305-OLD:DHE-RSA-CHACHA20-POLY1305:DHE-RSA-SEED-SHA:ECDHE-ECDSA-AES128-CCM8:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-CCM8:ECDHE-ECDSA-AES256-CCM:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-ECDSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305-OLD:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-RSA-CHACHA20-POLY1305-OLD:ECDHE-RSA-CHACHA20-POLY1305"
      local fs_hex_cipher_list="" ciphers_to_test tls13_ciphers_to_test
      local ecdhe_cipher_list="" tls13_cipher_list="" ecdhe_cipher_list_hex="" ffdhe_cipher_list_hex=""
-     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e" "00,1f" "00,20" "00,21")
-     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13")
-     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13")
-     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448 256 384 512)
+     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e" "00,1f" "00,20" "00,21" "11,eb" "11,ec" "11,ed" "63,99")
+     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
+     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
+     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448 256 384 512 192 192 256 128)
      # Many curves have been deprecated, and RFC 8446, Appendix B.3.1.4, states
      # that these curves MUST NOT be offered in a TLS 1.3 ClientHello.
-     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false" "false" "false" "false")
+     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false" "false" "false" "false" "false" "false" "false" "false")
      local -a ffdhe_groups_hex=("01,00" "01,01" "01,02" "01,03" "01,04")
      local -a ffdhe_groups_output=("ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
      local -a supported_curve
@@ -10529,7 +10559,7 @@ run_fs() {
      local rsa_cipher="" ecdsa_cipher="" dss_cipher=""
      local sigalgs_to_test tls12_supported_sigalg_list="" tls13_supported_sigalg_list=""
      local -i nr_supported_ciphers=0 nr_curves=0 nr_ossl_curves=0 i j low high
-     local fs_ciphers curves_offered="" curves_to_test temp
+     local fs_ciphers curves_offered="" kems_offered="" curves_to_test temp
      local curves_option="" curves_list1="" curves_list2=""
      local len1 len2 curve_found sigalg_found
      local key_bitstring quality_str
@@ -10719,7 +10749,7 @@ run_fs() {
                     else
                          ! "$fs_tls12_offered" && [[ "$(get_protocol "$TMPFILE")" == TLSv1.2 ]] && fs_tls12_offered=true
                     fi
-                    if "$WIDE"; then
+                    if "$WIDE" && [[ ${kx[i]} == Kx=ECDH || ${kx[i]} == Kx=DH || ${kx[i]} == Kx=EDH ]]; then
                          dhlen=$(read_dhbits_from_file "$TMPFILE" quiet)
                          kx[i]="${kx[i]} $dhlen"
                     fi
@@ -10755,7 +10785,7 @@ run_fs() {
                               fs_tls13_offered=true
                               "$WIDE" && kx[i]="$(read_dhtype_from_file "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")"
                          fi
-                         if "$WIDE"; then
+                         if "$WIDE" && [[ ${kx[i]} == Kx=ECDH || ${kx[i]} == Kx=DH || ${kx[i]} == Kx=EDH ]]; then
                               dhlen=$(read_dhbits_from_file "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt" quiet)
                               kx[i]="${kx[i]} $dhlen"
                          fi
@@ -10819,7 +10849,7 @@ run_fs() {
                fi
           fi
           debugme echo $fs_offered
-          "$WIDE" || outln
+          outln
           fileout "${jsonID}_ciphers" "INFO" "$fs_ciphers"
      fi
 
@@ -10930,12 +10960,21 @@ run_fs() {
           low=1000
           for (( i=0; i < nr_curves; i++ )); do
                if "${supported_curve[i]}"; then
-                    curves_offered+="${curves_ossl[i]} "
-                    [[ ${curves_bits[i]} -lt $low ]] && low=${curves_bits[i]}
+                    if [[ "${curves_ossl[i]}" =~ KEM ]] || [[ "${curves_ossl[i]}" =~ Kyber ]]; then
+                         kems_offered+="${curves_ossl[i]} "
+                    else
+                         curves_offered+="${curves_ossl[i]} "
+                         [[ ${curves_bits[i]} -lt $low ]] && low=${curves_bits[i]}
+                    fi
                fi
           done
+          if [[ -n "$kems_offered" ]]; then
+               pr_bold " KEMs offered                 "
+               out_row_aligned_max_width_by_entry "$kems_offered" "                              " $TERM_WIDTH pr_kem_param_set_quality
+               outln
+               fileout "${jsonID}_KEMs" "OK" "$kems_offered"
+          fi
           if [[ -n "$curves_offered" ]]; then
-               "$WIDE" && outln
                pr_bold " Elliptic curves offered:     "
                out_row_aligned_max_width_by_entry "$curves_offered" "                              " $TERM_WIDTH pr_ecdh_curve_quality
                outln
@@ -14513,6 +14552,10 @@ parse_tls_serverhello() {
                                          "0102") echo -n "ffdhe4096" >> $TMPFILE ;;
                                          "0103") echo -n "ffdhe6144" >> $TMPFILE ;;
                                          "0104") echo -n "ffdhe8192" >> $TMPFILE ;;
+                                         "11EB") echo -n "SecP256r1MLKEM768" >> $TMPFILE ;;
+                                         "11EC") echo -n "X25519MLKEM768" >> $TMPFILE ;;
+                                         "11ED") echo -n "SecP384r1MLKEM1024" >> $TMPFILE ;;
+                                         "6399") echo -n "X25519Kyber768Draft00" >> $TMPFILE ;;
                                               *) echo -n "unknown (${tls_serverhello_ascii:offset:4})" >> $TMPFILE ;;
                                     esac
                                     offset=$((offset+4))
@@ -14608,6 +14651,10 @@ parse_tls_serverhello() {
                                     258) dh_bits=4096 ; named_curve_str="ffdhe4096" ;;
                                     259) dh_bits=6144 ; named_curve_str="ffdhe6144" ;;
                                     260) dh_bits=8192 ; named_curve_str="ffdhe8192" ;;
+                                    4587) dh_bits=192 ; named_curve_str="SecP256r1MLKEM768" ;;
+                                    4588) dh_bits=192 ; named_curve_str="X25519MLKEM768" ;;
+                                    4589) dh_bits=256 ; named_curve_str="SecP384r1MLKEM1024" ;;
+                                    25497) dh_bits=128 ; named_curve_str="X25519Kyber768Draft00" ;;
                                     *) named_curve_str="" ; named_curve_oid="" ;;
                                esac
                                offset=$((extns_offset+20+i))
@@ -14795,9 +14842,9 @@ parse_tls_serverhello() {
      fi
      echo "Cipher    : $rfc_cipher_suite" >> $TMPFILE
      if [[ $dh_bits -ne 0 ]]; then
-          if [[ "$named_curve_str" =~ "ffdhe" ]]; then
+          if [[ "$named_curve_str" =~ ffdhe ]]; then
                echo "Server Temp Key: DH, $named_curve_str, $dh_bits bits" >> $TMPFILE
-          elif [[ "$named_curve_str" == "X25519" ]] || [[ "$named_curve_str" == "X448" ]]; then
+          elif [[ "$named_curve_str" == X25519 ]] || [[ "$named_curve_str" == X448 ]] || [[ "$named_curve_str" =~ KEM ]] || [[ "$named_curve_str" =~ Kyber ]]; then
                echo "Server Temp Key: $named_curve_str, $dh_bits bits" >> $TMPFILE
           else
                echo "Server Temp Key: ECDH, $named_curve_str, $dh_bits bits" >> $TMPFILE
@@ -14840,9 +14887,9 @@ parse_tls_serverhello() {
                echo ""
           fi
           if [[ $dh_bits -ne 0 ]]; then
-               if [[ "$named_curve_str" =~ "ffdhe" ]]; then
+               if [[ "$named_curve_str" =~ ffdhe ]]; then
                     echo "     dh_bits:                DH, $named_curve_str, $dh_bits bits"
-               elif [[ "$named_curve_str" == "X25519" ]] || [[ "$named_curve_str" == "X448" ]]; then
+               elif [[ "$named_curve_str" == X25519 ]] || [[ "$named_curve_str" == X448 ]] || [[ "$named_curve_str" =~ KEM ]] || [[ "$named_curve_str" =~ Kyber ]]; then
                     echo "     dh_bits:                $named_curve_str, $dh_bits bits"
                else
                     echo "     dh_bits:                ECDH, $named_curve_str, $dh_bits bits"
@@ -15631,7 +15678,15 @@ prepare_tls_clienthello() {
                00, 01, 00, 02, 00, 03, 00, 0f, 00, 10, 00, 11, 01, 00, 01, 01"
           elif [[ 0x$tls_low_byte -gt 0x03 ]]; then
                # Supported Groups Extension
-               if [[ ! "$process_full" =~ all ]] || { "$HAS_X25519" && "$HAS_X448"; }; then
+               if [[ ! "$process_full" =~ all ]]; then
+                    extension_supported_groups="
+                    00,0a,                      # Type: Supported Groups, see RFC 8446
+                    00,1e, 00,1c,               # lengths
+                    00,1d, 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21,
+                    01,00, 01,01, 11,eb, 11,ec, 11,ed, 63,99"
+                    # Only include ML-KEM and Kyber hybrids as options if the response does
+                    # not need to be decrypted.
+               elif [[ ! "$process_full" =~ all ]] || { "$HAS_X25519" && "$HAS_X448"; }; then
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
                     00,16, 00,14,               # lengths
@@ -15653,7 +15708,7 @@ prepare_tls_clienthello() {
                     00,1d, 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01, 00,1e"
                     # OpenSSL prior to 1.1.0 does not support either X25519 or X448,
-                    # so list them as the least referred options if the response
+                    # so list them as the least preferred options if the response
                     # needs to be decrypted, and do not list them at all if the
                     # response MUST be decrypted.
                elif [[ "$process_full" == all+ ]]; then
@@ -20354,8 +20409,8 @@ find_openssl_binary() {
      $OPENSSL s_client -tls1_3 </dev/null 2>&1 | grep -aiq "unknown option" || HAS_TLS13=true
      $OPENSSL s_client -no_ssl2 </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_SSL2=true
 
-     $OPENSSL genpkey -algorithm X448 2>&1 | grep -aq "not found" || HAS_X448=true
-     $OPENSSL genpkey -algorithm X25519 2>&1 | grep -aq "not found" || HAS_X25519=true
+     $OPENSSL genpkey -algorithm X448 2>&1 | grep -Eaq "not found|unsupported" || HAS_X448=true
+     $OPENSSL genpkey -algorithm X25519 2>&1 | grep -Eaq "not found|unsupported" || HAS_X25519=true
      $OPENSSL pkey -help 2>&1 | grep -q Error || HAS_PKEY=true
      $OPENSSL pkeyutl 2>&1 | grep -q Error ||  HAS_PKUTIL=true
 
