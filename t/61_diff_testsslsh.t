@@ -3,11 +3,10 @@
 # Baseline diff test against testssl.sh (csv output)
 #
 # We don't use a full run yet and only the certificate section.
-# There we would need to blacklist at least:
+# There we would need to blacklist more, like:
 # cert_serialNumber, cert_fingerprintSHA1, cert_fingerprintSHA256, cert
 # cert_expirationStatus, cert_notBefore, cert_notAfter, cert_caIssuers, intermediate_cert
 #
-# help is appreciated here
 
 use strict;
 use Test::More;
@@ -16,55 +15,54 @@ use Text::Diff;
 
 my $tests = 0;
 my $prg="./testssl.sh";
-my $master_socket_csv="./t/baseline_data/default_testssl.csvfile";
-my $socket_csv="tmp.csv";
-my $check2run="-p -s -P --fs -h -U -c -q --ip=one --color 0 --csvfile $socket_csv";
-#my $check2run="-p --color 0 --csvfile $socket_csv";
+my $baseline_csv="./t/baseline_data/default_testssl.csvfile";
+my $cat_csv="tmp.csv";
+my $check2run="-p -s -P --fs -h -U -c -q --ip=one --color 0 --csvfile $cat_csv";
 my $uri="testssl.sh";
 my $diff="";
 
 die "Unable to open $prg" unless -f $prg;
-die "Unable to open $master_socket_csv" unless -f $master_socket_csv;
-
+die "Unable to open $baseline_csv" unless -f $baseline_csv;
 
 # Provide proper start conditions
-unlink "tmp.csv";
+unlink $cat_csv;
 
-# Title
-printf "\n%s\n", "Diff unit test IPv4 against \"$uri\"";
+my @args=("$prg", "$check2run", "$uri", "2>&1");
 
 #1 run
-`$prg $check2run $uri 2>&1`;
+printf "\n%s\n", "Diff unit test (IPv4) against \"$uri\"";
+printf "@args\n";
+system("@args") == 0
+     or die ("FAILED: \"@args\" ");
 
-$diff = diff $socket_csv, $master_socket_csv;
-
-$socket_csv=`cat tmp.csv`;
-$master_socket_csv=`cat $master_socket_csv`;
+$cat_csv=`cat $cat_csv`;
+$baseline_csv=`cat $baseline_csv`;
 
 # Filter for changes that are allowed to occur
-$socket_csv=~ s/HTTP_clock_skew.*\n//g;
-$master_socket_csv=~ s/HTTP_clock_skew.*\n//g;
-
-# DROWN
-$socket_csv=~ s/censys.io.*\n//g;
-$master_socket_csv=~ s/censys.io.*\n//g;
+$cat_csv      =~ s/HTTP_clock_skew.*\n//g;
+$baseline_csv =~ s/HTTP_clock_skew.*\n//g;
 
 # HTTP time
-$socket_csv=~ s/HTTP_headerTime.*\n//g;
-$master_socket_csv=~ s/HTTP_headerTime.*\n//g;
+$cat_csv      =~ s/HTTP_headerTime.*\n//g;
+$baseline_csv =~ s/HTTP_headerTime.*\n//g;
 
-# Compare the differences to the master file -- and print differences if there were detected.
+# DROWN
+$cat_csv      =~ s/censys.io.*\n//g;
+$baseline_csv =~ s/censys.io.*\n//g;
+
+$diff = diff \$cat_csv, \$baseline_csv;
+
+# Compare the differences to the baseline file -- and print differences if there were detected.
 #
-cmp_ok($socket_csv, "eq", $master_socket_csv, "Check whether CSV output matches master file from $uri") or
+ok($cat_csv eq $baseline_csv, "Check whether CSV output matches baseline file from $uri") or
      diag ("\n%s\n", "$diff");
-
-$tests++;
 
 unlink "tmp.csv";
 
+$tests++;
 done_testing($tests);
 printf "\n";
 
 
-#  vim:ts=5:sw=5:expandtab
+# vim:ts=5:sw=5:expandtab
 
