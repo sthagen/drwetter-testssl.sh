@@ -10,7 +10,7 @@ for some new / advanced cipher suites and/or features which are not in the
 official branch like (old version of the) CHACHA20+POLY1305 and CAMELLIA 256 bit ciphers.
 
 The (stripped) binaries this directory are all compiled from my openssl snapshot
-(https://github.com/drwetter/openssl-1.0.2.bad) which adds a few bits to Peter
+(https://github.com/testssl/openssl-1.0.2.bad) which adds a few bits to Peter
 Mosman's openssl fork (https://github.com/PeterMosmans/openssl). Thx a bunch, Peter!
 The few bits are IPv6 support (except IPV6 proxy) and some STARTTLS backports.
 
@@ -71,11 +71,11 @@ Compilation instructions
 If you want to compile OpenSSL yourself, here are the instructions:
 
 1.)
-    git git clone https://github.com/drwetter/openssl-1.0.2-bad
+    git git clone https://github.com/testssl/openssl-1.0.2-bad
     cd openssl
 
 
-2.) configure the damned thing. Options I used (see https://github.com/drwetter/testssl.sh/blob/master/utils/make-openssl.sh)
+2.) configure the damned thing. Options I used (see https://github.com/testssl/testssl.sh/blob/master/utils/make-openssl.sh)
 
 **for 64Bit including Kerberos ciphers:**
 

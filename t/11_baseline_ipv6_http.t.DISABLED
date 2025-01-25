@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# disabled as IPv6 is not supported by Travis, see https://github.com/drwetter/testssl.sh/issues/1177
+# disabled as IPv6 wasn't supported by Travis CI and isn't by GH action, see https://github.com/testssl/testssl.sh/issues/1177
 
 # Just a functional test, whether there are any problems on the client side
 # Probably we could also inspect the JSON for any problems for

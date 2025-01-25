@@ -12,6 +12,7 @@
 * Improved compatibility with Open/LibreSSL versions not supporting TLS 1.0-1.1 anymore
 * Renamed PFS/perfect forward secrecy --> FS/forward secrecy
 * Cipher list straightening
+* Support RFC 9150 cipher suites
 * Improved mass testing
 * Better align colors of ciphers with standard cipherlists
 * Save a few cycles for ROBOT
@@ -23,13 +24,16 @@
 * Test for STARTTLS injection vulnerabilities (SMTP, POP3, IMAP)
 * STARTTLS: XMPP server support, plus new set of OpenSSL-bad binaries
 * Several code improvements to STARTTLS, also better detection when no STARTTLS is offered
+* Renegotiation checks more reliable against different servers
 * STARTTLS on active directory service support
 * Security fixes: DNS and other input from servers
 * Don't penalize missing trust in rating when CA not in Java store
 * Added support for certificates with EdDSA signatures and public keys
 * Extract CA list shows supported certification authorities sent by the server
+* Wildcard certificates: detection and warning
 * TLS 1.2 and TLS 1.3 sig algs added
 * Check for ffdhe groups
+* Check for three KEMs in draft-kwiatkowski-tls-ecdhe-mlkem/draft-tls-westerbaan-xyber768d00
 * Show server supported signature algorithms
 * --add-ca can also now be a directory with \*.pem files
 * Warning of 398 day limit for certificates issued after 2020/9/1
@@ -41,6 +45,7 @@
 * DNS via proxy improvements
 * Client simulation runs in wide mode which is even better readable
 * Added --reqheader to support custom headers in HTTP requests
+* Search for more HTTP security headers on the server
 * Test for support for RFC 8879 certificate compression
 * Deprecating --fast and --ssl-native (warning but still av)
 * Compatible to GNU grep 3.8

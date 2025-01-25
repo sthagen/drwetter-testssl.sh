@@ -587,4 +587,4 @@ Probably. Current known ones and interface for filing new ones: https://testssl.
 
 ## SEE ALSO
 
-`ciphers`(1), `openssl`(1), `s_client`(1), `x509`(1), `verify`(1), `ocsp`(1), `crl`(1), `bash`(1) and the websites https://testssl.sh/ and https://github.com/drwetter/testssl.sh/ .
+`ciphers`(1), `openssl`(1), `s_client`(1), `x509`(1), `verify`(1), `ocsp`(1), `crl`(1), `bash`(1) and the websites https://testssl.sh/ and https://github.com/testssl/testssl.sh/ .
