@@ -25,18 +25,18 @@ die "Unable to open $prg" unless -f $prg;
 die "Unable to open $distro_openssl" unless -f $distro_openssl;
 
 # Provide proper start conditions
-unlink "tmp.csv";
-unlink "tmp2.csv";
+unlink $csvfile;
+unlink $csvfile2;
 
 #1 run
 printf "\n%s\n", "Diff test IPv4 with supplied openssl against \"$uri\"";
-@args="$prg $check2run $csvfile $uri 2>&1";
+@args="$prg $check2run $csvfile $uri >/dev/null";
 system("@args") == 0
      or die ("FAILED: \"@args\"");
 
 # 2
 printf "\n%s\n", "Diff test IPv4 with $distro_openssl against \"$uri\"";
-@args="$prg $check2run $csvfile2 --openssl=$distro_openssl $uri 2>&1";
+@args="$prg $check2run $csvfile2 --openssl=$distro_openssl $uri >/dev/null";
 system("@args") == 0
      or die ("FAILED: \"@args\" ");
 
@@ -62,6 +62,10 @@ $cat_csvfile  =~  s/ECDH\/MLKEM/ECDH 253  /g;
 # Nonce in CSP
 $cat_csvfile  =~ s/.nonce-.* //g;
 $cat_csvfile2 =~ s/.nonce-.* //g;
+
+# Fix IP addresses. Needed when we don't hit the same IP address. We just remove them
+$cat_csvfile  =~ s/","google.com\/.*","443/","google.com","443/g;
+$cat_csvfile2 =~ s/","google.com\/.*","443/","google.com","443/g;
 
 $diff = diff \$cat_csvfile, \$cat_csvfile2;
 

@@ -20,6 +20,7 @@ my $cat_csv="tmp.csv";
 my $check2run="-p -s -P --fs -h -U -c -q --ip=one --color 0 --csvfile $cat_csv";
 my $uri="testssl.sh";
 my $diff="";
+my @args="";
 
 die "Unable to open $prg" unless -f $prg;
 die "Unable to open $baseline_csv" unless -f $baseline_csv;
@@ -27,11 +28,10 @@ die "Unable to open $baseline_csv" unless -f $baseline_csv;
 # Provide proper start conditions
 unlink $cat_csv;
 
-my @args=("$prg", "$check2run", "$uri", "2>&1");
 
 #1 run
 printf "\n%s\n", "Diff unit test (IPv4) against \"$uri\"";
-printf "@args\n";
+@args="$prg $check2run $uri >/dev/null";
 system("@args") == 0
      or die ("FAILED: \"@args\" ");
 

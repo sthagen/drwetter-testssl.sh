@@ -15,47 +15,50 @@ use JSON;
 
 my $tests = 0;
 my $prg="./testssl.sh";
-my $check2run="-p -s -P --fs -S -h -U -q --ip=one --color 0";
+my $tmp_json="tmp.json";
+my $check2run="-p -s -P --fs -S -h -U -q --ip=one --color 0 --jsonfile $tmp_json";
 my $uri="google.com";
 my $socket_out="";
 my $openssl_out="";
-# Blacklists we use to trigger an error:
-my $socket_regex_bl='(e|E)rror|\.\/testssl\.sh: line |(f|F)atal|(c|C)ommand not found';
-my $openssl_regex_bl='(e|E)rror|(f|F)atal|\.\/testssl\.sh: line |Oops|s_client connect problem|(c|C)ommand not found';
-my $json_regex_bl='(id".*:\s"scanProblem"|severity".*:\s"FATAL"|"Scan interrupted")';
-
 my $socket_json="";
 my $openssl_json="";
-$check2run="--jsonfile tmp.json $check2run";
+#FIXME: Blacklists we use to trigger an error, but likely we can skip that and instead we should?/could use
+#       @args="$prg $check2run $uri >/dev/null";
+#       system("@args") == 0
+#           or die ("FAILED: \"@args\" ");
+my $socket_errors='(e|E)rror|\.\/testssl\.sh: line |(f|F)atal|(c|C)ommand not found';
+my $openssl_errors='(e|E)rror|(f|F)atal|\.\/testssl\.sh: line |Oops|s_client connect problem|(c|C)ommand not found';
+my $json_errors='(id".*:\s"scanProblem"|severity".*:\s"FATAL"|"Scan interrupted")';
+
 
 die "Unable to open $prg" unless -f $prg;
 
 # Provide proper start conditions
-unlink "tmp.json";
+unlink $tmp_json;
 
 # Title
 printf "\n%s\n", "Baseline unit test IPv4 against \"$uri\"";
 
 #1
 $socket_out = `$prg $check2run $uri 2>&1`;
-$socket_json = json('tmp.json');
-unlink "tmp.json";
-unlike($socket_out, qr/$socket_regex_bl/, "via sockets, terminal output");
+$socket_json = json($tmp_json);
+unlike($socket_out, qr/$socket_errors≈/, "via sockets, checking terminal output");
 $tests++;
-unlike($socket_json, qr/$json_regex_bl/, "via sockets JSON output");
+unlike($socket_json, qr/$json_errors/, "via sockets checking JSON output");
 $tests++;
+
+unlink $tmp_json;
+
 
 #2
 $openssl_out = `$prg --ssl-native $check2run $uri 2>&1`;
-$openssl_json = json('tmp.json');
-unlink "tmp.json";
-# With Google only we sometimes encounter an error as they return a 0 char with openssl, so we white list this pattern here:
-# It should be fixed in the code though so we comment this out
-# $openssl_out =~ s/testssl.*warning: command substitution: ignored null byte in input\n//g;
-unlike($openssl_out, qr/$openssl_regex_bl/, "via OpenSSL");
+$openssl_json = json($tmp_json);
+unlike($openssl_out, qr/$openssl_errors/, "via (builtin) OpenSSL, checking terminal output");
 $tests++;
-unlike($openssl_json, qr/$json_regex_bl/, "via OpenSSL JSON output");
+unlike($openssl_json, qr/$json_errors/, "via OpenSSL (builtin) checking JSON output");
 $tests++;
+
+unlink $tmp_json;
 
 done_testing($tests);
 printf "\n";
@@ -69,5 +72,5 @@ sub json($) {
 }
 
 
-#  vim:ts=5:sw=5:expandtab
+# vim:ts=5:sw=5:expandtab
 
