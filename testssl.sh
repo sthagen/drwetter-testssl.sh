@@ -11500,8 +11500,7 @@ starttls_full_read(){
                debugme tmln_out "${debugpad} ${one_line} "
                IFS="${oldIFS}"
                break
-          fi
-          if [[ ! ${one_line} =~ ${cont_pattern} ]]; then
+          elif [[ ! ${one_line} =~ ${cont_pattern} ]]; then
                debugme echo "=== full read syntax error, expected regex pattern ${cont_pattern} (cont) or ${end_pattern} (end) ==="
                IFS="${oldIFS}"
                ret_found=2
@@ -11607,9 +11606,9 @@ starttls_sieve_dialog() {
 
      [[ -n "$1" ]] && starttls="$starttls\r\n$1"            # this adds a payload if supplied
      debugme echo "=== starting sieve STARTTLS dialog ==="
-     starttls_full_read '^"' '^OK '   '"STARTTLS"'          "received server capabilities and checked STARTTLS availability" &&
+     starttls_full_read '^"' '^OK'   '"STARTTLS"'           "received server capabilities and checked STARTTLS availability" &&
      starttls_just_send "$starttls"                         "initiated STARTTLS" &&
-     starttls_full_read '^OK ' '^OK ' ''                    "received ack for STARTTLS"
+     starttls_full_read '^OK' '^OK' ''                      "received ack for STARTTLS"
      ret=$?
      debugme echo "=== finished sieve STARTTLS dialog with ${ret} ==="
      return $ret
@@ -21256,7 +21255,7 @@ parse_hn_port() {
      NODE="$1"
      NODE="${NODE/https\:\/\//}"        # strip "https"
      NODE="${NODE%%/*}"                 # strip trailing urlpath
-     NODE="${NODE%%.}"                  # strip trailing "." if supplied
+
      if grep -q ':$' <<< "$NODE"; then
           if grep -wq http <<< "$NODE"; then
                fatal "\"http\" is not what you meant probably" $ERR_CMDLINE
@@ -21278,6 +21277,8 @@ parse_hn_port() {
           grep -q ':' <<< "$NODE" && \
                PORT=$(sed 's/^.*\://' <<< "$NODE") && NODE=$(sed 's/\:.*$//' <<< "$NODE")
      fi
+
+     NODE="${NODE%%.}"                  # strip trailing "." if supplied
 
      # We check for non-ASCII chars now. If there are some we'll try to convert it if IDN/IDN2 is installed
      # If not, we'll continue. Hoping later that dig can use it. If not the error handler will tell
