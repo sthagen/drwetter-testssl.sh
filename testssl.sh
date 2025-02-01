@@ -6121,7 +6121,7 @@ listciphers() {
           [[ "$TLS13_OSSL_CIPHERS" =~ $cipher ]] && tls13_supported_ciphers+=":$cipher"
      done
      tls13_ciphers="${tls13_supported_ciphers:1}"
-     
+
      "$HAS_SECLEVEL" && [[ -n "$ciphers" ]] && ciphers="@SECLEVEL=0:$1"
      ! "$HAS_TLS1" && options="${options//-tls1 /}"
      if "$HAS_CIPHERSUITES"; then
@@ -11466,6 +11466,7 @@ starttls_full_read(){
      local end_pattern="$2"
      local starttls_regex="$3"     # optional: pattern we search for in the server's response
      local debug_str="$4"          # optional
+     local problem_pattern="$5"       # optional: used currently only for 421 code
      local starttls_read_data=()
      local one_line=""
      local ret=0
@@ -11486,13 +11487,20 @@ starttls_full_read(){
      while read -r -t $STARTTLS_SLEEP one_line; ret=$?; (exit $ret); do
           debugme tmln_out "S: ${one_line}"
           if [[ $DEBUG -ge 5 ]]; then
-               echo "end_pattern/cont_pattern: ${end_pattern} / ${cont_pattern}"
+               echo "end / cont problem pattern: ${end_pattern} / ${cont_pattern} / ${problem_pattern}"
           fi
           if [[ -n "$starttls_regex" ]]; then
                if [[ ${one_line} =~ $starttls_regex ]]; then
                     debugme tmln_out "${debugpad} ${one_line} "
                     # We don't exit here as the buffer is not empty. So we continue reading but save the status:
                     ret_found=0
+               fi
+          elif [[ -n "$problem_pattern" ]]; then
+               if [[ ${one_line} =~ ${problem_pattern} ]]; then
+                    debugme echo "=== matches ${problem_pattern} ==="
+                    IFS="${oldIFS}"
+                    ret_found=4
+                    break
                fi
           fi
           starttls_read_data+=("${one_line}")
@@ -11542,6 +11550,7 @@ starttls_smtp_dialog() {
      local greet_str="EHLO testssl.sh"
      local proto="smtp"
      local reSTARTTLS='^250[ -]STARTTLS'
+     local reToofast='^421 '                                # 421 4.7.0 .* Error: too many connections, see #2098
      local starttls="STARTTLS"
      local -i ret=0
 
@@ -11553,13 +11562,14 @@ starttls_smtp_dialog() {
      fi
      debugme echo "=== starting $proto STARTTLS dialog ==="
 
-     starttls_full_read '^220-' '^220 '  ''                 "received server greeting" &&
+     starttls_full_read '^220-' '^220 '  ''                 "received server greeting" "${reToofast}" &&
      starttls_just_send "$greet_str"                        "sent $greet_str" &&
      starttls_full_read '^250-' '^250 '  "${reSTARTTLS}"    "received server capabilities and checked STARTTLS availability" &&
      starttls_just_send "$starttls"                         "initiated STARTTLS" &&
      starttls_full_read '^220-' '^220 '  ''                 "received ack for STARTTLS"
      ret=$?
      debugme echo "=== finished $proto STARTTLS dialog with ${ret} ==="
+     # ret will be 4 if $reToofast matches
      return $ret
 }
 
@@ -11781,9 +11791,13 @@ starttls_telnet_dialog() {
      return $ret
 }
 
-# arg1: fd for socket -- which we don't use yes as it is a hassle (not clear whether it works under every bash version)
+# arg1: fd for socket (which we don't use yet. It's a hassle, not clear whether it works under every bash version
 # arg2: optional: for STARTTLS additional command to be injected
-# returns 6 if opening the socket caused a problem, 1 if STARTTLS handshake failed, 0: all ok
+# return values:
+#    0: all ok
+#    1: STARTTLS handshake failed
+#    4: throtteling on STARTTLS level encountered
+#    6: if opening the socket caused a problem
 #
 fd_socket() {
      local fd="$1"
@@ -11902,6 +11916,9 @@ fd_socket() {
           case $ret in
                0)   return 0 ;;
                3)   fatal "No STARTTLS found in handshake" $ERR_CONNECT ;;
+               4)   ((NR_STARTTLS_FAIL++))
+                    connectivity_problem $NR_STARTTLS_FAIL $MAX_STARTTLS_FAIL "Throtteling detected (STARTTLS server msg 421)" "repeated STARTTLS problems due to throtteling, giving up"
+                    return 4 ;;
                *)   if [[ $ret -eq 2 ]] && [[ -n "$payload" ]]; then
                          # We don't want this handling for STARTTLS injection
                          return 0
@@ -24119,7 +24136,7 @@ parse_cmd_line() {
                --mtls|--mtls=*)
                     MTLS="$(parse_opt_equal_sign "$1" "$2")"
                     [[ $? -eq 0 ]] && shift
-                    ;;  
+                    ;;
                --connect-timeout|--connect-timeout=*)
                     CONNECT_TIMEOUT="$(parse_opt_equal_sign "$1" "$2")"
                     [[ $? -eq 0 ]] && shift

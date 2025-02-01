@@ -22,8 +22,10 @@
 * BREACH check: list all compression methods and add brotli
 * Test for old winshock vulnerability
 * Test for STARTTLS injection vulnerabilities (SMTP, POP3, IMAP)
-* STARTTLS: XMPP server support, plus new set of OpenSSL-bad binaries
+* STARTTLS: XMPP server support, plus a new set of OpenSSL-bad binaries
+* STARTTLS sieve support, plus again a new set of OpenSSL-bad binaries
 * Several code improvements to STARTTLS, also better detection when no STARTTLS is offered
+* Detect throtteling via STARTTLS smtp
 * Renegotiation checks more reliable against different servers
 * STARTTLS on active directory service support
 * Security fixes: DNS and other input from servers
@@ -41,13 +43,13 @@
 * Added --user-agent argument to support using a custom User Agent
 * Added --overwrite argument to support overwriting output files without warning
 * Headerflag X-XSS-Protection is now labeled as INFO
+* Search for more HTTP security headers on the server
 * Strict parser for HSTS
 * DNS via proxy improvements
 * Client simulation runs in wide mode which is even better readable
 * Added --reqheader to support custom headers in HTTP requests
-* Search for more HTTP security headers on the server
 * Test for support for RFC 8879 certificate compression
-* Deprecating --fast and --ssl-native (warning but still av)
+* Deprecating --fast and --ssl-native (warning only but still av)
 * Compatible to GNU grep 3.8
 * Don't use external pwd command anymore
 * Doesn't hang anymore when there's no local resolver
