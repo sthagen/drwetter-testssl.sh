@@ -117,9 +117,6 @@ Please address questions not specifically to the code of testssl.sh to the respe
 * https://github.com/johannesschaefer/webnettools
 * https://github.com/TKCERT/testssl.sh-webfrontend
 
-#### Free to use Web frontend + commercial API
-* https://inspect.rapydblok.com (see also https://inspect.rapydblok.com/about)
-
 #### Mass scanner w parallel scans and elastic searching the results
 * https://github.com/TKCERT/testssl.sh-masscan
 
@@ -129,6 +126,9 @@ Please address questions not specifically to the code of testssl.sh to the respe
 #### Nagios / Icinga Plugins
 * https://github.com/dnmvisser/nagios-testssl (Python 3)
 * https://gitgud.malvager.net/Wazakindjes/icinga2_plugins/src/master/check_testssl.sh (Shell)
+
+#### pentest2xlsx: generate Excel sheets from CSV
+* https://github.com/AresS31/pentest2xlsx (python)
 
 #### Brew package
 

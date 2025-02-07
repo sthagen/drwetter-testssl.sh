@@ -23545,10 +23545,10 @@ set_skip_tests() {
 # arg2: value (if no = provided)
 parse_opt_equal_sign() {
      if [[ "$1" == *=* ]]; then
-          echo ${1#*=}
+          safe_echo "${1#*=}"
           return 1  # = means we don't need to shift args!
      else
-          echo "$2"
+          safe_echo "${2}"
           return 0  # we need to shift
      fi
 }
@@ -24205,13 +24205,16 @@ parse_cmd_line() {
      [[ $CMDLINE_IP == one ]] && ( is_ipv4addr "$URI" || is_ipv6addr "$URI" )  && fatal_cmd_line "\"--ip=one\" plus supplying an IP address doesn't work" $ERR_CMDLINE
      "$do_mx_all_ips" && [[ "$NODNS" == none ]] && fatal_cmd_line "\"--mx\" and \"--nodns=none\" don't work together" $ERR_CMDLINE
 
-     if [[ -d $ADDTL_CA_FILES ]]; then
+     if [[ "${ADDTL_CA_FILES}" =~ \  ]]; then
+          fatal_cmd_line "The CA file \"${ADDTL_CA_FILES}\" must not contain spaces" $ERR_RESOURCE
+     fi
+     if [[ -d "${ADDTL_CA_FILES}" ]]; then
           ADDTL_CA_FILES="$ADDTL_CA_FILES/*.pem"
      else
           ADDTL_CA_FILES="${ADDTL_CA_FILES//,/ }"
      fi
-     for fname in $ADDTL_CA_FILES; do
-          [[ -s "$fname" ]] || fatal_cmd_line "CA file \"$fname\" does not exist" $ERR_RESOURCE
+     for fname in ${ADDTL_CA_FILES}; do
+          [[ -s "$fname" ]] || fatal_cmd_line "The CA file \"$fname\" does not exist" $ERR_RESOURCE
           grep -q 'BEGIN CERTIFICATE' "$fname" || fatal_cmd_line "\"$fname\" is not CA file in PEM format" $ERR_RESOURCE
      done
 

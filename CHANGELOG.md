@@ -109,7 +109,7 @@
 * Renegotiation checks improved, also no false positive for Node.js anymore
 * Major update of client simulations with self-collected up-to-date data
 * Update of CA certificate stores
-* Lots of bug fixes
+* Lots of bug and security fixes
 * More travis/CI checks -- still place for improvements
 * Man page reviewed
 
