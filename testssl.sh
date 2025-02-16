@@ -3370,7 +3370,7 @@ run_cookie_flags() {     # ARG1: Path
      fi
 
      if [[ ! "$HTTP_STATUS_CODE" =~ 20 ]]; then
-          if [[ "$HTTP_STATUS_CODE" =~ [301|302] ]]; then
+          if [[ "$HTTP_STATUS_CODE" =~ 301|302 ]]; then
                msg302=" -- maybe better try target URL of 30x"
                msg302_=" (30x detected, better try target URL of 30x)"
           else
@@ -11253,7 +11253,7 @@ npn_pre(){
           fileout "NPN" "WARN" "not tested as proxies do not support proxying it"
           return 1
      fi
-     if ! "$HAS_NPN"; then
+     if "$SSL_NATIVE" && ! "$HAS_NPN"; then
           pr_local_problem "$OPENSSL doesn't support NPN/SPDY";
           fileout "NPN" "WARN" "not tested $OPENSSL doesn't support NPN/SPDY"
           return 7
@@ -11299,20 +11299,31 @@ run_npn() {
           return 0
      fi
 
-     # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
-     # TLS13_ONLY is tested here again, just to be sure, see npn_pre
-     if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
-           proto="-no_tls1_3"
+     if "$HAS_NPN"; then
+          # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
+          # TLS13_ONLY is tested here again, just to be sure, see npn_pre
+          if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
+                proto="-no_tls1_3"
+          fi
+          $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
+          [[ $? -ne 0 ]] && ret=1
+     else
+          tls_sockets "03" "$TLS12_CIPHER" "all"
+          ret=$?
+          if [[ $ret -eq 0 ]] || [[ $ret -eq 2 ]]; then
+               ret=0
+          else
+               ret=1
+          fi
+          mv "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt" "$TMPFILE"
      fi
-     $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
-     [[ $? -ne 0 ]] && ret=1
      tmpstr="$(grep -a '^Protocols' $TMPFILE | sed 's/Protocols.*: //')"
      if [[ -z "$tmpstr" ]] || [[ "$tmpstr" == " " ]]; then
           outln "not offered"
           fileout "$jsonID" "INFO" "not offered"
      else
           # now comes a strange thing: "Protocols advertised by server:" is empty but connection succeeded
-          if [[ "$tmpstr" =~ [h2|spdy|http] ]]; then
+          if [[ "$tmpstr" =~ h2|spdy|http ]]; then
                out "$tmpstr"
                outln " (advertised)"
                fileout "$jsonID" "INFO" "offered with $tmpstr (advertised)"
@@ -16854,7 +16865,7 @@ run_ccs_injection(){
                fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
           fi
      elif [[ "${tls_hello_ascii:0:4}" == "1503" ]]; then
-          if [[ ! "${tls_hello_ascii:5:2}" =~ [03|02|01|00] ]]; then
+          if [[ ! "${tls_hello_ascii:5:2}" =~ 03|02|01|00 ]]; then
                pr_warning "test failed "
                out "no proper TLS reply (debug info: protocol sent: 1503${tls_hexcode#x03, x}, reply: ${tls_hello_ascii:0:14}"
                fileout "$jsonID" "DEBUG" "test failed, around line $LINENO, debug info (${tls_hello_ascii:0:14})" "$cve" "$cwe" "$hint"
@@ -16907,25 +16918,11 @@ run_ccs_injection(){
      return $ret
 }
 
-sub_session_ticket_tls() {
-     local tls_proto="$1"
-     local sessticket_tls=""
-     #FIXME: we likely have done this already before (either @ run_server_defaults() or at least the output
-     #       from a previous handshake) --> would save 1x connect. We have TLS_TICKET but not yet the ticket itself #FIXME
-     #ATTENTION: we DO NOT use SNI here as we assume ticketbleed is a vulnerability of the TLS stack. If we'd do SNI here, we'd also need
-     #           it in the ClientHello of run_ticketbleed() otherwise the ticket will be different and the whole thing won't work!
-     #
-     sessticket_tls="$($OPENSSL s_client $(s_client_options "$BUGS $tls_proto $PROXY $SNI -connect $NODEIP:$PORT") </dev/null 2>$ERRFILE | awk '/TLS session ticket:/,/^$/' | awk '!/TLS session ticket/')"
-     sessticket_tls="$(sed -e 's/^.* - /x/g' -e 's/  .*$//g' <<< "$sessticket_tls" | tr '\n' ',')"
-     sed -e 's/ /,x/g' -e 's/-/,x/g' <<< "$sessticket_tls"
-
-}
-
 
 # see https://blog.filippo.io/finding-ticketbleed/ |  https://filippo.io/ticketbleed/
 run_ticketbleed() {
      local tls_hexcode tls_proto=""
-     local session_tckt_tls=""
+     local sessticket_tls="" session_tckt_tls=""
      local -i len_ch=300                            # fixed len of prepared clienthello below
      local sid="x00,x0B,xAD,xC0,xDE,x00,"           # some arbitrary bytes
      local len_sid="$(( ${#sid} / 4))"
@@ -16961,17 +16958,23 @@ run_ticketbleed() {
           return 0
      fi
 
-     if [[ 0 -eq $(has_server_protocol tls1) ]]; then
-          tls_hexcode="x03, x01"; tls_proto="-tls1"
+     if [[ 0 -eq $(has_server_protocol tls1_2) ]]; then
+          tls_hexcode="x03, x03"; tls_proto="-tls1_2"
      elif [[ 0 -eq $(has_server_protocol tls1_1) ]]; then
           tls_hexcode="x03, x02"; tls_proto="-tls1_1"
-     elif [[ 0 -eq $(has_server_protocol tls1_2) ]]; then
-          tls_hexcode="x03, x03"; tls_proto="-tls1_2"
+     elif [[ 0 -eq $(has_server_protocol tls1) ]]; then
+          tls_hexcode="x03, x01"; tls_proto="-tls1"
      elif [[ 0 -eq $(has_server_protocol ssl3) ]]; then
           tls_hexcode="x03, x00"; tls_proto="-ssl3"
      else # no protocol for some reason defined, determine TLS versions offered with a new handshake
           "$HAS_TLS13" && tls_proto="-no_tls1_3"
           $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS $tls_proto -connect $NODEIP:$PORT $PROXY") >$TMPFILE 2>$ERRFILE </dev/null
+          sclient_connect_successful $? "$TMPFILE"
+          if [$? -ne 0 ]]; then
+               prln_warning "Cannot test for ticketbleed. Your OpenSSL cannot connect to $NODEIP:$PORT"
+               fileout "$jsonID" "WARN" "Cannot test for ticketbleed. Your OpenSSL cannot connect to $NODEIP:$PORT."
+               return 1
+          fi
           case "$(get_protocol $TMPFILE)" in
                *1.2)  tls_hexcode="x03, x03"; tls_proto="-tls1_2" ; add_proto_offered tls1_2 yes ;;
                *1.1)  tls_hexcode="x03, x02"; tls_proto="-tls1_1" ; add_proto_offered tls1_1 yes ;;
@@ -16979,9 +16982,28 @@ run_ticketbleed() {
                SSLv3) tls_hexcode="x03, x00"; tls_proto="-ssl3" ; add_proto_offered ssl3 yes ;;
           esac
      fi
+     if ! sclient_supported "$tls_proto"; then
+          prln_local_problem "Cannot test for ticketbleed. $OPENSSL doesn't support \"s_client $tls_proto\"."
+          fileout "$jsonID" "WARN" "Cannot test for ticketbleed. $OPENSSL doesn't support \"s_client $tls_proto\"."
+          return 1
+     fi
      debugme echo "using protocol $tls_hexcode"
 
-     session_tckt_tls="$(sub_session_ticket_tls "$tls_proto")"
+     #FIXME: we likely have done this already before (either @ run_server_defaults() or at least the output
+     #       from a previous handshake) --> would save 1x connect. We have TLS_TICKET but not yet the ticket itself #FIXME
+     #ATTENTION: we DO NOT use SNI here as we assume ticketbleed is a vulnerability of the TLS stack. If we'd do SNI here, we'd also need
+     #           it in the ClientHello of run_ticketbleed() otherwise the ticket will be different and the whole thing won't work!
+     #
+     $OPENSSL s_client $(s_client_options "$BUGS $tls_proto $PROXY $SNI -connect $NODEIP:$PORT") </dev/null >$TMPFILE 2>$ERRFILE
+     sclient_connect_successful $? "$TMPFILE"
+     if [[ $? -ne 0 ]]; then
+          prln_warning "$OPENSSL unable to connect to $NODEIP:$PORT when testing for ticketbleed."
+          fileout "$jsonID" "WARN" "$OPENSSL unable to connect to $NODEIP:$PORT when testing for ticketbleed."
+          return 1
+     fi
+     sessticket_tls="$(awk '/TLS session ticket:/,/^$/' "$TMPFILE" | awk '!/TLS session ticket/')"
+     sessticket_tls="$(sed -e 's/^.* - /x/g' -e 's/  .*$//g' <<< "$sessticket_tls" | tr '\n' ',')"
+     session_tckt_tls="$(sed -e 's/ /,x/g' -e 's/-/,x/g' <<< "$sessticket_tls")"
      if [[ "$session_tckt_tls" == "," ]]; then
           pr_svrty_best "not vulnerable (OK)"
           outln ", no session tickets"
