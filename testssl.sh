@@ -16991,8 +16991,6 @@ run_ticketbleed() {
 
      #FIXME: we likely have done this already before (either @ run_server_defaults() or at least the output
      #       from a previous handshake) --> would save 1x connect. We have TLS_TICKET but not yet the ticket itself #FIXME
-     #ATTENTION: we DO NOT use SNI here as we assume ticketbleed is a vulnerability of the TLS stack. If we'd do SNI here, we'd also need
-     #           it in the ClientHello of run_ticketbleed() otherwise the ticket will be different and the whole thing won't work!
      #
      $OPENSSL s_client $(s_client_options "$BUGS $tls_proto $PROXY $SNI -connect $NODEIP:$PORT") </dev/null >$TMPFILE 2>$ERRFILE
      sclient_connect_successful $? "$TMPFILE"
