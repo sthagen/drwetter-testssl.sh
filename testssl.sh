@@ -20505,7 +20505,7 @@ find_openssl_binary() {
           HAS_CURVES=true
           for curve in "${curves_ossl[@]}"; do
                # Same as above, we just don't need a port for invalid.
-               $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option"
+               $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Call to SSL_CONF_cmd(.*) failed"
                [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
           done
      fi
