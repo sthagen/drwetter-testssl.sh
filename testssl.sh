@@ -20824,7 +20824,7 @@ file output options (can also be preset via environment variables)
      --html                        additional output as HTML to file '\${NODE}-p\${port}\${YYYYMMDD-HHMM}.html'
      --htmlfile|-oH <htmlfile>     additional output as HTML to the specified file or directory, similar to --logfile
      --out(f,F)ile|-oa/-oA <fname> log to a LOG,JSON,CSV,HTML file (see nmap). -oA/-oa: pretty/flat JSON.
-                                   "auto" uses '\${NODE}-p\${port}\${YYYYMMDD-HHMM}'. If fname if a dir uses 'dir/\${NODE}-p\${port}\${YYYYMMDD-HHMM}'
+                                   "auto" uses '\${NODE}-p\${port}\${YYYYMMDD-HHMM}'. If fname is a dir uses 'dir/\${NODE}-p\${port}\${YYYYMMDD-HHMM}'
      --hints                       additional hints to findings
      --severity <severity>         severities with lower level will be filtered for CSV+JSON, possible values <LOW|MEDIUM|HIGH|CRITICAL>
      --append                      if (non-empty) <logfile>, <csvfile>, <jsonfile> or <htmlfile> exists, append to file. Omits any header
