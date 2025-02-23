@@ -23427,6 +23427,7 @@ set_rating_state() {
           return 1
      fi
 
+     do_rating=true
      return 0
 }
 
