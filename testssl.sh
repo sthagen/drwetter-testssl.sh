@@ -10931,7 +10931,7 @@ run_fs() {
                     # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
                     # used in the certificate. The easiest solution is to move the curves to the end of the list.
                     # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
-                    if (! "$HAS_TLS13" || [[ "$proto" == "-no_tls1_3" ]]) && [[ ! "$ecdhe_cipher_list" == *RSA* ]]; then
+                    if { ! "$HAS_TLS13" || [[ "$proto" == "-no_tls1_3" ]]; } && [[ ! "$ecdhe_cipher_list" == *RSA* ]]; then
                          while true; do
                               curves_to_test=""
                               for (( i=low; i < high; i++ )); do
@@ -11001,7 +11001,7 @@ run_fs() {
                # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
                # used in the certificate. The easiest solution is to move the curves to the end of the list.
                # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
-               if ([[ "$proto" == 03 ]] && [[ ! "$ecdhe_cipher_list" == *RSA* ]]); then
+               if [[ "$proto" == 03 ]] && [[ ! "$ecdhe_cipher_list" == *RSA* ]]; then
                     while true; do
                          curves_to_test=""
                          for (( i=0; i < nr_curves; i++ )); do
