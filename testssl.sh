@@ -20480,11 +20480,14 @@ find_openssl_binary() {
      case "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" in
           1.0.2|1.1.0|1.1.1|3.*) HAS_DH_BITS=true ;;
      esac
-     if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
+
+     OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
+
+     if [[ $OPENSSL_NR_CIPHERS -le 140 ]]; then
           [[ ${OSSL_VER//./} -ge 210 ]] && HAS_DH_BITS=true
           if "$SSL_NATIVE"; then
                outln
-               pr_warning "LibreSSL in native ssl mode is not a good choice for testing INSECURE features!"
+               pr_warning "LibreSSL/OpenSSL in native ssl mode with poor cipher support is not a good choice for testing INSECURE features!"
           fi
      fi
 
@@ -20573,7 +20576,6 @@ find_openssl_binary() {
      $OPENSSL s_client -comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_COMP=true
      $OPENSSL s_client -no_comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_COMP=true
 
-     OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
      # The following statement works with OpenSSL 1.0.2, 1.1.1 and 3.0 and LibreSSL 3.4
      if $OPENSSL s_client -curves </dev/null 2>&1 | grep -aiq "unknown option"; then
           # LibreSSL (tested with version 3.4.1 and 3.0.2) need -groups instead of -curve
@@ -21152,8 +21154,8 @@ EOF
 
      # remove clock and dow if the first word is a dow and not a dom (suse)
      short_built_date=${OSSL_BUILD_DATE/??:??:?? /}
-     if [[ ${short_built_date%% *} =~ [A-Za-z]{3} ]]; then
-        short_built_date=${short_built_date#* }
+     if [[ ${short_built_date%% *} =~ ^[A-Za-z]{3}$ ]]; then
+          short_built_date=${short_built_date#* }
      fi
      out "${spaces}Using "
      pr_italic "$OSSL_NAME $OSSL_VER ($short_built_date)"
