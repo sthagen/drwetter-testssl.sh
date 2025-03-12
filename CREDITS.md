@@ -33,7 +33,7 @@ Full contribution, see git log.
   - RFC 8879, certificate compression
   - 128 cipher limit, padding
   - compatibility for LibreSSL and different OpenSSL versions
-  - Check for ffdhe groups
+  - Check for ffdhe and ML-KEM groups
   - TLS 1.2 and TLS 1.3 sig algs added
   - Show server supported signature algorithms
   - Show supported certification authorities sent by the server when client auth is requested

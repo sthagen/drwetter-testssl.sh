@@ -8,7 +8,7 @@
 * Remove "negotiated cipher / protocol"
 * Provide a better verdict wrt to server order: Now per protocol and ciphers are weighted for each protocol
 * Switched to multi-stage docker image with opensuse base to avoid musl libc issues, performance gain also
-* Improved compatibility with OpenSSL 3.0
+* Improved compatibility with OpenSSL 3.0 and higher versions
 * Improved compatibility with Open/LibreSSL versions not supporting TLS 1.0-1.1 anymore
 * Renamed PFS/perfect forward secrecy --> FS/forward secrecy
 * Cipher list straightening
@@ -35,7 +35,7 @@
 * Wildcard certificates: detection and warning
 * TLS 1.2 and TLS 1.3 sig algs added
 * Check for ffdhe groups
-* Check for three KEMs in draft-kwiatkowski-tls-ecdhe-mlkem/draft-tls-westerbaan-xyber768d00
+* Check for six KEMs in draft-connolly-tls-mlkem-key-agreement/draft-kwiatkowski-tls-ecdhe-mlkem/draft-tls-westerbaan-xyber768d00
 * Show server supported signature algorithms
 * --add-ca can also now be a directory with \*.pem files
 * Warning of 398 day limit for certificates issued after 2020/9/1

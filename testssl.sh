@@ -14861,6 +14861,10 @@ parse_tls_serverhello() {
                     002F) tls_extensions+="TLS server extension \"certificate authorities\" (id=47), len=$extension_len\n" ;;
                     0030) tls_extensions+="TLS server extension \"oid filters\" (id=48), len=$extension_len\n" ;;
                     0031) tls_extensions+="TLS server extension \"post handshake auth\" (id=49), len=$extension_len\n" ;;
+                    0032) tls_extensions+="TLS server extension \"signature algorithms cert\" (id=50), len=$extension_len\n" ;;
+                    0034) tls_extensions+="TLS server extension \"transparency info \" (id=52), len=$extension_len\n" ;;
+                         # 54,55,56 (x36 to x38) is DTLS
+                    003A) tls_extensions+="TLS server extension \"ticket request \" (id=58), len=$extension_len\n" ;;
                     3374) tls_extensions+="TLS server extension \"next protocol\" (id=13172), len=$extension_len\n"
                           if [[ "$process_full" =~ all ]]; then
                                local -i protocol_len
