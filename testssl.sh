@@ -277,7 +277,7 @@ KNOWN_OSSL_PROB=false                   # We need OpenSSL a few times. This vari
 DETECTED_TLS_VERSION=""                 # .. as hex string, e.g. 0300 or 0303
 APP_TRAF_KEY_INFO=""                    # Information about the application traffic keys for a TLS 1.3 connection.
 TLS13_ONLY=false                        # Does the server support TLS 1.3 ONLY?
-TLS_EXTENSIONS=""
+declare -a TLS_EXTENSIONS=()
 TLS13_CERT_COMPRESS_METHODS=""
 CERTIFICATE_TRANSPARENCY_SOURCE=""
 V2_HELLO_CIPHERSPEC_LENGTH=0
@@ -2083,7 +2083,7 @@ check_revocation_ocsp() {
           if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
                host_header="-header Host ${host_header}"
           elif [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.0* ]] || [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* ]] || \
-               [[ $OSSL_VER_MAJOR == 3 ]]; then
+               [[ $OSSL_VER_MAJOR -ge 3 ]]; then
                host_header="-header Host=${host_header}"
           else
                host_header="-header Host ${host_header}"
@@ -4443,7 +4443,7 @@ ciphers_by_strength() {
                ossl_ciphers_proto=""
           elif [[ $proto == -ssl2 ]] || [[ $proto == -ssl3 ]] || \
                [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.0* ]] || [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* ]] || \
-               [[ $OSSL_VER_MAJOR == 3 ]]; then
+               [[ $OSSL_VER_MAJOR -ge 3 ]]; then
                ossl_ciphers_proto="$proto"
           else
                ossl_ciphers_proto="-tls1"
@@ -5216,7 +5216,7 @@ run_client_simulation() {
                     fi
                     if [[ $sclient_success -eq 0 ]]; then
                          # If an ephemeral DH key was used, check that the number of bits is within range.
-                         temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")        # extract line
+                         temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key/ { print $2 }' "$TMPFILE")        # extract line
                          what_dh="${temp%%,*}"
                          bits="${temp##*, }"
                          # formatting
@@ -6550,10 +6550,13 @@ pr_kem_param_set_quality() {
      local -i bits=0
 
      case "$kem" in
-          "SecP256r1MLKEM768") bits=192  ;;
-          "X25519MLKEM768") bits=192  ;;
+          "MLKEM512") bits=128 ;;
+          "MLKEM768") bits=192 ;;
+          "MLKEM1024") bits=256 ;;
+          "SecP256r1MLKEM768") bits=192 ;;
+          "X25519MLKEM768") bits=192 ;;
           "SecP384r1MLKEM1024") bits=256 ;;
-          "X25519Kyber768Draft00") bits=128  ;;
+          "X25519Kyber768Draft00") bits=128 ;;
      esac
      pr_kem_quality "$bits" "$kem"
 }
@@ -6706,7 +6709,7 @@ pr_cipher_quality() {
 read_dhtype_from_file() {
      local temp kx
 
-     temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$1")        # extract line
+     temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$1")        # extract line
      kx="Kx=${temp%%,*}"
      [[ "$kx" == "Kx=X25519" ]] && kx="Kx=ECDH"
      [[ "$kx" == "Kx=X448" ]] && kx="Kx=ECDH"
@@ -6739,7 +6742,7 @@ read_dhbits_from_file() {
      local add=""
      local old_fart=" (your $OPENSSL cannot show DH bits)"
 
-     temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$1")        # extract line
+     temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$1")        # extract line
      what_dh="${temp%%,*}"
      bits="${temp##*, }"
      curve="${temp#*, }"
@@ -6852,7 +6855,7 @@ sub_session_resumption() {
           fi
      fi
      if "$byID" && [[ ! "$OSSL_NAME" =~ LibreSSL ]] && \
-        [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* || $OSSL_VER_MAJOR == 3 ]] && \
+        [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* || $OSSL_VER_MAJOR -ge 3 ]] && \
         [[ ! -s "$sess_data" ]]; then
           # it seems OpenSSL indicates no Session ID resumption by just not generating output
           debugme echo -n "No session resumption byID (empty file)"
@@ -7706,15 +7709,13 @@ determine_trust() {
      # and the output should should be indented by two more spaces.
      [[ -n $json_postfix ]] && spaces="                                "
 
-     case $OSSL_VER_MAJOR.$OSSL_VER_MINOR in
-          1.0.2|1.1.0|1.1.1|2.[1-9].*|3.*|4.*)           # 2.x is LibreSSL. 2.1.1 was tested to work, below is not sure
-               :
-          ;;
-          *)   addtl_warning="Your $OPENSSL <= 1.0.2 might be too unreliable to determine trust"
-               fileout "${jsonID}${json_postfix}" "WARN" "$addtl_warning"
-               addtl_warning="(${addtl_warning})"
-          ;;
-     esac
+     if [[ $OSSL_VER_MAJOR -lt 3 ]] && [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" != 1.0.2 ]] && \
+        [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" != 1.1.* ]] && [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" != 2.[1-9].* ]]; then
+          # 2.x is LibreSSL. 2.1.1 was tested to work, below is not sure
+          addtl_warning="Your $OPENSSL <= 1.0.2 might be too unreliable to determine trust"
+          fileout "${jsonID}${json_postfix}" "WARN" "$addtl_warning"
+          addtl_warning="(${addtl_warning})"
+     fi
      debugme tmln_out
 
      # if you run testssl.sh from a different path /you can set either TESTSSL_INSTALL_DIR or CA_BUNDLES_PATH to find the CA BUNDLES
@@ -7884,6 +7885,7 @@ sclient_connect_successful() {
 
 extract_new_tls_extensions() {
      local tls_extensions
+     local -i i
 
      # this is not beautiful (grep+sed)
      # but maybe we should just get the ids and do a private matching, according to
@@ -7897,12 +7899,15 @@ extract_new_tls_extensions() {
      if [[ -n "$tls_extensions" ]]; then
           # check to see if any new TLS extensions were returned and add any new ones to TLS_EXTENSIONS
           while read -d "\"" -r line; do
-               if [[ $line != "" ]] && [[ ! "$TLS_EXTENSIONS" =~ "$line" ]]; then
-#FIXME: This is a string of quoted strings, so this seems to determine the output format already. Better e.g. would be an array
-                    TLS_EXTENSIONS+=" \"${line}\""
+               if [[ $line != "" ]] && [[ ! "${TLS_EXTENSIONS[*]}" =~ "$line" ]]; then
+                    i=${#TLS_EXTENSIONS[*]}
+                    while [[ $i -gt 0 ]] && [[ ${TLS_EXTENSIONS[i-1]#*/#} -gt ${line#*/#} ]]; do
+                         TLS_EXTENSIONS[i]="${TLS_EXTENSIONS[i-1]}"
+                         i=$((i-1))
+                    done
+                    TLS_EXTENSIONS[i]="$line"
                fi
           done <<<$tls_extensions
-          [[ "${TLS_EXTENSIONS:0:1}" == " " ]] && TLS_EXTENSIONS="${TLS_EXTENSIONS:1}"
      fi
 }
 
@@ -7918,7 +7923,7 @@ extract_new_tls_extensions() {
 determine_tls_extensions() {
      local addcmd
      local -i success=1
-     local line params="" tls_extensions=""
+     local line params="" tls_extensions="" extn
      local alpn_proto alpn="" alpn_list_len_hex alpn_extn_len_hex
      local -i alpn_list_len alpn_extn_len
      local cbc_cipher_list="ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA256:DH-RSA-AES256-SHA256:DH-DSS-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-DSS-AES256-SHA:DH-RSA-AES256-SHA:DH-DSS-AES256-SHA:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CAMELLIA256-SHA384:DHE-RSA-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA256:DH-RSA-CAMELLIA256-SHA256:DH-DSS-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-DSS-CAMELLIA256-SHA:DH-RSA-CAMELLIA256-SHA:DH-DSS-CAMELLIA256-SHA:ECDH-RSA-AES256-SHA384:ECDH-ECDSA-AES256-SHA384:ECDH-RSA-AES256-SHA:ECDH-ECDSA-AES256-SHA:ECDH-RSA-CAMELLIA256-SHA384:ECDH-ECDSA-CAMELLIA256-SHA384:AES256-SHA256:AES256-SHA:CAMELLIA256-SHA256:CAMELLIA256-SHA:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:DHE-RSA-AES128-SHA256:DHE-DSS-AES128-SHA256:DH-RSA-AES128-SHA256:DH-DSS-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA:DH-RSA-AES128-SHA:DH-DSS-AES128-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA256:DH-RSA-CAMELLIA128-SHA256:DH-DSS-CAMELLIA128-SHA256:DHE-RSA-SEED-SHA:DHE-DSS-SEED-SHA:DH-RSA-SEED-SHA:DH-DSS-SEED-SHA:DHE-RSA-CAMELLIA128-SHA:DHE-DSS-CAMELLIA128-SHA:DH-RSA-CAMELLIA128-SHA:DH-DSS-CAMELLIA128-SHA:ECDH-RSA-AES128-SHA256:ECDH-ECDSA-AES128-SHA256:ECDH-RSA-AES128-SHA:ECDH-ECDSA-AES128-SHA:ECDH-RSA-CAMELLIA128-SHA256:ECDH-ECDSA-CAMELLIA128-SHA256:AES128-SHA256:AES128-SHA:CAMELLIA128-SHA256:SEED-SHA:CAMELLIA128-SHA:IDEA-CBC-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:EDH-DSS-DES-CBC3-SHA:DH-RSA-DES-CBC3-SHA:DH-DSS-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:ECDH-ECDSA-DES-CBC3-SHA:DES-CBC3-SHA:EXP1024-DHE-DSS-DES-CBC-SHA:EDH-RSA-DES-CBC-SHA:EDH-DSS-DES-CBC-SHA:DH-RSA-DES-CBC-SHA:DH-DSS-DES-CBC-SHA:EXP1024-DES-CBC-SHA:DES-CBC-SHA:EXP-EDH-RSA-DES-CBC-SHA:EXP-EDH-DSS-DES-CBC-SHA:EXP-DES-CBC-SHA:EXP-RC2-CBC-MD5:EXP-DH-DSS-DES-CBC-SHA:EXP-DH-RSA-DES-CBC-SHA"
@@ -7940,7 +7945,7 @@ determine_tls_extensions() {
                alpn_extn_len_hex=$(printf "%04x" $alpn_extn_len)
                tls_extensions+=", 00,10,${alpn_extn_len_hex:0:2},${alpn_extn_len_hex:2:2},${alpn_list_len_hex:0:2},${alpn_list_len_hex:2:2}$alpn"
           fi
-          if [[ ! "$TLS_EXTENSIONS" =~ encrypt-then-mac ]]; then
+          if [[ ! "${TLS_EXTENSIONS[*]}" =~ encrypt-then-mac ]]; then
                tls_sockets "03" "$cbc_cipher_list_hex, 00,ff" "all" "$tls_extensions"
                success=$?
           fi
@@ -7965,7 +7970,7 @@ determine_tls_extensions() {
           else
                addcmd="$SNI"
           fi
-          if [[ ! "$TLS_EXTENSIONS" =~ encrypt-then-mac ]]; then
+          if [[ ! "${TLS_EXTENSIONS[*]}" =~ encrypt-then-mac ]]; then
                $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $addcmd $OPTIMAL_PROTO -tlsextdebug $params -cipher $cbc_cipher_list") </dev/null 2>$ERRFILE >$TMPFILE
                sclient_connect_successful $? $TMPFILE
                success=$?
@@ -7980,7 +7985,13 @@ determine_tls_extensions() {
      fi
 
      # Keep it "on file" for debugging purposes
-     [[ "$DEBUG" -ge 1 ]] && safe_echo "$TLS_EXTENSIONS" >"$TEMPDIR/$NODE.$NODEIP.tls_extensions.txt"
+     if [[ "$DEBUG" -ge 1 ]]; then
+          tls_extensions=""
+          for extn in "${TLS_EXTENSIONS[@]}"; do
+               tls_extensions+=" \"${extn}\""
+          done
+          safe_echo "${tls_extensions:1}" >"$TEMPDIR/$NODE.$NODEIP.tls_extensions.txt"
+     fi
 
      return $success
 }
@@ -8865,7 +8876,7 @@ certificate_transparency() {
      # determine_tls_extensions() discovered an SCT TLS extension. If the server has more than
      # one certificate, then it is possible that an SCT TLS extension is returned for some
      # certificates, but not for all of them.
-     if [[ $number_of_certificates -eq 1 ]] && [[ "$TLS_EXTENSIONS" =~ signed\ certificate\ timestamps ]]; then
+     if [[ $number_of_certificates -eq 1 ]] && [[ "${TLS_EXTENSIONS[*]}" =~ signed\ certificate\ timestamps ]]; then
           CERTIFICATE_TRANSPARENCY_SOURCE="TLS extension"
           return 0
      fi
@@ -10076,7 +10087,7 @@ run_server_defaults() {
      local -a ocsp_response_binary ocsp_response ocsp_response_status sni_used tls_version ct
      local -a ciphers_to_test certificate_type
      local -a -i success
-     local cn_nosni cn_sni sans_nosni sans_sni san tls_extensions client_auth_ca
+     local cn_nosni cn_sni sans_nosni sans_sni san tls_extensions extn client_auth_ca
      local using_sockets=true
 
      "$SSL_NATIVE" && using_sockets=false
@@ -10328,7 +10339,7 @@ run_server_defaults() {
      outln
 
      pr_bold " TLS extensions (standard)    "
-     if [[ -z "$TLS_EXTENSIONS" ]]; then
+     if [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]]; then
           outln "(none)"
           fileout "TLS_extensions" "INFO" "(none)"
      else
@@ -10339,12 +10350,17 @@ run_server_defaults() {
           # across lines, temporarily replace space characters within the text
           # of an extension with "}", and then convert the "}" back to space in
           # the output of out_row_aligned_max_width().
-          tls_extensions="${TLS_EXTENSIONS// /{}"
+          tls_extensions=""
+          for extn in "${TLS_EXTENSIONS[@]}"; do
+               tls_extensions+=" \"${extn}\""
+          done
+          tls_extensions="${tls_extensions:1}"
+          fileout "TLS_extensions" "INFO" "$tls_extensions"
+          tls_extensions="${tls_extensions// /{}"
           tls_extensions="${tls_extensions//\"{\"/\" \"}"
           tls_extensions="$(out_row_aligned_max_width "$tls_extensions" "                              " $TERM_WIDTH)"
           tls_extensions="${tls_extensions//{/ }"
           outln "$tls_extensions"
-          fileout "TLS_extensions" "INFO" "$TLS_EXTENSIONS"
      fi
 
      pr_bold " Session Ticket RFC 5077 hint "
@@ -10552,13 +10568,13 @@ run_fs() {
      local fs_cipher_list="DHE-DSS-AES128-GCM-SHA256:DHE-DSS-AES128-SHA256:DHE-DSS-AES128-SHA:DHE-DSS-AES256-GCM-SHA384:DHE-DSS-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-DSS-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA:DHE-DSS-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA:DHE-DSS-SEED-SHA:DHE-RSA-AES128-CCM8:DHE-RSA-AES128-CCM:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-CCM8:DHE-RSA-AES256-CCM:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA:DHE-RSA-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-RSA-CHACHA20-POLY1305-OLD:DHE-RSA-CHACHA20-POLY1305:DHE-RSA-SEED-SHA:ECDHE-ECDSA-AES128-CCM8:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-CCM8:ECDHE-ECDSA-AES256-CCM:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-ECDSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305-OLD:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-RSA-CHACHA20-POLY1305-OLD:ECDHE-RSA-CHACHA20-POLY1305"
      local fs_hex_cipher_list="" ciphers_to_test tls13_ciphers_to_test
      local ecdhe_cipher_list="" tls13_cipher_list="" ecdhe_cipher_list_hex="" ffdhe_cipher_list_hex=""
-     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e" "00,1f" "00,20" "00,21" "11,eb" "11,ec" "11,ed" "63,99")
-     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
-     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
-     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448 256 384 512 192 192 256 128)
+     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e" "00,1f" "00,20" "00,21" "02,00" "02,01" "02,02" "11,eb" "11,ec" "11,ed" "63,99")
+     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "MLKEM512" "MLKEM768" "MLKEM1024" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
+     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "MLKEM512" "MLKEM768" "MLKEM1024" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
+     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448 256 384 512 128 192 256 192 192 256 128)
      # Many curves have been deprecated, and RFC 8446, Appendix B.3.1.4, states
      # that these curves MUST NOT be offered in a TLS 1.3 ClientHello.
-     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false" "false" "false" "false" "false" "false" "false" "false")
+     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
      local -a ffdhe_groups_hex=("01,00" "01,01" "01,02" "01,03" "01,04")
      local -a ffdhe_groups_output=("ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
      local -a supported_curve
@@ -10910,7 +10926,7 @@ run_fs() {
                          [[ -z "$curves_to_test" ]] && break
                          $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                          sclient_connect_successful $? $TMPFILE || break
-                         temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")
+                         temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$TMPFILE")
                          curve_found="${temp%%,*}"
                          if [[ "$curve_found" == ECDH ]]; then
                               curve_found="${temp#*, }"
@@ -10943,7 +10959,7 @@ run_fs() {
                               done
                               $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                               sclient_connect_successful $? $TMPFILE || break
-                              temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")
+                              temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$TMPFILE")
                               curve_found="${temp%%,*}"
                               if [[ "$curve_found" == ECDH ]]; then
                                    curve_found="${temp#*, }"
@@ -12503,7 +12519,7 @@ hmac() {
      local key="$2" text="$3" output
      local -i ret
 
-     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR == 3 ]]; then
+     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR -ge 3 ]]; then
           output="$(hex2binary "$text" | $OPENSSL mac -macopt digest:"${hash_fn/-/}" -macopt hexkey:"$key" HMAC 2>/dev/null)"
           ret=$?
           tm_out "$(strip_lf "$output")"
@@ -12524,7 +12540,7 @@ hmac-transcript() {
      local key="$2" transcript="$3" output
      local -i ret
 
-     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR == 3 ]]; then
+     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR -ge 3 ]]; then
           output="$(hex2binary "$transcript" | \
                     $OPENSSL dgst "$hash_fn" -binary 2>/dev/null | \
                     $OPENSSL mac -macopt digest:"${hash_fn/-/}" -macopt hexkey:"$key" HMAC 2>/dev/null)"
@@ -14668,6 +14684,9 @@ parse_tls_serverhello() {
                                          "0102") echo -n "ffdhe4096" >> $TMPFILE ;;
                                          "0103") echo -n "ffdhe6144" >> $TMPFILE ;;
                                          "0104") echo -n "ffdhe8192" >> $TMPFILE ;;
+                                         "0200") echo -n "MLKEM512" >> $TMPFILE ;;
+                                         "0201") echo -n "MLKEM768" >> $TMPFILE ;;
+                                         "0202") echo -n "MLKEM1024" >> $TMPFILE ;;
                                          "11EB") echo -n "SecP256r1MLKEM768" >> $TMPFILE ;;
                                          "11EC") echo -n "X25519MLKEM768" >> $TMPFILE ;;
                                          "11ED") echo -n "SecP384r1MLKEM1024" >> $TMPFILE ;;
@@ -14767,6 +14786,9 @@ parse_tls_serverhello() {
                                     258) dh_bits=4096 ; named_curve_str="ffdhe4096" ;;
                                     259) dh_bits=6144 ; named_curve_str="ffdhe6144" ;;
                                     260) dh_bits=8192 ; named_curve_str="ffdhe8192" ;;
+                                    512) dh_bits=128 ; named_curve_str="MLKEM512" ;;
+                                    513) dh_bits=192 ; named_curve_str="MLKEM768" ;;
+                                    514) dh_bits=256 ; named_curve_str="MLKEM1024" ;;
                                     4587) dh_bits=192 ; named_curve_str="SecP256r1MLKEM768" ;;
                                     4588) dh_bits=192 ; named_curve_str="X25519MLKEM768" ;;
                                     4589) dh_bits=256 ; named_curve_str="SecP384r1MLKEM1024" ;;
@@ -15797,9 +15819,10 @@ prepare_tls_clienthello() {
                if [[ ! "$process_full" =~ all ]]; then
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,1e, 00,1c,               # lengths
+                    00,24, 00,22,               # lengths
                     00,1d, 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21,
-                    01,00, 01,01, 11,eb, 11,ec, 11,ed, 63,99"
+                    01,00, 01,01, 02,00, 02,01, 02,02, 11,eb, 11,ec, 11,ed,
+                    63,99"
                     # Only include ML-KEM and Kyber hybrids as options if the response does
                     # not need to be decrypted.
                elif [[ ! "$process_full" =~ all ]] || { "$HAS_X25519" && "$HAS_X448"; }; then
@@ -16712,8 +16735,8 @@ run_heartbleed(){
           return 1
      fi
 
-     [[ -z "$TLS_EXTENSIONS" ]] && determine_tls_extensions
-     if [[ ! "${TLS_EXTENSIONS}" =~ heartbeat ]]; then
+     [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]] && determine_tls_extensions
+     if [[ ! "${TLS_EXTENSIONS[*]}" =~ heartbeat ]]; then
           pr_svrty_best "not vulnerable (OK)"
           outln ", no heartbeat extension"
           fileout "$jsonID" "OK" "not vulnerable, no heartbeat extension" "$cve" "$cwe"
@@ -17017,8 +17040,8 @@ run_ticketbleed() {
      fi
 
      # highly unlikely that it is NOT supported. We may loose time here but it's more solid
-     [[ -z "$TLS_EXTENSIONS" ]] && determine_tls_extensions
-     if [[ ! "${TLS_EXTENSIONS}" =~ "session ticket" ]]; then
+     [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]] && determine_tls_extensions
+     if [[ ! "${TLS_EXTENSIONS[*]}" =~ "session ticket" ]]; then
           pr_svrty_best "not vulnerable (OK)"
           outln ", no session ticket extension"
           fileout "$jsonID" "OK" "no session ticket extension" "$cve" "$cwe"
@@ -19120,7 +19143,7 @@ run_winshock() {
      # (~ sub_check_curves) which is some work. But also for the sake of clean code this needs to be done.
 
 
-     [[ -z "$TLS_EXTENSIONS" ]] && determine_tls_extensions
+     [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]] && determine_tls_extensions
      # Basis of the following https://en.wikipedia.org/wiki/Comparison_of_TLS_implementations#Extensions
      # Our standard: https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml
 
@@ -19134,9 +19157,9 @@ run_winshock() {
      local -a forbidden_tls_ext=("encrypt-then-mac" "max fragment length")
      # Open whether ec_point_formats, supported_groups(=elliptic_curves), heartbeat are supported under windows <=2012
      # key_share and supported_versions are extensions which came with TLS 1.3. We checked the protocol before.
-     if [[ -n "$TLS_EXTENSIONS" ]]; then
+     if [[ ${#TLS_EXTENSIONS[*]} -gt 0 ]]; then
           # Check whether there are any TLS extension which should not be available under <= Windows 2012 R2
-          for tls_ext in $TLS_EXTENSIONS; do
+          for tls_ext in "${TLS_EXTENSIONS[@]}"; do
                # We use the whole array, got to be careful when the array becomes bigger (unintended match)
                if [[ ${forbidden_tls_ext[@]} =~ $tls_ext ]]; then
                     pr_svrty_best "not vulnerable (OK)"; outln " - TLS extension $tls_ext detected"
@@ -20477,9 +20500,9 @@ find_openssl_binary() {
      OSSL_NAME=${OSSL_NAME//  /}
 
      # see #190, reverting logic: unless otherwise proved openssl has no dh bits
-     case "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" in
-          1.0.2|1.1.0|1.1.1|3.*) HAS_DH_BITS=true ;;
-     esac
+     if [[ $OSSL_VER_MAJOR -ge 3 ]] || [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" == 1.1.* ]] || [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" == 1.0.2 ]]; then
+          HAS_DH_BITS=true
+     fi
 
      OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
 
@@ -20625,7 +20648,7 @@ find_openssl_binary() {
      # not check /usr/bin/openssl -- if available. This is more a kludge which we shouldn't use for
      # every openssl feature. At some point we need to decide which with openssl version we go.
      # We also check, whether there's /usr/bin/openssl which has TLS 1.3
-     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ ! $OSSL_VER_MAJOR =~ 3 ]]; then
+     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
           if [[ -x $OPENSSL2 ]]; then
                $OPENSSL2 s_client -help 2>$s_client_has2
                $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
@@ -22354,7 +22377,7 @@ determine_optimal_proto() {
 
           debugme echo "OPTIMAL_PROTO: $OPTIMAL_PROTO"
      fi
-     [[ "$optimal_proto" != -ssl2 ]]  && ! "$all_failed" && grep -q '^Server Temp Key' $TMPFILE && HAS_DH_BITS=true     # FIX #190
+     [[ "$optimal_proto" != -ssl2 ]]  && ! "$all_failed" && grep -Eq '^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group' $TMPFILE && HAS_DH_BITS=true     # FIX #190
      if [[ "$(has_server_protocol "tls1_3")" -eq 0 ]] && [[ "$(has_server_protocol "tls1_2")" -ne 0 ]] &&
         [[ "$(has_server_protocol "tls1_1")" -ne 0 ]] && [[ "$(has_server_protocol "tls1")" -ne 0 ]] &&
         [[ "$(has_server_protocol "ssl3")" -ne 0 ]]; then
@@ -24378,7 +24401,7 @@ reset_hostdepended_vars() {
      NR_OSSL_FAIL=0
      NR_STARTTLS_FAIL=0
      NR_HEADER_FAIL=0
-     TLS_EXTENSIONS=""
+     TLS_EXTENSIONS=()
      TLS13_CERT_COMPRESS_METHODS=""
      CERTIFICATE_TRANSPARENCY_SOURCE=""
      PROTOS_OFFERED=""
