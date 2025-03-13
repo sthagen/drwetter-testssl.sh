@@ -184,7 +184,8 @@ FNAME_PREFIX=${FNAME_PREFIX:-""}        # output filename prefix, see --outprefi
 APPEND=${APPEND:-false}                 # append to csv/json/html/log file
 OVERWRITE=${OVERWRITE:-false}           # overwriting csv/json/html/log file
 [[ -z "$NODNS" ]] && declare NODNS      # If unset it does all DNS lookups per default. "min" only for hosts or "none" at all
-NXCONNECT=${NXCONNECT:-invalid.}        # For WSL this helps avoiding DNS requests to "invalid." which windows seem to handle delayed
+NXDNS=${NXDNS:-invalid.}                # For WSL this helps avoiding DNS requests to "invalid." which windows seem to handle delayed
+NXCONNECT=""                            # needed when when need to test capabilities of the openssl binary
 HAS_IPv6=${HAS_IPv6:-false}             # if you have OpenSSL with IPv6 support AND IPv6 networking set it to yes
 ALL_CLIENTS=${ALL_CLIENTS:-false}       # do you want to run all client simulation form all clients supplied by SSLlabs?
 OFFENSIVE=${OFFENSIVE:-true}            # do you want to include offensive vulnerability tests which may cause blocking by an IDS?
@@ -5349,7 +5350,7 @@ sclient_supported() {
           -tls1_3)
                "$HAS_TLS13" || return 7
                ;;
-          *)   if $OPENSSL s_client -connect $NXCONNECT "$1" </dev/null 2>&1 | grep -aiq "unknown option"; then
+          *)   if $OPENSSL s_client $NXCONNECT "$1" </dev/null 2>&1 | grep -aiq "unknown option"; then
                     return 7
                fi
                ;;
@@ -20421,9 +20422,8 @@ find_openssl_binary() {
      local s_client_has2=$TEMPDIR/s_client_has2.txt
      local s_client_starttls_has=$TEMPDIR/s_client_starttls_has.txt
      local s_client_starttls_has2=$TEMPDIR/s_client_starttls_has2
-     local openssl_location cwd=""
-     local ossl_wo_dev_info
-     local curve
+     local openssl_location="" cwd=""
+     local curve=""
      local ossl_line1="" yr=""
      local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
 
@@ -20437,7 +20437,7 @@ find_openssl_binary() {
           # 2. otherwise, only if on Bash on Windows, use system binaries only.
           SYSTEM2="WSL"
           # Workaround for delayed responses of Windows DNS when using "invalid.", see #1738, #1812.
-          [[ $NXCONNECT == invalid. ]] && NXCONNECT=127.0.0.1:0
+          [[ $NXDNS == invalid. ]] && NXDNS=127.0.0.1:0
      elif test_openssl_suffix "$TESTSSL_INSTALL_DIR"; then
           :    # 3. otherwise try openssl in path of testssl.sh
      elif test_openssl_suffix "$TESTSSL_INSTALL_DIR/bin"; then
@@ -20508,19 +20508,10 @@ find_openssl_binary() {
           HAS_DH_BITS=true
      fi
 
-     OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
-
-     if [[ $OPENSSL_NR_CIPHERS -le 140 ]]; then
-          [[ ${OSSL_VER//./} -ge 210 ]] && HAS_DH_BITS=true
-          if "$SSL_NATIVE"; then
-               outln
-               pr_warning "LibreSSL/OpenSSL in native ssl mode with poor cipher support is not a good choice for testing INSECURE features!"
-          fi
-     fi
-
      initialize_engine
 
      openssl_location="$(type -p $OPENSSL)"
+     
      [[ -n "$GIT_REL" ]] && \
           cwd="$PWD" || \
           cwd="$RUN_DIR"
@@ -20589,10 +20580,22 @@ find_openssl_binary() {
      $OPENSSL pkey -help 2>&1 | grep -q Error || HAS_PKEY=true
      $OPENSSL pkeyutl 2>&1 | grep -q Error ||  HAS_PKUTIL=true
 
-     # Below and at other occurrences we do a little trick using "$NXCONNECT" to avoid plain and
-     # link level DNS lookups. See issue #1418 and https://tools.ietf.org/html/rfc6761#section-6.4
+     # In order to avoid delays due to lookups of the hostname "invalid." we just try to avoid using "-connect invalid."
+     # when possible. The following does a check fopr that. For WSL we stick for now to the old scheme. Not sure about Cygwin
+     if [[ SYSTEM2 == "WSL" ]]; then
+          NXCONNECT=-connect $NXDNS
+     else
+          # If this connects and bails out with an error message, we do not need "-connect invalid."
+          if $OPENSSL s_client 2>&1 </dev/null | grep -Eiaq 'Connection refused|connect error|Bad file descriptor'; then
+               NXCONNECT=""
+          else
+               # We need to do link level DNS lookups. See issue #1418 and https://tools.ietf.org/html/rfc6761#section-6.4
+               NXCONNECT="-connect $NXDNS"
+          fi
+     fi
+
      if "$HAS_TLS13"; then
-          $OPENSSL s_client -tls1_3 -sigalgs PSS+SHA256:PSS+SHA384 -connect $NXCONNECT </dev/null 2>&1 | grep -aiq "unknown option" || HAS_SIGALGS=true
+          $OPENSSL s_client -tls1_3 -sigalgs PSS+SHA256:PSS+SHA384 $NXCONNECT </dev/null 2>&1 | grep -aiq "unknown option" || HAS_SIGALGS=true
      fi
 
      $OPENSSL s_client -noservername </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NOSERVERNAME=true
@@ -20603,21 +20606,34 @@ find_openssl_binary() {
      $OPENSSL s_client -comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_COMP=true
      $OPENSSL s_client -no_comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_COMP=true
 
-     # The following statement works with OpenSSL 1.0.2, 1.1.1 and 3.0 and LibreSSL 3.4
+     OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
+
+     if [[ $OPENSSL_NR_CIPHERS -le 140 ]]; then
+          [[ ${OSSL_VER//./} -ge 210 ]] && HAS_DH_BITS=true
+          if "$SSL_NATIVE"; then
+               outln
+               pr_warning "LibreSSL/OpenSSL in native ssl mode with poor cipher support is not a good choice for testing INSECURE features!"
+          fi
+     fi
+
      if $OPENSSL s_client -curves </dev/null 2>&1 | grep -aiq "unknown option"; then
-          # LibreSSL (tested with version 3.4.1 and 3.0.2) need -groups instead of -curve
-          # WSL users connect to "127.0.0.1:0", others to "invalid." or "invalid.:0"
-          # The $OPENSSL connect call deliberately fails: when the curve isn't available with the described error messages
-          for curve in "${curves_ossl[@]}"; do
-               $OPENSSL s_client -groups $curve -connect ${NXCONNECT%:*}:0 </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Failed to set groups"
-               [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
-          done
+          if $OPENSSL s_client -groups </dev/null 2>&1 | grep -aiq "unknown option"; then
+               # this is for openssl versions like 0.9.8, they do not have -groups or -curves -- just to be safe
+               :
+          else
+               # LibreSSL (tested with version 3.4.1 and 3.0.2) need -groups instead of -curve
+               # WSL users connect to "127.0.0.1:0", others to "invalid." or "invalid.:0"
+               # The $OPENSSL connect call deliberately fails: when the curve isn't available with the described error messages
+               for curve in "${curves_ossl[@]}"; do
+                    $OPENSSL s_client -groups $curve $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Failed to set groups"
+                    [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
+               done
+          fi
      else
           HAS_CURVES=true
           for curve in "${curves_ossl[@]}"; do
                # Same as above, we just don't need a port for invalid.
-               #FIXME: openssl 3 sometimes seems to hang  when using '-connect invalid.' for up to 10 seconds
-               $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Call to SSL_CONF_cmd(.*) failed|cannot be set"
+               $OPENSSL s_client -curves $curve $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Call to SSL_CONF_cmd(.*) failed|cannot be set"
                [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
           done
      fi
