@@ -2097,7 +2097,7 @@ check_revocation_ocsp() {
           host_header=${uri##http://}
           host_header=${host_header%%/*}
 
-          # This the follwomg is the default (like "-header Host r11.o.lencr.org")
+          # The following is the default (like "-header Host r11.o.lencr.org")
           host_header="-header Host ${host_header}"
 
           if "$smartswitch" ; then
