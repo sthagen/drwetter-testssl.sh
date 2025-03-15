@@ -3,7 +3,7 @@
 ARG LEAP_VERSION=15.6
 ARG INSTALL_ROOT=/rootfs
 
-FROM opensuse/leap:${LEAP_VERSION} as builder
+FROM opensuse/leap:${LEAP_VERSION} AS builder
 ARG CACHE_ZYPPER=/tmp/cache/zypper
 ARG INSTALL_ROOT
 
