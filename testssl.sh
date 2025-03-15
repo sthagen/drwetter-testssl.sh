@@ -2050,6 +2050,8 @@ check_revocation_ocsp() {
      local -i success=1
      local response=""
      local host_header=""
+     local openssl_bin="$OPENSSL"
+     local addtl_warning=""
 
      "$PHONE_OUT" || [[ -n "$stapled_response" ]] || return 0
      [[ -n "$GOOD_CA_BUNDLE" ]] || return 0
@@ -2079,6 +2081,17 @@ check_revocation_ocsp() {
                success=$?
           fi
      else
+          if [[ $OPENSSL =~ openssl.Linux.$(uname -m) ]]; then
+               # --phone-out in some cases throws a segfault with "our" binary, probably because a static binary with
+               # NSS and gethostbyname(3) doesn't work under Linux. So we use the vendor supplied binary if available.
+               # See #2516 and probably also #2667 and #1275 .
+               if [[ -x "$OPENSSL2" ]]; then
+                    openssl_bin="$OPENSSL2"
+                    [[ $DEBUG -ge 3 ]] && echo "Switching to $openssl_bin "
+               fi
+          else
+               addtl_warning="(a segfault indicates here you need to test this with another binary)"
+          fi
           host_header=${uri##http://}
           host_header=${host_header%%/*}
           if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
@@ -2089,7 +2102,7 @@ check_revocation_ocsp() {
           else
                host_header="-header Host ${host_header}"
           fi
-          $OPENSSL ocsp -no_nonce ${host_header} -url "$uri" \
+          $openssl_bin ocsp -no_nonce ${host_header} -url "$uri" \
                -issuer $TEMPDIR/hostcert_issuer.pem -verify_other $TEMPDIR/intermediatecerts.pem \
                -CAfile <(cat $ADDTL_CA_FILES "$GOOD_CA_BUNDLE") -cert $HOSTCERT -text &> "$tmpfile"
           success=$?
@@ -2109,8 +2122,8 @@ check_revocation_ocsp() {
                set_grade_cap "T" "Certificate revoked"
           else
                out ", "
-               pr_warning "error querying OCSP responder"
-               fileout "$jsonID" "WARN" "$response"
+               pr_warning "error querying OCSP responder $addtl_warning"
+               fileout "$jsonID" "WARN" "$response $addtl_warning"
                if [[ $DEBUG -ge 2 ]]; then
                     outln
                     cat "$tmpfile"
