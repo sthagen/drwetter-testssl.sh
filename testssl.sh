@@ -2052,7 +2052,7 @@ check_revocation_ocsp() {
      local host_header=""
      local openssl_bin="$OPENSSL"
      local addtl_warning=""
-     local smartswitch=false
+     local ossl_name="$OSSL_NAME" ossl_ver="$OSSL_VER" ossl_ver_major="$OSSL_VER_MAJOR"
 
      "$PHONE_OUT" || [[ -n "$stapled_response" ]] || return 0
      [[ -n "$GOOD_CA_BUNDLE" ]] || return 0
@@ -2088,8 +2088,12 @@ check_revocation_ocsp() {
                # See #2516 and probably also #2667 and #1275 .
                if [[ -x "$OPENSSL2" ]]; then
                     openssl_bin="$OPENSSL2"
-                    smartswitch=true
                     [[ $DEBUG -ge 3 ]] && echo "Switching to $openssl_bin "
+                    ossl_ver="$($openssl_bin version -v 2>/dev/null)"
+                    ossl_name="${ossl_ver%% *}"
+                    ossl_ver="${ossl_ver#$ossl_name }"
+                    ossl_ver="${ossl_ver%% *}"
+                    ossl_ver_major="${ossl_ver%%\.*}"
                fi
           else
                addtl_warning="(a segfault indicates here you need to test this with another binary)"
@@ -2100,15 +2104,8 @@ check_revocation_ocsp() {
           # The following is the default (like "-header Host r11.o.lencr.org")
           host_header="-header Host ${host_header}"
 
-          if "$smartswitch" ; then
-               case $(openssl version -v | awk -F' ' '{ print $2 }') in
-                    # for those versions it's "-header Host=r11.o.lencr.org"
-                    3.*|1.1*) host_header=${host_header/Host /Host=} ;;
-               esac
-          else
-               case $OSSL_VER_MAJOR.$OSSL_VER_MINOR in
-                    3.*|1.1*) host_header=${host_header/Host /Host=} ;;
-               esac
+          if [[ "$ossl_ver" == 1.1.* ]] || [[ $ossl_ver_major -ge 3 ]]; then
+               [[ ! "$ossl_name" =~ LibreSSL ]] && host_header=${host_header/Host /Host=}
           fi
           $openssl_bin ocsp -no_nonce ${host_header} -url "$uri" \
                -issuer $TEMPDIR/hostcert_issuer.pem -verify_other $TEMPDIR/intermediatecerts.pem \
