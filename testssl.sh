@@ -2490,6 +2490,16 @@ connectivity_problem() {
      fi
 }
 
+sanitze_http_header() {
+     # sed implementations tested were sometime not fine with header containing x0d x0a (CRLF) which is the usual
+     # case. Also we use tr here to remove any crtl chars which the server side offers --> possible security problem
+     # Only allowed now is LF + CR. See #2337. awk, see above, doesn't seem to care -- but not under MacOS.
+     sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $HEADERFILE | tr -d '\000-\011\013\014\016-\037' >$HEADERFILE.tmp
+     # Now to be more sure we delete from '<' or '{' maybe with a leading blank until the end
+     sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $HEADERFILE.tmp >$HEADERFILE
+     debugme echo -e "---\n $(< $HEADERFILE) \n---"
+}
+
 
 #problems not handled: chunked
 run_http_header() {
@@ -2520,16 +2530,14 @@ run_http_header() {
           # Doing it again in the foreground to get an accurate header time
           tm_out "$GET_REQ11" | $OPENSSL s_client $(s_client_options "$OPTIMAL_PROTO $BUGS -quiet -ign_eof -connect $NODEIP:$PORT $PROXY $SNI") >$HEADERFILE 2>$ERRFILE
           NOW_TIME=$(date "+%s")
-          HTTP_TIME=$(awk -F': ' '/^date:/ { print $2 }  /^Date:/ { print $2 }' $HEADERFILE)
-          HTTP_AGE=$(awk -F': ' '/^[aA][gG][eE]: / { print $2 }' $HEADERFILE)
           HAD_SLEPT=0
+          sanitze_http_header
      else
+          sanitze_http_header
           # 1st GET request hung and needed to be killed. Check whether it succeeded anyway:
           if grep -Eiaq "XML|HTML|DOCTYPE|HTTP|Connection" $HEADERFILE; then
                # correct by seconds we slept, HAD_SLEPT comes from wait_kill()
                NOW_TIME=$(($(date "+%s") - HAD_SLEPT))
-               HTTP_TIME=$(awk -F': ' '/^date:/ { print $2 }  /^Date:/ { print $2 }' $HEADERFILE)
-               HTTP_AGE=$(awk -F': ' '/^[aA][gG][eE]: / { print $2 }' $HEADERFILE)
           else
                prln_warning " likely HTTP header requests failed (#lines: $(wc -l $HEADERFILE | awk '{ print $1 }'))"
                [[ "$DEBUG" -lt 1 ]] && outln "Rerun with DEBUG>=1 and inspect $HEADERFILE\n"
@@ -2538,6 +2546,8 @@ run_http_header() {
                ((NR_HEADER_FAIL++))
           fi
      fi
+     HTTP_TIME=$(awk -F': ' '/^date:/ { print $2 }  /^Date:/ { print $2 }' $HEADERFILE)
+     HTTP_AGE=$(awk -F': ' '/^[aA][gG][eE]: / { print $2 }' $HEADERFILE)
      if [[ ! -s $HEADERFILE ]]; then
           ((NR_HEADER_FAIL++))
           if [[ $NR_HEADER_FAIL -ge $MAX_HEADER_FAIL ]]; then
@@ -2564,18 +2574,6 @@ run_http_header() {
      [[ -n "$HTTP_AGE" ]] && HTTP_AGE="$(strip_lf "$HTTP_AGE")"
      [[ -n "$HTTP_TIME" ]] && HTTP_TIME="$(strip_lf "$HTTP_TIME")"
      debugme echo "NOW_TIME: $NOW_TIME | HTTP_AGE: $HTTP_AGE | HTTP_TIME: $HTTP_TIME"
-
-     # Quit on first empty line to catch 98% of the cases. Next pattern is there because the SEDs tested
-     # so far seem not to be fine with header containing x0d x0a (CRLF) which is the usual case.
-     # So we also trigger also on any sign on a single line which is not alphanumeric (plus _)
-     #
-     # Also we use tr here to remove any crtl chars which the server side offers --> possible security problem
-     # Only allowed now is LF + CR. See  #2337
-     # awk, see above, doesn't seem to care
-     sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $HEADERFILE | tr -d '\000-\011\013\014\016-\037' >$HEADERFILE.tmp
-     # Now to be more sure we delete from '<' or '{' maybe with a leading blank until the end
-     sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $HEADERFILE.tmp >$HEADERFILE
-     debugme echo -e "---\n $(< $HEADERFILE) \n---"
 
      HTTP_STATUS_CODE=$(awk '/^HTTP\// { print $2 }' $HEADERFILE 2>>$ERRFILE)
      msg_thereafter=$(awk -F"$HTTP_STATUS_CODE" '/^HTTP\// { print $2 }' $HEADERFILE 2>>$ERRFILE)   # dirty trick to use the status code as a
