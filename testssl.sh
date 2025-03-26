@@ -8190,6 +8190,17 @@ get_server_certificate() {
      local -r a_gost="00,80, 00,81, 00,82, 00,83"
      local using_sockets=true
 
+     # The caller indicates what type of certificate to find (e.g., RSA, DSA, ECC, DH) and get_server_certificate() is supposed to request
+     # just that type of certificate. This is done in order to obtain all of a server's certificates, if it has more than one.
+     # For TLS 1.2 and earlier, this is done by specifying in the ClientHello only cipher suites that use the specified type of certificate.
+     # The variables a_rsa, e_rsa, a_dss, etc. indicate which cipher suites to use depending on what type of certificate is to be asked for.
+     # For TLS 1.3, the way to indicate what type of certificate the server should use is through the signature_algorithms/-cert extension.
+     # So, for TLS 1.3 connections, the -sigalgs option is used with $OPENSSL and an appropriate signature_algorithms (0x0d) extension
+     # is provided to tls_sockets().
+     #      The return 1 if $1 is neither tls_1_3_RSA nor tls_1_3_ECDSA is unnecessary. That would only happen if there were a bug in the
+     # code. For example, if someone added another certificate type (e.g., ML-DSA) to run_server_defaults(), but forgot to add corresponding
+     # code to get_server_certificate().
+
      "$SSL_NATIVE" && using_sockets=false
 
      CERTIFICATE_LIST_ORDERING_PROBLEM=false
