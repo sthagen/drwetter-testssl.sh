@@ -19668,7 +19668,7 @@ run_starttls_injection() {
           outln "Need socat for this check"
           return 1
      fi
-     if [[ -z "$HAS_UDS2" ]] && [[ -z "$HAS_UDS" ]]; then
+     if ! "$HAS_UDS2" && ! "$HAS_UDS"; then
           fileout "$jsonID" "WARN" "Need OpenSSL with Unix-domain socket s_client support for this check" "$cve" "$cwe" "$hint"
           outln "Need an OpenSSL with Unix-domain socket s_client support for this check"
           return 1
