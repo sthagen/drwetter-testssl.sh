@@ -247,6 +247,9 @@ TLS_DATA_FILE=""                        # mandatory file for socket-based handsh
 OPENSSL=""                              # ~/bin/openssl.$(uname).$(uname -m) if you run this from GitHub. Linux otherwise probably /usr/bin/openssl
 OPENSSL2=${OPENSSL2:-/usr/bin/openssl}  # This will be openssl version >=1.1.1 (auto determined) as opposed to openssl-bad (OPENSSL)
 OPENSSL2_HAS_TLS_1_3=false              # If we run with supplied binary AND $OPENSSL2 supports TLS 1.3 this will be set to true
+OPENSSL2_HAS_CHACHA20=false
+OPENSSL2_HAS_AES128_GCM=false
+OPENSSL2_HAS_AES256_GCM=false
 OSSL_SHORTCUT=${OSSL_SHORTCUT:-true}    # If you don't want automagically switch from $OPENSSL to $OPENSSL2 for TLS 1.3-only hosts, set this to false
 OPENSSL_LOCATION=""
 OPENSSL_NOTIMEOUT=""                    # Needed for renegotiation tests
@@ -13117,6 +13120,11 @@ chacha20() {
                        $OPENSSL enc -chacha20 -K "$key" -iv "01000000$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
           tm_out "$(strip_spaces "$plaintext")"
           return 0
+     elif "$OPENSSL2_HAS_CHACHA20"; then
+          plaintext="$(hex2binary "$ciphertext" | \
+                       $OPENSSL2 enc -chacha20 -K "$key" -iv "01000000$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          tm_out "$(strip_spaces "$plaintext")"
+          return 0
      fi
 
      ciphertext_len=${#ciphertext}
@@ -13808,9 +13816,19 @@ gcm-decrypt() {
                        $OPENSSL enc -aes-128-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
           tm_out "$(strip_spaces "$plaintext")"
           return 0
+     elif [[ "$cipher" == TLS_AES_128_GCM_SHA256 ]] && "$OPENSSL2_HAS_AES128_GCM" && ! "$compute_tag"; then
+          plaintext="$(hex2binary "$ciphertext" | \
+                       $OPENSSL2 enc -aes-128-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          tm_out "$(strip_spaces "$plaintext")"
+          return 0
      elif [[ "$cipher" == TLS_AES_256_GCM_SHA384 ]] && "$HAS_AES256_GCM" && ! "$compute_tag"; then
           plaintext="$(hex2binary "$ciphertext" | \
                        $OPENSSL enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          tm_out "$(strip_spaces "$plaintext")"
+          return 0
+     elif [[ "$cipher" == TLS_AES_256_GCM_SHA384 ]] && "$OPENSSL2_HAS_AES256_GCM" && ! "$compute_tag"; then
+          plaintext="$(hex2binary "$ciphertext" | \
+                       $OPENSSL2 enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
           tm_out "$(strip_spaces "$plaintext")"
           return 0
      fi
@@ -20695,23 +20713,6 @@ find_openssl_binary() {
 
      grep -qe '-enable_pha' $s_client_has && HAS_ENABLE_PHA=true
 
-     # Now check whether the standard $OPENSSL has Unix-domain socket and xmpp-server support. If
-     # not check /usr/bin/openssl -- if available. This is more a kludge which we shouldn't use for
-     # every openssl feature. At some point we need to decide which with openssl version we go.
-     # We also check, whether there's /usr/bin/openssl which has TLS 1.3
-     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
-          if [[ -x $OPENSSL2 ]]; then
-               $OPENSSL2 s_client -help 2>$s_client_has2
-               $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
-               grep -q 'Unix-domain socket' $s_client_has2 && HAS_UDS2=true
-               grep -q 'xmpp-server' $s_client_starttls_has2 && HAS_XMPP_SERVER2=true
-               # Likely we don't need the following second check here, see 6 lines above
-               if grep -wq 'tls1_3' $s_client_has2 && [[ $OPENSSL != /usr/bin/openssl ]]; then
-                    OPENSSL2_HAS_TLS_1_3=true
-               fi
-          fi
-     fi
-
      $OPENSSL enc -chacha20 -K 12345678901234567890123456789012 -iv 01000000123456789012345678901234 > /dev/null 2> /dev/null <<< "test"
      [[ $? -eq 0 ]] && HAS_CHACHA20=true
 
@@ -20720,6 +20721,36 @@ find_openssl_binary() {
 
      $OPENSSL enc -aes-256-gcm -K 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567  > /dev/null 2> /dev/null <<< "test"
      [[ $? -eq 0 ]] && HAS_AES256_GCM=true
+
+     if [[ $OPENSSL2 != $OPENSSL ]] && [[ -x $OPENSSL2 ]]; then
+          if ! "$HAS_CHACHA20"; then
+               $OPENSSL2 enc -chacha20 -K 12345678901234567890123456789012 -iv 01000000123456789012345678901234 > /dev/null 2> /dev/null <<< "test"
+               [[ $? -eq 0 ]] && OPENSSL2_HAS_CHACHA20=true
+          fi
+          if ! "$HAS_AES128_GCM"; then
+               $OPENSSL2 enc -aes-128-gcm -K 0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567  > /dev/null 2> /dev/null <<< "test"
+               [[ $? -eq 0 ]] && OPENSSL2_HAS_AES128_GCM=true
+          fi
+          if ! "$HAS_AES256_GCM"; then
+               $OPENSSL2 enc -aes-256-gcm -K 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567  > /dev/null 2> /dev/null <<< "test"
+               [[ $? -eq 0 ]] && OPENSSL2_HAS_AES256_GCM=true
+          fi
+
+          # Now check whether the standard $OPENSSL has Unix-domain socket and xmpp-server support. If
+          # not check $OPENSSL2 -- if available. This is more a kludge which we shouldn't use for
+          # every openssl feature. At some point we need to decide which with openssl version we go.
+          # We also check, whether there's $OPENSSL2 which has TLS 1.3
+          if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
+               $OPENSSL2 s_client -help 2>$s_client_has2
+               $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
+               grep -q 'Unix-domain socket' $s_client_has2 && HAS_UDS2=true
+               grep -q 'xmpp-server' $s_client_starttls_has2 && HAS_XMPP_SERVER2=true
+               # Likely we don't need the following second check here, see 6 lines above
+               if grep -wq 'tls1_3' $s_client_has2; then
+                    OPENSSL2_HAS_TLS_1_3=true
+               fi
+          fi
+     fi
 
      [[ "$(echo -e "\x78\x9C\xAB\xCA\xC9\x4C\xE2\x02\x00\x06\x20\x01\xBC" | $OPENSSL zlib -d 2>/dev/null)" == zlib ]] && HAS_ZLIB=true
 
