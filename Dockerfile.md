@@ -28,17 +28,15 @@ docker run -t mytestssl --help
 docker run --rm -t mytestssl -p --header example.com
 ```
 
-### From dockerhub
+### From dockerhub or GHCR
 
-You can pull the image from dockerhub and run:
+You can pull the image from dockerhub or ghcr.io and run:
 
-```
-docker run --rm -t drwetter/testssl.sh --fs example.com
-```
+``docker run --rm -t drwetter/testssl.sh --fs example.com`` or ``docker run --rm -t ghcr.io/testssl/testssl.sh --fs example.com``
 
-Supported tags are: ``3.2`` and ``latest``, which are the same, i.e. the rolling release. ``3.0`` is the latest stable version from git which might have a few improvements (see git log) over the released version 3.0.X.
+Supported tags are: ``3.2`` and ``latest``, which are the same. ``3.0`` is the old stable version which will be retired soon.
 
-``docker run --rm -t drwetter/testssl.sh:stable example.com``.
+``docker run --rm -t drwetter/testssl.sh:stable example.com`` or ``docker run --rm -t ghcr.io/testssl/testssl.sh:stable example.com``
 
 Keep in mind that any output file (--log, --html, --json etc.) will be created within the container. If you wish to have this created in a local directory on your host you can mount a volume into the container and change the output prefix where the container user has write access to, e.g.:
 

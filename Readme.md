@@ -64,7 +64,14 @@ Testssl.sh has minimal requirements. As stated you don't have to install or buil
 docker run --rm -ti  drwetter/testssl.sh <your_cmd_line>
 ```
 
+or from GHCR (GitHub Container Registry which supports more platforms: linux/amd64,linux/386,linux/arm64,linux/arm/v7,linux/arm/v6,linux/ppc64le):
+
+```
+docker run --rm -it ghcr.io/testssl/testssl.sh <your_cmd_line>
+```
+
 Or if you have cloned this repo you also can just ``cd`` to the INSTALLDIR and run
+
 ```
 docker build . -t imagefoo && docker run --rm -t imagefoo example.com
 ```
