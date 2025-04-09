@@ -4,7 +4,7 @@
 [![CI tests](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests.yml)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/testssl/testssl.sh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![License](https://img.shields.io/github/license/testssl/testssl.sh)](https://github.com/testssl/testssl.sh/LICENSE)
-[![Docker](https://img.shields.io/docker/pulls/testssl/testssl.sh)](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md)
+[![Docker](https://img.shields.io/docker/pulls/drwetter/testssl.sh)](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md)
 
 
 `testssl.sh` is a free command line tool which checks a server's service on
