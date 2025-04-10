@@ -20472,7 +20472,7 @@ find_openssl_binary() {
      local s_client_starttls_has=$TEMPDIR/s_client_starttls_has.txt
      local s_client_starttls_has2=$TEMPDIR/s_client_starttls_has2
      local openssl_location="" cwd=""
-     local curve=""
+     local curve="" ossl_tls13_supported_curves
      local ossl_line1="" yr=""
      local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
 
@@ -20665,26 +20665,42 @@ find_openssl_binary() {
           fi
      fi
 
-     if $OPENSSL s_client -curves </dev/null 2>&1 | grep -aiq "unknown option"; then
-          if $OPENSSL s_client -groups </dev/null 2>&1 | grep -aiq "unknown option"; then
-               # this is for openssl versions like 0.9.8, they do not have -groups or -curves -- just to be safe
-               :
+     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR -gt 3 || $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 3.[5-9]* ]]; then
+          OSSL_SUPPORTED_CURVES="$($OPENSSL list -tls1_2 -tls-groups)"
+          if [[ -n "$OSSL_SUPPORTED_CURVES" ]]; then
+               OSSL_SUPPORTED_CURVES=" ${OSSL_SUPPORTED_CURVES//:/ } "
+               ossl_tls13_supported_curves="$($OPENSSL list -tls1_3 -tls-groups)"
+               for curve in ${ossl_tls13_supported_curves//:/ }; do
+                    [[ ! "$OSSL_SUPPORTED_CURVES" =~ \ $curve\  ]] && OSSL_SUPPORTED_CURVES+="$curve "
+               done
+               OSSL_SUPPORTED_CURVES="${OSSL_SUPPORTED_CURVES//secp192r1/prime192v1}"
+               OSSL_SUPPORTED_CURVES="${OSSL_SUPPORTED_CURVES//secp256r1/prime256v1}"
+               OSSL_SUPPORTED_CURVES="${OSSL_SUPPORTED_CURVES//x25519/X25519}"
+               OSSL_SUPPORTED_CURVES="${OSSL_SUPPORTED_CURVES//x448/X448}"
+          fi
+     fi
+     if [[ -z "$OSSL_SUPPORTED_CURVES" ]]; then
+          if $OPENSSL s_client -curves </dev/null 2>&1 | grep -aiq "unknown option"; then
+               if $OPENSSL s_client -groups </dev/null 2>&1 | grep -aiq "unknown option"; then
+                    # this is for openssl versions like 0.9.8, they do not have -groups or -curves -- just to be safe
+                    :
+               else
+                    # LibreSSL (tested with version 3.4.1 and 3.0.2) need -groups instead of -curve
+                    # WSL users connect to "127.0.0.1:0", others to "invalid." or "invalid.:0"
+                    # The $OPENSSL connect call deliberately fails: when the curve isn't available with the described error messages
+                    for curve in "${curves_ossl[@]}"; do
+                         $OPENSSL s_client -groups $curve $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Failed to set groups"
+                         [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
+                    done
+               fi
           else
-               # LibreSSL (tested with version 3.4.1 and 3.0.2) need -groups instead of -curve
-               # WSL users connect to "127.0.0.1:0", others to "invalid." or "invalid.:0"
-               # The $OPENSSL connect call deliberately fails: when the curve isn't available with the described error messages
+               HAS_CURVES=true
                for curve in "${curves_ossl[@]}"; do
-                    $OPENSSL s_client -groups $curve $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Failed to set groups"
+                    # Same as above, we just don't need a port for invalid.
+                    $OPENSSL s_client -curves $curve $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Call to SSL_CONF_cmd(.*) failed|cannot be set"
                     [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
                done
           fi
-     else
-          HAS_CURVES=true
-          for curve in "${curves_ossl[@]}"; do
-               # Same as above, we just don't need a port for invalid.
-               $OPENSSL s_client -curves $curve $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Call to SSL_CONF_cmd(.*) failed|cannot be set"
-               [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
-          done
      fi
 
      # For the following we feel safe enough to query the s_client help functions.
