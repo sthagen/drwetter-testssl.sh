@@ -1166,7 +1166,7 @@ set_key_str_score() {
           elif [[ $size -lt 225 ]] && [[ $KEY_EXCH_SCORE -ge 90 ]]; then
                KEY_EXCH_SCORE=90
           fi
-     else
+     elif [[ $type == RSA || $type == DSA || $type == DH ]]; then
           if [[ $size -lt 512 ]] && [[ $KEY_EXCH_SCORE -ge 20 ]]; then
                KEY_EXCH_SCORE=20
           elif [[ $size -lt 1024 ]] && [[ $KEY_EXCH_SCORE -ge 40 ]]; then
@@ -1174,6 +1174,10 @@ set_key_str_score() {
           elif [[ $size -lt 2048 ]] && [[ $KEY_EXCH_SCORE -ge 80 ]]; then
                KEY_EXCH_SCORE=80
           elif [[ $size -lt 4096 ]] && [[ $KEY_EXCH_SCORE -ge 90 ]]; then
+               KEY_EXCH_SCORE=90
+          fi
+     elif [[ $type == ML-DSA ]]; then
+          if [[ $size -lt 4032 ]] && [[ $KEY_EXCH_SCORE -ge 90 ]]; then
                KEY_EXCH_SCORE=90
           fi
      fi
@@ -6750,6 +6754,21 @@ read_sigalg_from_file() {
      case "$sig_alg" in
           1.3.101.112|ED25519) tm_out "Ed25519" ;;
           1.3.101.113|ED448)   tm_out "Ed448" ;;
+          2.16.840.1.101.3.4.3.17) tm_out "ML-DSA-44" ;;
+          2.16.840.1.101.3.4.3.18) tm_out "ML-DSA-65" ;;
+          2.16.840.1.101.3.4.3.19) tm_out "ML-DSA-87" ;;
+          2.16.840.1.101.3.4.3.20) tm_out "SLH-DSA-SHA2-128s" ;;
+          2.16.840.1.101.3.4.3.21) tm_out "SLH-DSA-SHA2-128f" ;;
+          2.16.840.1.101.3.4.3.22) tm_out "SLH-DSA-SHA2-192s" ;;
+          2.16.840.1.101.3.4.3.23) tm_out "SLH-DSA-SHA2-192f" ;;
+          2.16.840.1.101.3.4.3.24) tm_out "SLH-DSA-SHA2-256s" ;;
+          2.16.840.1.101.3.4.3.25) tm_out "SLH-DSA-SHAKE-256f" ;;
+          2.16.840.1.101.3.4.3.26) tm_out "SLH-DSA-SHAKE-128s" ;;
+          2.16.840.1.101.3.4.3.27) tm_out "SLH-DSA-SHAKE-128f" ;;
+          2.16.840.1.101.3.4.3.28) tm_out "SLH-DSA-SHAKE-192s" ;;
+          2.16.840.1.101.3.4.3.29) tm_out "SLH-DSA-SHAKE-192f" ;;
+          2.16.840.1.101.3.4.3.30) tm_out "SLH-DSA-SHAKE-256s" ;;
+          2.16.840.1.101.3.4.3.31) tm_out "SLH-DSA-SHAKE-256f" ;;
           *)                   tm_out "$sig_alg" ;;
      esac
 
@@ -8201,7 +8220,7 @@ get_server_certificate() {
      # So, for TLS 1.3 connections, the -sigalgs option is used with $OPENSSL and an appropriate signature_algorithms (0x0d) extension
      # is provided to tls_sockets().
      #      The return 1 if $1 is neither tls_1_3_RSA nor tls_1_3_ECDSA is unnecessary. That would only happen if there were a bug in the
-     # code. For example, if someone added another certificate type (e.g., ML-DSA) to run_server_defaults(), but forgot to add corresponding
+     # code. For example, if someone added another certificate type (e.g., FN-DSA) to run_server_defaults(), but forgot to add corresponding
      # code to get_server_certificate().
 
      "$SSL_NATIVE" && using_sockets=false
@@ -8209,7 +8228,7 @@ get_server_certificate() {
      CERTIFICATE_LIST_ORDERING_PROBLEM=false
      if [[ "$1" =~ tls1_3 ]]; then
           [[ $(has_server_protocol "tls1_3") -eq 1 ]] && return 1
-          if "$HAS_TLS13" && "$HAS_SIGALGS" && [[ ! "$1" =~ tls1_3_EdDSA ]]; then
+          if "$HAS_TLS13" && "$HAS_SIGALGS" && [[ ! "$1" =~ tls1_3_EdDSA ]] && [[ ! "$1" =~ tls1_3_MLDSA ]]; then
                if [[ "$1" =~ tls1_3_RSA ]]; then
                     $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -showcerts -connect $NODEIP:$PORT $PROXY $SNI -tls1_3 -tlsextdebug -status -msg -sigalgs PSS+SHA256:PSS+SHA384:PSS+SHA512:rsa_pss_pss_sha256:rsa_pss_pss_sha384:rsa_pss_pss_sha512") </dev/null 2>$ERRFILE >$TMPFILE
                elif [[ "$1" =~ tls1_3_ECDSA ]]; then
@@ -8232,6 +8251,8 @@ get_server_certificate() {
                     tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,0a,00,08,04,03,05,03,06,03,02,03"
                elif [[ "$1" =~ tls1_3_EdDSA ]]; then
                     tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,06,00,04,08,07,08,08"
+               elif [[ "$1" =~ tls1_3_MLDSA ]]; then
+                    tls_sockets "04" "$TLS13_CIPHER" "all+" "00,12,00,00, 00,05,00,05,01,00,00,00,00, 00,0d,00,08,00,06,09,04,09,05,09,06"
                else
                     return 1
                fi
@@ -9105,12 +9126,30 @@ certificate_info() {
      case "$cert_sig_algo" in
           1.3.101.112|ED25519) cert_sig_algo="Ed25519" ;;
           1.3.101.113|ED448)   cert_sig_algo="Ed448" ;;
+          2.16.840.1.101.3.4.3.17) cert_sig_algo="ML-DSA-44" ;;
+          2.16.840.1.101.3.4.3.18) cert_sig_algo="ML-DSA-65" ;;
+          2.16.840.1.101.3.4.3.19) cert_sig_algo="ML-DSA-87" ;;
+          2.16.840.1.101.3.4.3.20) cert_sig_algo="SLH-DSA-SHA2-128s" ;;
+          2.16.840.1.101.3.4.3.21) cert_sig_algo="SLH-DSA-SHA2-128f" ;;
+          2.16.840.1.101.3.4.3.22) cert_sig_algo="SLH-DSA-SHA2-192s" ;;
+          2.16.840.1.101.3.4.3.23) cert_sig_algo="SLH-DSA-SHA2-192f" ;;
+          2.16.840.1.101.3.4.3.24) cert_sig_algo="SLH-DSA-SHA2-256s" ;;
+          2.16.840.1.101.3.4.3.25) cert_sig_algo="SLH-DSA-SHAKE-256f" ;;
+          2.16.840.1.101.3.4.3.26) cert_sig_algo="SLH-DSA-SHAKE-128s" ;;
+          2.16.840.1.101.3.4.3.27) cert_sig_algo="SLH-DSA-SHAKE-128f" ;;
+          2.16.840.1.101.3.4.3.28) cert_sig_algo="SLH-DSA-SHAKE-192s" ;;
+          2.16.840.1.101.3.4.3.29) cert_sig_algo="SLH-DSA-SHAKE-192f" ;;
+          2.16.840.1.101.3.4.3.30) cert_sig_algo="SLH-DSA-SHAKE-256s" ;;
+          2.16.840.1.101.3.4.3.31) cert_sig_algo="SLH-DSA-SHAKE-256f" ;;
      esac
      cert_key_algo="$(awk -F':' '/Public Key Algorithm:/ { print $2; if (++Match >= 1) exit; }' <<< "$cert_txt")"
      cert_key_algo="${cert_key_algo// /}"
      case "$cert_key_algo" in
           1.3.101.112|E[Dd]25519) cert_key_algo="Ed25519"; cert_keysize=253 ;;
           1.3.101.113|E[Dd]448)   cert_key_algo="Ed448"; cert_keysize=456 ;;
+          2.16.840.1.101.3.4.3.17) cert_key_algo="ML-DSA-44"; cert_keysize=2560 ;;
+          2.16.840.1.101.3.4.3.18) cert_key_algo="ML-DSA-65"; cert_keysize=4032 ;;
+          2.16.840.1.101.3.4.3.19) cert_key_algo="ML-DSA-87"; cert_keysize=4896 ;;
      esac
 
      out "$indent" ; pr_bold " Signature Algorithm          "
@@ -9219,7 +9258,7 @@ certificate_info() {
                fileout "${jsonID}${json_postfix}" "CRITICAL" "MD5"
                set_grade_cap "F" "Supports a insecure signature (MD5)"
                ;;
-          Ed25519|Ed448)
+          Ed25519|Ed448|ML-DSA*|SLH-DSA*)
                prln_svrty_good "$cert_sig_algo"
                fileout "${jsonID}${json_postfix}" "OK" "$cert_sig_algo"
                ;;
@@ -9244,13 +9283,17 @@ certificate_info() {
                *RSA*|*rsa*)             short_keyAlgo="RSA";;
                *ecdsa*|*ecPublicKey)    short_keyAlgo="EC";;
                *Ed25519*|*Ed448*)       short_keyAlgo="EdDSA";;
+               *ML-DSA*)                short_keyAlgo="ML-DSA" ;;
+               *SLH-DSA*)               short_keyAlgo="SLH-DSA" ;;
                *DSA*|*dsa*)             short_keyAlgo="DSA";;
                *GOST*|*gost*)           short_keyAlgo="GOST";;
                *dh*|*DH*)               short_keyAlgo="DH" ;;
                *)                       pr_fixme "don't know $cert_key_algo "
                                         ((ret++)) ;;
           esac
-          out "$short_keyAlgo "
+          if [[ $short_keyAlgo != EdDSA ]] && [[ $short_keyAlgo != ML-DSA ]]; then
+               out "$short_keyAlgo "
+          fi
           # https://tools.ietf.org/html/rfc4492,  https://www.keylength.com/en/compare/
           # https://doi.org/10.1007/s00145-001-0009-4
           # see https://csrc.nist.gov/publications/detail/sp/800-57-part-1/rev-4/final
@@ -9307,7 +9350,7 @@ certificate_info() {
                fi
 
                set_key_str_score "$short_keyAlgo" "$cert_keysize"
-          elif [[ $cert_key_algo == Ed* ]]; then
+          elif [[ $cert_key_algo == Ed* ]] || [[ $cert_key_algo == ML-DSA* ]]; then
                pr_svrty_good "$cert_key_algo"
                json_rating="OK"; json_msg="$short_keyAlgo $cert_key_algo"
                set_key_str_score "$short_keyAlgo" "$cert_keysize"
@@ -10143,27 +10186,29 @@ run_server_defaults() {
      ciphers_to_test[8]="tls1_3_RSA"
      ciphers_to_test[9]="tls1_3_ECDSA"
      ciphers_to_test[10]="tls1_3_EdDSA"
+     ciphers_to_test[11]="tls1_3_MLDSA"
      certificate_type[1]="" ; certificate_type[2]=""
      certificate_type[3]=""; certificate_type[4]=""
      certificate_type[5]="" ; certificate_type[6]=""
      certificate_type[7]="" ; certificate_type[8]="RSASig"
      certificate_type[9]="ECDSA" ; certificate_type[10]="EdDSA"
+     certificate_type[11]="MLDSA"
 
-     for (( n=1; n <= 17 ; n++ )); do
+     for (( n=1; n <= 18 ; n++ )); do
           # Some servers use a different certificate if the ClientHello
           # specifies TLSv1.1 and doesn't include a server name extension.
           # So, for each public key type for which a certificate was found,
           # try again, but only with TLSv1.1 and without SNI.
           if [[ $n -ne 1 ]] && [[ "$OPTIMAL_PROTO" == -ssl2 ]]; then
                ciphers_to_test[n]=""
-          elif [[ $n -ge 11 ]]; then
+          elif [[ $n -ge 12 ]]; then
                ciphers_to_test[n]=""
-               [[ ${success[n-10]} -eq 0 ]] && [[ $(has_server_protocol "tls1_1") -ne 1 ]] && \
-                    ciphers_to_test[n]="${ciphers_to_test[n-10]}" && certificate_type[n]="${certificate_type[n-10]}"
+               [[ ${success[n-11]} -eq 0 ]] && [[ $(has_server_protocol "tls1_1") -ne 1 ]] && \
+                    ciphers_to_test[n]="${ciphers_to_test[n-11]}" && certificate_type[n]="${certificate_type[n-11]}"
           fi
 
           if [[ -n "${ciphers_to_test[n]}" ]]; then
-               if [[ $n -ge 11 ]]; then
+               if [[ $n -ge 12 ]]; then
                     sni="$SNI"
                     SNI=""
                     get_server_certificate "${ciphers_to_test[n]}" "tls1_1"
@@ -10174,7 +10219,7 @@ run_server_defaults() {
                     success[n]=$?
                fi
                if [[ ${success[n]} -eq 0 ]] && [[ -s "$HOSTCERT" ]]; then
-                    [[ $n -ge 11 ]] && [[ ! -e $HOSTCERT.nosni ]] && cp $HOSTCERT $HOSTCERT.nosni
+                    [[ $n -ge 12 ]] && [[ ! -e $HOSTCERT.nosni ]] && cp $HOSTCERT $HOSTCERT.nosni
                     cp "$TEMPDIR/$NODEIP.get_server_certificate.txt" $TMPFILE
                     >$ERRFILE
                     if [[ -z "$sessticket_lifetime_hint" ]]; then
@@ -10256,7 +10301,7 @@ run_server_defaults() {
                          fi
                          i=$((i + 1))
                     done
-                    if ! "$match_found" && [[ $n -ge 11 ]] && [[ $certs_found -ne 0 ]]; then
+                    if ! "$match_found" && [[ $n -ge 12 ]] && [[ $certs_found -ne 0 ]]; then
                          # A new certificate was found using TLSv1.1 without SNI.
                          # Check to see if the new certificate should be displayed.
                          # It should be displayed if it is either a match for the
@@ -10313,7 +10358,7 @@ run_server_defaults() {
                          [[ -n "${previous_intermediates[certs_found]}" ]] && [[ -r $TEMPDIR/hostcert_issuer.pem ]] && \
                               previous_hostcert_issuer[certs_found]=$(cat $TEMPDIR/hostcert_issuer.pem)
                          previous_ordering_problem[certs_found]=$CERTIFICATE_LIST_ORDERING_PROBLEM
-                         [[ $n -ge 11 ]] && sni_used[certs_found]="" || sni_used[certs_found]="$SNI"
+                         [[ $n -ge 12 ]] && sni_used[certs_found]="" || sni_used[certs_found]="$SNI"
                          tls_version[certs_found]="$DETECTED_TLS_VERSION"
                          previous_hostcert_type[certs_found]=" ${certificate_type[n]}"
                          if [[ $DEBUG -ge 1 ]]; then
@@ -10611,10 +10656,10 @@ run_fs() {
      local -a ffdhe_groups_hex=("01,00" "01,01" "01,02" "01,03" "01,04")
      local -a ffdhe_groups_output=("ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
      local -a supported_curve
-     local -a sigalgs_hex=("01,01" "01,02" "01,03" "02,01" "02,02" "02,03" "03,01" "03,02" "03,03" "04,01" "04,02" "04,03" "04,20" "05,01" "05,02" "05,03" "05,20" "06,01" "06,02" "06,03" "06,20" "07,08" "08,04" "08,05" "08,06" "08,07" "08,08" "08,09" "08,0a" "08,0b" "08,1a" "08,1b" "08,1c")
-     local -a sigalgs_strings=("RSA+MD5" "DSA+MD5" "ECDSA+MD5" "RSA+SHA1" "DSA+SHA1" "ECDSA+SHA1" "RSA+SHA224" "DSA+SHA224" "ECDSA+SHA224" "RSA+SHA256" "DSA+SHA256" "ECDSA+SHA256" "RSA+SHA256" "RSA+SHA384" "DSA+SHA384" "ECDSA+SHA384" "RSA+SHA384" "RSA+SHA512" "DSA+SHA512" "ECDSA+SHA512" "RSA+SHA512" "SM2+SM3" "RSA-PSS-RSAE+SHA256" "RSA-PSS-RSAE+SHA384" "RSA-PSS-RSAE+SHA512" "Ed25519" "Ed448" "RSA-PSS-PSS+SHA256" "RSA-PSS-PSS+SHA384" "RSA-PSS-PSS+SHA512" "ECDSA-BRAINPOOL+SHA256" "ECDSA-BRAINPOOL+SHA384" "ECDSA-BRAINPOOL+SHA512")
-     local -a tls13_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
-     local -a tls12_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
+     local -a sigalgs_hex=("01,01" "01,02" "01,03" "02,01" "02,02" "02,03" "03,01" "03,02" "03,03" "04,01" "04,02" "04,03" "04,20" "05,01" "05,02" "05,03" "05,20" "06,01" "06,02" "06,03" "06,20" "07,08" "08,04" "08,05" "08,06" "08,07" "08,08" "08,09" "08,0a" "08,0b" "08,1a" "08,1b" "08,1c" "09,04" "09,05" "09,06")
+     local -a sigalgs_strings=("RSA+MD5" "DSA+MD5" "ECDSA+MD5" "RSA+SHA1" "DSA+SHA1" "ECDSA+SHA1" "RSA+SHA224" "DSA+SHA224" "ECDSA+SHA224" "RSA+SHA256" "DSA+SHA256" "ECDSA+SHA256" "RSA+SHA256" "RSA+SHA384" "DSA+SHA384" "ECDSA+SHA384" "RSA+SHA384" "RSA+SHA512" "DSA+SHA512" "ECDSA+SHA512" "RSA+SHA512" "SM2+SM3" "RSA-PSS-RSAE+SHA256" "RSA-PSS-RSAE+SHA384" "RSA-PSS-RSAE+SHA512" "Ed25519" "Ed448" "RSA-PSS-PSS+SHA256" "RSA-PSS-PSS+SHA384" "RSA-PSS-PSS+SHA512" "ECDSA-BRAINPOOL+SHA256" "ECDSA-BRAINPOOL+SHA384" "ECDSA-BRAINPOOL+SHA512" "ML-DSA-44" "ML-DSA-65" "ML-DSA-87")
+     local -a tls13_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
+     local -a tls12_supported_sigalgs=("false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false" "false")
      local rsa_cipher="" ecdsa_cipher="" dss_cipher=""
      local sigalgs_to_test tls12_supported_sigalg_list="" tls13_supported_sigalg_list=""
      local -i nr_supported_ciphers=0 nr_curves=0 nr_ossl_curves=0 i j low high
@@ -15467,8 +15512,8 @@ parse_tls_serverhello() {
           fi
      fi
      if [[ 0x$peering_signing_digest -eq 8 ]] && \
-        [[ 0x$peer_signature_type -ge 4 ]] && [[ 0x$peer_signature_type -le 11 ]] || \
-        [[ 0x$peer_signature_type -ge 26 ]] && [[ 0x$peer_signature_type -le 28 ]]; then
+        { [[ 0x$peer_signature_type -ge 4 && 0x$peer_signature_type -le 11 ]] || \
+          [[ 0x$peer_signature_type -ge 26 && 0x$peer_signature_type -le 28 ]]; }; then
           case $peer_signature_type in
                04) peering_signing_digest="SHA256"; peer_signature_type="RSA-PSS-RSAE" ;;
                05) peering_signing_digest="SHA384"; peer_signature_type="RSA-PSS-RSAE" ;;
@@ -15505,6 +15550,15 @@ parse_tls_serverhello() {
           esac
           echo "Peer signing digest: $peering_signing_digest" >> $TMPFILE
           [[ $DEBUG -ge 3 ]] && echo -e "     Peer signing digest:    $peering_signing_digest"
+          echo "Peer signature type: $peer_signature_type" >> $TMPFILE
+          [[ $DEBUG -ge 3 ]] && echo -e "     Peer signature type:    $peer_signature_type\n"
+     elif [[ 0x$peering_signing_digest -eq 9 ]] && \
+          [[ 0x$peer_signature_type -ge 4 ]] && [[ 0x$peer_signature_type -le 6 ]]; then
+          case $peer_signature_type in
+               04) peering_signing_digest=""; peer_signature_type="ML-DSA-44" ;;
+               05) peering_signing_digest=""; peer_signature_type="ML-DSA-65" ;;
+               06) peering_signing_digest=""; peer_signature_type="ML-DSA-87" ;;
+          esac
           echo "Peer signature type: $peer_signature_type" >> $TMPFILE
           [[ $DEBUG -ge 3 ]] && echo -e "     Peer signature type:    $peer_signature_type\n"
      fi
@@ -15839,10 +15893,10 @@ prepare_tls_clienthello() {
           else
                extension_signature_algorithms="
                00, 0d,                    # Type: signature_algorithms , see RFC 8446
-               00, 22, 00, 20,            # lengths
-               04,03, 05,03, 06,03, 08,04, 08,05, 08,06,
-               04,01, 05,01, 06,01, 08,09, 08,0a, 08,0b,
-               08,07, 08,08, 02,01, 02,03"
+               00, 28, 00, 26,            # lengths
+               04,03, 05,03, 06,03, 08,04, 08,05, 08,06, 04,01, 05,01,
+               06,01, 08,09, 08,0a, 08,0b, 08,07, 08,08, 02,01, 02,03,
+               09,04, 09,05, 09,06"
           fi
 
           extension_heartbeat="

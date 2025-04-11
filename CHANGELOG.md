@@ -36,6 +36,7 @@
 * TLS 1.2 and TLS 1.3 sig algs added
 * Check for ffdhe groups
 * Check for six KEMs in draft-connolly-tls-mlkem-key-agreement/draft-kwiatkowski-tls-ecdhe-mlkem/draft-tls-westerbaan-xyber768d00
+* Check for ML-DSA signatures (draft-tls-westerbaan-mldsa)
 * Show server supported signature algorithms
 * --add-ca can also now be a directory with \*.pem files
 * Warning of 398 day limit for certificates issued after 2020/9/1
