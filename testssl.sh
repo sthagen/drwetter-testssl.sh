@@ -12778,11 +12778,12 @@ create-initial-transcript() {
 #arg2: file containing cipher name, public key, and private key
 derive-handshake-secret() {
      local cipher="$1"
-     local tmpfile="$2"
-     local -i retcode
+     local tmpfile="$(cat -v "$2")"
      local hash_fn
-     local pub_file priv_file tmpfile
-     local early_secret derived_secret shared_secret handshake_secret
+     local key_or_cipher pubkeys_and_ciphers privkeys
+     local -a pubkey_or_cipher=() privkey=()
+     local early_secret derived_secret shared_secret="" handshake_secret
+     local -i i numkeys=0
 
      "$HAS_PKUTIL" || return 1
 
@@ -12794,20 +12795,68 @@ derive-handshake-secret() {
           return 1
      fi
 
-     pub_file="$(mktemp "$TEMPDIR/pubkey.XXXXXX")" || return 7
-     awk '/-----BEGIN PUBLIC KEY/,/-----END PUBLIC KEY/ { print $0 }' \
-          "$tmpfile" > "$pub_file"
-     [[ ! -s "$pub_file" ]] && return 1
+     if [[ ! "$tmpfile" =~ BEGIN\ HYBRID\ PRIV\ KEY ]]; then
+          # For (EC)DH groups the server's key share is a public key.
+          # For KEM groups, the server's key share is a ciphertext.
+          if [[ "$tmpfile" =~ \-\-\-\-\-BEGIN\ CIPHERTEXT ]]; then
+               key_or_cipher="-----BEGIN CIPHERTEXT${tmpfile#*-----BEGIN CIPHERTEXT}"
+               key_or_cipher="${key_or_cipher%END CIPHERTEXT------*}END CIPHERTEXT------"
+          else
+               key_or_cipher="-----BEGIN PUBLIC KEY${tmpfile#*-----BEGIN PUBLIC KEY}"
+               key_or_cipher="${key_or_cipher%END PUBLIC KEY-----*}END PUBLIC KEY-----"
+          fi
+          [[ -z "$key_or_cipher" ]] && return 1
+          pubkey_or_cipher+=("$key_or_cipher")
 
-     priv_file="$(mktemp "$TEMPDIR/privkey.XXXXXX")" || return 7
-     if grep -qe "-----BEGIN EC PARAMETERS" "$tmpfile"; then
-          awk '/-----BEGIN EC PARAMETERS/,/-----END EC PRIVATE KEY/ { print $0 }' \
-               "$tmpfile" > "$priv_file"
+          if [[ "$tmpfile" =~ \-\-\-\-\-BEGIN\ EC\ PARAMETERS ]]; then
+               key_or_cipher="-----BEGIN EC PARAMETERS${tmpfile#*-----BEGIN EC PARAMETERS}"
+               key_or_cipher="${key_or_cipher%END EC PRIVATE KEY-----*}END EC PRIVATE KEY-----"
+          else
+               key_or_cipher="-----BEGIN PRIVATE KEY${tmpfile#*-----BEGIN PRIVATE KEY}"
+               key_or_cipher="$key_or_cipher%END PRIVATE KEY-----*}END PRIVATE KEY-----"
+          fi
+          [[ -z "$key_or_cipher" ]] && return 1
+          privkey+=("$key_or_cipher")
+          numkeys=1
      else
-          awk '/-----BEGIN PRIVATE KEY/,/-----END PRIVATE KEY/ { print $0 }' \
-               "$tmpfile" > "$priv_file"
+          # Some newer TLS 1.3 groups follow the approach defined in
+          # https://datatracker.ietf.org/doc/html/draft-ietf-tls-hybrid-design.
+          # A single group is composed from multiple key exchange algorithms (e.g.,
+          # X25519 and ML-KEM 768), with the public key being the concatenation of
+          # the component public keys and the server's key share being the concatenation
+          # of the components key shares (public keys for (EC)DH and ciphertexts for KEMs).
+          # As this is a hybrid key exchange, each of the component private keys and
+          # corresponding server key shares need to be extracted.
+          pubkeys_and_ciphers="${tmpfile#*--BEGIN HYBRID CIPHERTEXT--}"
+          pubkeys_and_ciphers="${pubkeys_and_ciphers%--END HYBRID CIPHERTEXT--*}"
+          privkeys="${tmpfile#*---BEGIN HYBRID PRIV KEY---}"
+          privkeys="${privkeys%---END HYBRID PRIV KEY---*}"
+          
+          while [[ "$pubkeys_and_ciphers" =~ BEGIN ]]; do
+               if [[ "${pubkeys_and_ciphers:0:27}" =~ BEGIN\ CIPHERTEXT ]]; then
+                    key_or_cipher="-----BEGIN CIPHERTEXT${pubkeys_and_ciphers#*-----BEGIN CIPHERTEXT}"
+                    key_or_cipher="${key_or_cipher%END CIPHERTEXT------*}END CIPHERTEXT------"
+                    pubkeys_and_ciphers="${pubkeys_and_ciphers#*END CIPHERTEXT------}"
+               else
+                    key_or_cipher="-----BEGIN PUBLIC KEY${pubkeys_and_ciphers#*-----BEGIN PUBLIC KEY}"
+                    key_or_cipher="${key_or_cipher%END PUBLIC KEY-----*}END PUBLIC KEY-----"
+                    pubkeys_and_ciphers="${pubkeys_and_ciphers#*END PUBLIC KEY-----}"
+               fi
+               pubkey_or_cipher+=("$key_or_cipher")
+
+               if [[ "${privkeys:0:27}" =~ BEGIN\ EC\ PARAMETERS ]]; then
+                    key_or_cipher="-----BEGIN EC PARAMETERS${privkeys#*-----BEGIN EC PARAMETERS}"
+                    key_or_cipher="${key_or_cipher%END EC PRIVATE KEY-----*}END EC PRIVATE KEY-----"
+                    privkeys="${privkeys#*END EC PRIVATE KEY-----}"
+               else
+                    key_or_cipher="-----BEGIN PRIVATE KEY${privkeys#*-----BEGIN PRIVATE KEY}"
+                    key_or_cipher="$key_or_cipher%END PRIVATE KEY-----*}END PRIVATE KEY-----"
+                    privkeys="${privkeys#*END PRIVATE KEY-----}"
+               fi
+               privkey+=("$key_or_cipher")
+               numkeys+=1
+          done
      fi
-     [[ ! -s "$priv_file" ]] && return 1
 
      # early_secret="$(hmac "$hash_fn" "000...000" "000...000")"
      case "$hash_fn" in
@@ -12835,8 +12884,20 @@ derive-handshake-secret() {
                      ;;
      esac
 
-     shared_secret="$($OPENSSL pkeyutl -derive -inkey "$priv_file" -peerkey "$pub_file" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
-     rm "$pub_file" "$priv_file"
+     # The approach defined in https://datatracker.ietf.org/doc/html/draft-ietf-tls-hybrid-design
+     # for hybrid key exchanges is to make the shared secret the concatenation of the components'
+     # shared secrets. So, each component shared secret is derived or decapsulated, and
+     # the components are concatenated.
+     for (( i=0; i<numkeys; i++ )); do
+          if [[ "${pubkey_or_cipher[i]}" =~ BEGIN\ PUBLIC\ KEY ]]; then
+               shared_secret+="$($OPENSSL pkeyutl -derive -inkey <(safe_echo "${privkey[i]}") -peerkey <(safe_echo "${pubkey_or_cipher[i]}") 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          else
+               pubkey_or_cipher[i]="${pubkey_or_cipher[i]#*-----BEGIN CIPHERTEXT}"
+               pubkey_or_cipher[i]="${pubkey_or_cipher[i]%END CIPHERTEXT------*}"
+               pubkey_or_cipher[i]="${pubkey_or_cipher[i]//[!a-fA-F0-9]/}"
+               shared_secret+="$($OPENSSL pkeyutl -decap -inkey <(safe_echo "${privkey[i]}") -in <(hex2binary "${pubkey_or_cipher[i]}") 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          fi
+     done
 
      # For draft 18 use $early_secret rather than $derived_secret.
      if [[ "${TLS_SERVER_HELLO:8:4}" == "7F12" ]]; then
@@ -14923,8 +14984,76 @@ parse_tls_serverhello() {
                                     key_bitstring="${dh_param}0382${len1}00$key_bitstring"
                                     len1="$(printf "%04x" $((${#key_bitstring}/2)))"
                                     key_bitstring="3082${len1}$key_bitstring"
+                               elif [[ $named_curve -ge 512 ]] && [[ $named_curve -le 514 ]]; then
+                                    # The server's key share is a ML-KEM-512, ML-KEM-768, or ML-KEM-1024 ciphertext
+                                    if [[ ! "$OSSL_SUPPORTED_CURVES" =~ MLKEM ]]; then
+                                         debugme prln_warning "Your $OPENSSL doesn't support ML-KEM"
+                                    else
+                                         key_bitstring="-----BEGIN CIPHERTEXT------${tls_serverhello_ascii:offset:msg_len}-----END CIPHERTEXT------"
+                                    fi
+                               elif [[ $named_curve -eq 4587 ]]; then
+                                    # The server's key share is the concatenation of a P-256 public key and a ML-KEM-768 ciphertext
+                                    if [[ $msg_len -ne 2306 ]]; then
+                                         debugme tmln_warning "Malformed key share extension."
+                                         [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
+                                         return 1
+                                    fi
+                                    if [[ ! "$OSSL_SUPPORTED_CURVES" =~ MLKEM ]]; then
+                                         debugme prln_warning "Your $OPENSSL doesn't support ML-KEM"
+                                    else
+                                         key_bitstring="3059301306072a8648ce3d020106082a8648ce3d030107034200${tls_serverhello_ascii:offset:130}"
+                                         key_bitstring="$(hex2binary "$key_bitstring" | $OPENSSL pkey -pubin -inform DER 2>$ERRFILE)"
+                                         if [[ -z "$key_bitstring" ]]; then
+                                              debugme prln_warning "Your $OPENSSL doesn't support P-256"
+                                         else
+                                              key_bitstring="--BEGIN HYBRID CIPHERTEXT--${key_bitstring}"
+                                              key_bitstring+="-----BEGIN CIPHERTEXT------${tls_serverhello_ascii:$((offset+130)):2176}-----END CIPHERTEXT------"
+                                              key_bitstring+="--END HYBRID CIPHERTEXT--"
+                                         fi
+                                    fi
+                               elif [[ $named_curve -eq 4588 ]]; then
+                                    # The server's key share is the concatenation of a ML-KEM-768 ciphertext and a X25519 public key.
+                                    if [[ $msg_len -ne 2240 ]]; then
+                                         debugme tmln_warning "Malformed key share extension."
+                                         [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
+                                         return 1
+                                    fi
+                                    if [[ ! "$OSSL_SUPPORTED_CURVES" =~ MLKEM ]]; then
+                                         debugme prln_warning "Your $OPENSSL doesn't support ML-KEM"
+                                    elif ! "$HAS_X25519"; then
+                                        debugme prln_warning "Your $OPENSSL doesn't support X25519"
+                                    else
+                                         key_bitstring="302a300506032b656e032100${tls_serverhello_ascii:$((offset+2176)):64}"
+                                         key_bitstring="$(hex2binary "$key_bitstring" | $OPENSSL pkey -pubin -inform DER 2>$ERRFILE)"
+                                         if [[ -z "$key_bitstring" ]]; then
+                                              debugme prln_warning "Your $OPENSSL doesn't support X25519"
+                                         else
+                                              key_bitstring="-----BEGIN CIPHERTEXT------${tls_serverhello_ascii:offset:2176}-----END CIPHERTEXT------${key_bitstring}"
+                                              key_bitstring="--BEGIN HYBRID CIPHERTEXT--${key_bitstring}--END HYBRID CIPHERTEXT--"
+                                         fi
+                                    fi
+                               elif [[ $named_curve -eq 4589 ]]; then
+                                    # The server's key share is the concatenation of a P-384 public key and a ML-KEM-1024 ciphertext
+                                    if [[ $msg_len -ne 3330 ]]; then
+                                         debugme tmln_warning "Malformed key share extension."
+                                         [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
+                                         return 1
+                                    fi
+                                    if [[ ! "$OSSL_SUPPORTED_CURVES" =~ MLKEM ]]; then
+                                         debugme prln_warning "Your $OPENSSL doesn't support ML-KEM"
+                                    else
+                                         key_bitstring="3076301006072a8648ce3d020106052b81040022036200${tls_serverhello_ascii:offset:194}"
+                                         key_bitstring="$(hex2binary "$key_bitstring" | $OPENSSL pkey -pubin -inform DER 2>$ERRFILE)"
+                                         if [[ -z "$key_bitstring" ]]; then
+                                              debugme prln_warning "Your $OPENSSL doesn't support P-384"
+                                         else
+                                              key_bitstring="--BEGIN HYBRID CIPHERTEXT--${key_bitstring}"
+                                              key_bitstring+="-----BEGIN CIPHERTEXT------${tls_serverhello_ascii:$((offset+194)):3136}-----END CIPHERTEXT------"
+                                              key_bitstring+="--END HYBRID CIPHERTEXT--"
+                                         fi
+                                    fi
                                fi
-                               if [[ -n "$key_bitstring" ]]; then
+                               if [[ -n "$key_bitstring" ]] && [[ ! "$key_bitstring" =~ BEGIN ]]; then
                                     key_bitstring="$(hex2binary "$key_bitstring" | $OPENSSL pkey -pubin -inform DER 2>$ERRFILE)"
                                     if [[ -z "$key_bitstring" ]] && [[ $DEBUG -ge 2 ]]; then
                                          if [[ -n "$named_curve_str" ]]; then
@@ -15923,51 +16052,49 @@ prepare_tls_clienthello() {
           elif [[ 0x$tls_low_byte -gt 0x03 ]]; then
                # Supported Groups Extension
                if [[ ! "$process_full" =~ all ]]; then
+                    # The response does not need to be decrypted, so groups may be included
+                    # regardless of whether testssl.sh can decrypt the response.
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
                     00,24, 00,22,               # lengths
                     00,1d, 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01, 02,00, 02,01, 02,02, 11,eb, 11,ec, 11,ed,
                     63,99"
-                    # Only include ML-KEM and Kyber hybrids as options if the response does
-                    # not need to be decrypted.
-               elif [[ ! "$process_full" =~ all ]] || { "$HAS_X25519" && "$HAS_X448"; }; then
-                    extension_supported_groups="
-                    00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,16, 00,14,               # lengths
-                    00,1d, 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21,
-                    01,00, 01,01"
-                    # OpenSSL prior to 1.1.1 does not support X448, so list it as the least
-                    # preferred option if the response needs to be decrypted, and do not
-                    # list it at all if the response MUST be decrypted.
-               elif "$HAS_X25519" && [[ "$process_full" == all+ ]]; then
-                    extension_supported_groups="
-                    00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,14, 00,12,               # lengths
-                    00,1d, 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
-                    01,00, 01,01"
-               elif "$HAS_X25519"; then
-                    extension_supported_groups="
-                    00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,16, 00,14,               # lengths
-                    00,1d, 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
-                    01,00, 01,01, 00,1e"
-                    # OpenSSL prior to 1.1.0 does not support either X25519 or X448,
-                    # so list them as the least preferred options if the response
-                    # needs to be decrypted, and do not list them at all if the
-                    # response MUST be decrypted.
                elif [[ "$process_full" == all+ ]]; then
-                    extension_supported_groups="
-                    00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,12, 00,10,               # lengths
-                    00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
-                    01,00, 01,01"
+                    # Since the response needs to be decrypted, only include groups that can be
+                    # decrypted using $OPENSSL. Place X25519 and X448 early in the list, if they
+                    # are included.
+                    if "$HAS_X448"; then
+                         extension_supported_groups=", 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21, 01,00, 01,01"
+                    else
+                         extension_supported_groups=", 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21, 01,00, 01,01"
+                    fi
+                    "$HAS_X25519" && extension_supported_groups=", 00,1d$extension_supported_groups"
+                    if [[ "$OSSL_SUPPORTED_CURVES" =~ MLKEM ]]; then
+                         "$HAS_X25519" && extension_supported_groups+=", 11,ec"
+                         extension_supported_groups+=", 02,00, 02,01, 02,02, 11,eb, 11,ed"
+                    fi
+                    extension_supported_groups="00,0a, 00,$(printf "%02x" $((2+2*${#extension_supported_groups}/7))), 00,$(printf "%02x" $((2*${#extension_supported_groups}/7)))$extension_supported_groups"
                else
-                    extension_supported_groups="
-                    00,0a,                      # Type: Supported Groups, see RFC 8446
-                    00,16, 00,14,               # lengths
-                    00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
-                    01,00, 01,01, 00,1d, 00,1e"
+                    # Groups for which testssl.sh can decrypt the response are preferred, but if no such
+                    # groups are supported by the server, it is preferable to connect with a group that
+                    # cannot be decrypted rather than fail the connection. So, groups that cannot be
+                    # decrypted are placed at the end of the list.
+                    # Place X25519 and X448 early in the list if they are supported by $OPENSSL, but at the
+                    # end of the list if they are not.
+                    if "$HAS_X448"; then
+                         extension_supported_groups=", 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21, 01,00, 01,01"
+                    else
+                         extension_supported_groups=", 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21, 01,00, 01,01"
+                    fi
+                    if "$HAS_X25519"; then
+                         extension_supported_groups=", 00,1d$extension_supported_groups"
+                    else
+                         extension_supported_groups+=", 00,1d"
+                    fi
+                    ! "$HAS_X448" && extension_supported_groups+=", 00,1e"
+                    extension_supported_groups+=", 02,00, 02,01, 02,02, 11,eb, 11,ec, 11,ed, 63,99"
+                    extension_supported_groups="00,0a, 00,24, 00,22$extension_supported_groups"
                fi
 
                code2network "$extension_supported_groups"
@@ -20528,6 +20655,13 @@ find_openssl_binary() {
      local openssl_location="" cwd=""
      local curve="" ossl_tls13_supported_curves
      local ossl_line1="" yr=""
+     # FIXME: At the moment curves_ossl does not include any post-quantum key-exchange
+     # groups (e.g., MLKEM512, MLKEM768, MLKEM1024, SecP256r1MLKEM768, X25519MLKEM768,
+     # SecP384r1MLKEM1024). They do not need to be included since they are only
+     # supported by OpenSSL 3.5.0 (and above), and "$OPENSSL list -tls-groups" is used
+     # instead of curves_ossl to populate $OSSL_SUPPORTED_CURVES. If newer versions of
+     # LibreSSL include support for groups that are not in curves_ossl, then they
+     # should be added.
      local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
 
      # 0. check environment variable whether it's executable
