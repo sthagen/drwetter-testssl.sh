@@ -14,16 +14,16 @@ cryptographic flaws.
 ### Key features
 
 * Clear output: you can tell easily whether anything is good or bad.
-* Machine readable output (CSV, two JSON formats)
+* Machine readable output (CSV, two JSON formats), also HTML output.
 * No need to install or to configure something.  No gems, CPAN, pip or the like.
 * Works out of the box: Linux, OSX/Darwin, FreeBSD, NetBSD, MSYS2/Cygwin, WSL (bash on Windows). Only OpenBSD needs bash.
-* A Dockerfile is provided, there's also an official container build @ dockerhub.
+* A Dockerfile is provided, there's also an official container build @ dockerhub and GHCR.
 * Flexibility: You can test any SSL/TLS enabled and STARTTLS service, not only web servers at port 443.
 * Toolbox: Several command line options help you to run *your* test and configure *your* output.
 * Reliability: features are tested thoroughly.
 * Privacy: It's only you who sees the result, not a third party.
 * Freedom: It's 100% open source. You can look at the code, see what's going on.
-* The development is open (GitHub) and participation is welcome.
+* The development is open @ GitHub and participation is welcome.
 
 ### License
 
@@ -39,13 +39,14 @@ to get bugfixes, other feedback and more contributions.
 
 Testssl.sh is working on every Linux/BSD distribution out of the box. Latest by 2.9dev
 most of the limitations of disabled features from the openssl client are gone
-due to bash-socket-based checks. As a result you can also use e.g. LibreSSL or OpenSSL >=
-1.1.1 . testssl.sh also works on other unixoid systems out of the box, supposed they have
+due to bash-socket-based checks. An old OpenSSL-bad version is supplied but
+but you can also use any LibreSSL or OpenSSL version.
+   testssl.sh also works on other unixoid systems out of the box, supposed they have
 `/bin/bash` >= version 3.2 and standard tools like sed and awk installed. An implicit
 (silent) check for binaries is done when you start testssl.sh . System V needs probably
 to have GNU grep installed. MacOS X and Windows (using MSYS2, Cygwin or WSL) work too.
 
-Update notification here or @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). Please note the [twitter](https://twitter.com/drwetter) account is not being used anymore.
+Update notification here or @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
 
 ### Installation
 
@@ -53,8 +54,8 @@ You can download testssl.sh branch 3.2 just by cloning this git repository:
 
     git clone --depth 1 https://github.com/testssl/testssl.sh.git
 
-3.2 is now the latest branch which evolved from 3.1dev. It's in the release candidate phase and considered as stable.
-For the former stable version named oldstable please help yourself by downloading the [ZIP](https://codeload.github.com/testssl/testssl.sh/zip/v3.0.9) or [tar.gz](https://codeload.github.com/testssl/testssl.sh/tar.gz/v3.0.9) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there.
+3.2 is now the latest stable branch which evolved from 3.1dev. There will be one last bugfix release for the former stable version named old-stable, which will be 3.0.10.
+<!--  please help yourself by downloading the [ZIP](https://codeload.github.com/testssl/testssl.sh/zip/v3.0.9) or [tar.gz](https://codeload.github.com/testssl/testssl.sh/tar.gz/v3.0.9) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there. -->
 
 #### Docker
 
@@ -64,7 +65,7 @@ Testssl.sh has minimal requirements. As stated you don't have to install or buil
 docker run --rm -ti  drwetter/testssl.sh <your_cmd_line>
 ```
 
-or from GHCR (GitHub Container Registry which supports more platforms: linux/amd64,linux/386,linux/arm64,linux/arm/v7,linux/arm/v6,linux/ppc64le):
+or from GHCR (GitHub Container Registry which supports more platforms: linux/amd64, linux/386, linux/arm64, linux/arm/v7, linux/arm/v6, linux/ppc64le):
 
 ```
 docker run --rm -it ghcr.io/testssl/testssl.sh <your_cmd_line>
@@ -86,11 +87,7 @@ Testssl.sh is intended to be used as a standalone CLI tool. While we tried to ap
 
 ### Status
 
-We're currently in the release candidate phase for version 3.2. You should use it despite the label "RC". Bigger features will be developed in a separate branch before merged into a 3.3dev to avoid hiccups or inconsistencies.
-
-Version 3.0.X receives bugfixes, labeled as 3.0.1, 3.0.2 and so on. This will happen until 3.2 is finally released.
-
-Support for 2.9.5 has been dropped. Supported is >= 3.0.x only.
+This is the stable release version 3.2. Please use it **now**, as 3.0.x will not get any updates after 3.0.10, with the current manpower we only support n-1 versions. There will be soon a separate 3.3.dev branch where further development takes place before 3.4 becomes the stable version and 3.2 becomes old-stable.
 
 ### Documentation
 
@@ -100,9 +97,11 @@ Support for 2.9.5 has been dropped. Supported is >= 3.0.x only.
 
 ### Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](https://github.com/testssl/testssl.sh/blob/3.2/CONTRIBUTING.md) for details. Please also have a look at the [Coding Convention](https://github.com/testssl/testssl.sh/blob/3.2/Coding_Convention.md). A lot of contributors already helped to push the project where it currently is, see [CREDITS.md](https://github.com/testssl/testssl.sh/blob/3.2/CREDITS.md). We still you use your help now. A start would be look for issues which are labeled as [good first issue](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), [for grabs](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+grabs%22) or [help wanted](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22). The latter is more advanced.
+A lot of contributors already helped to push the project where it currently is, see [CREDITS.md](https://github.com/testssl/testssl.sh/blob/3.2/CREDITS.md). Your contributions would be also welcome! There's a [large to-do list](https://github.com/testssl/testssl.sh/issues). To get started look for issues which are labeled as [good first issue](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), [for grabs](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+grabs%22) or [help wanted](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22). The latter is more advanced, you can also lookout for documentation issues.
 
-In general there's some maintenance burden, like maintaining handshakes and CA stores, writing unit tests, improving github actions. If you believe you can contribute, speak up.
+It is recommended to read [CONTRIBUTING.md](https://github.com/testssl/testssl.sh/blob/3.2/CONTRIBUTING.md) and please also have a look at he [Coding Convention](https://github.com/testssl/testssl.sh/blob/3.2/Coding_Convention.md). Before you start writing patches with hundreds of lines, better create an issue first.
+
+In general there's also some maintenance burden, like maintaining handshakes and CA stores, writing unit tests, improving github actions. If you believe you can contribute and be responsible to one of those maintenance task, please speak up. That would free resources that we could use for development.
 
 
 ### Bug reports
