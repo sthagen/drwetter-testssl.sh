@@ -1,4 +1,5 @@
 "id","fqdn/ip","port","severity","finding","cve","cwe"
+"engine_problem","/","443","WARN","No engine or GOST support via engine with your ./bin/openssl.Linux.x86_64","",""
 "service","testssl.sh/81.169.166.184","443","INFO","HTTP","",""
 "pre_128cipher","testssl.sh/81.169.166.184","443","INFO","No 128 cipher limit bug","",""
 "SSLv2","testssl.sh/81.169.166.184","443","OK","not offered","",""
