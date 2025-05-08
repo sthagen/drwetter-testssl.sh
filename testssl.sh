@@ -21689,7 +21689,7 @@ parse_hn_port() {
      local node_tmp=""
 
      NODE="$1"
-     NODE="${NODE,,}"                   # Lowercase
+     NODE="$(tolower "$NODE")"          # Lowercase
      NODE="${NODE/https\:\/\//}"        # strip "https"
      NODE="${NODE%%/*}"                 # strip trailing urlpath
 

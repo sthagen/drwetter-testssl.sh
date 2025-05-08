@@ -4,18 +4,19 @@ RUN apk add --no-cache bash procps drill coreutils libidn curl socat openssl xxd
     && adduser -G testssl -g "testssl user" -s /bin/bash -D testssl \
     && ln -s /home/testssl/testssl.sh /usr/local/bin/testssl.sh
 
+# Runtime config:
 USER testssl
 ENTRYPOINT ["testssl.sh"]
 CMD ["--help"]
 
-# Final image stage (add testssl.sh project files)
+# Final image stage (add `testssl.sh` project files)
 # Choose either one as the final stage (defaults to last stage, `dist-git`)
 
-# 30MB Image (Local repo copy from build context, uses `.dockerignore`):
+# 27MB Image (Local repo copy from build context, uses `.dockerignore`):
 FROM base-alpine AS dist-local
 COPY --chown=testssl:testssl . /home/testssl/
 
-# 38MB Image (Remote repo clone, cannot filter content through `.dockerignore`):
+# 35MB Image (Remote repo clone, cannot filter content through `.dockerignore`):
 FROM base-alpine AS dist-git
 ARG GIT_URL=https://github.com/testssl/testssl.sh.git
 ARG GIT_BRANCH

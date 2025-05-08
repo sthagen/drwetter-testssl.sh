@@ -1,47 +1,66 @@
 ## Usage
 
-### From git directory
+Run the image with `testssl.sh` options appended (default is `--help`). The container entrypoint is already set to `testsl.sh` as the command for convenience.
 
-```
-docker build .
-```
-
-Catch is when you run without image tags you need to catch the ID when building
-
-```
-[..]
----> 889fa2f99933
-Successfully built 889fa2f99933
+```bash
+docker run --rm -it ghcr.io/testssl/testssl.sh:3.2 --fs github.com
 ```
 
-More comfortable is
+### Output files
 
-```
-docker build -t mytestssl .
-docker run --rm -t mytestssl example.com
-```
+Keep in mind that any output file (_`--log`, `--html`, `--json`, etc._) will be created within the container.
 
-You can also supply command line options like:
+Use a volume bind mount to a local host directory to access the files outside of the container. Set a working directory for the container and any options output prefix can then use a relative path, like this example for `--htmfile`:
 
-```
-docker run -t mytestssl --help
-docker run --rm -t mytestssl -p --header example.com
+```bash
+# Writes the HTML output to the host path: /tmp/example.com_p443-<date>-<time>.html
+docker run --rm -it -v /tmp:/data --workdir /data ghcr.io/testssl/testssl.sh:3.2 --htmlfile ./ example.com
 ```
 
-### From dockerhub or GHCR
+**NOTE:**
+- The UID/GID ownership of the file will be created by the container user `testssl` (`1000:1000`), with permissions `644`.
+- Your host directory must permit the `testssl` container user or group to write to that host volume. You could alternatively use [`docker cp`](https://docs.docker.com/reference/cli/docker/container/cp/).
 
-You can pull the image from dockerhub or ghcr.io and run:
+### From DockerHub or GHCR
 
-``docker run --rm -t drwetter/testssl.sh --fs example.com`` or ``docker run --rm -t ghcr.io/testssl/testssl.sh --fs example.com``
+You can pull the image from either of these registries:
+- DockerHub: [`drwetter/testssl.sh`](https://hub.docker.com/r/drwetter/testssl.sh)
+- GHCR: [`ghcr.io/testssl/testssl.sh`](https://github.com/testssl/testssl.sh/pkgs/container/testssl.sh)
 
-Supported tags are: ``3.2`` and ``latest``, which are the same. ``3.0`` is the old stable version which will be retired soon.
+Supported tags:
+- `3.2` / `latest`
+- `3.0` is the old stable version ([soon to become EOL](https://github.com/testssl/testssl.sh/tree/3.0#status))
 
-``docker run --rm -t drwetter/testssl.sh:stable example.com`` or ``docker run --rm -t ghcr.io/testssl/testssl.sh:stable example.com``
+### Building
 
-Keep in mind that any output file (--log, --html, --json etc.) will be created within the container. If you wish to have this created in a local directory on your host you can mount a volume into the container and change the output prefix where the container user has write access to, e.g.:
+You can build with a standard `git clone` + `docker build`. Tagging the image will make it easier to reference.
 
+```bash
+mkdir /tmp/testssl && cd /tmp/testssl
+git clone --branch 3.2 --depth 1 https://github.com/testssl/testssl.sh .
+docker build --tag localhost/testssl.sh:3.2 .
 ```
-docker run --rm -t -v /tmp:/data drwetter/testssl.sh --htmlfile /data/ example.com
+
+There are two base images available:
+- `Dockerfile` (openSUSE Leap), glibc-based + faster.
+- `Dockerfile-alpine` (Alpine), musl-based + half the size.
+
+Alpine is made available if you need broarder platform support or an image about 30MB smaller at the expense of speed.
+
+#### Remote build context + `Dockerfile`
+You can build with a single command instead via:
+
+```bash
+docker build --tag localhost/testssl.sh:3.2 https://github.com/testssl/testssl.sh.git#3.2
 ```
 
-which writes the HTML output to ``/tmp/example.com_p443-<date>-<time>.html.`` The uid/gid is the one from the docker user. Normally the file is 644. testssl.sh's docker container uses a non-root user (usually with user/groupid 1000:1000).
+This will produce a slightly larger image however as `.dockerignore` is not supported with remote build contexts.
+
+If you would like to build the Alpine image instead this way, just provide the alternative `Dockerfile` via `--file`:
+
+```bash
+docker build \
+  --tag localhost/testssl.sh:3.2-alpine \
+  --file https://raw.githubusercontent.com/testssl/testssl.sh/3.2/Dockerfile-alpine \
+  https://github.com/testssl/testssl.sh.git#3.2
+```
