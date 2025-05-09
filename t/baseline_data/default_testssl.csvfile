@@ -112,6 +112,7 @@
 "clientsimulation-android_X","testssl.sh/81.169.166.184","443","INFO","TLSv1.3 TLS_AES_256_GCM_SHA384","",""
 "clientsimulation-android_11_12","testssl.sh/81.169.166.184","443","INFO","TLSv1.3 TLS_AES_256_GCM_SHA384","",""
 "clientsimulation-android_13_14","testssl.sh/81.169.166.184","443","INFO","TLSv1.3 TLS_AES_256_GCM_SHA384","",""
+"clientsimulation-android_15","testssl.sh/81.169.166.184","443","INFO","TLSv1.3 TLS_AES_256_GCM_SHA384","",""
 "clientsimulation-chrome_101_win10","testssl.sh/81.169.166.184","443","INFO","TLSv1.3 TLS_AES_256_GCM_SHA384","",""
 "clientsimulation-chromium_137_win11","testssl.sh/81.169.166.184","443","INFO","TLSv1.3 TLS_AES_256_GCM_SHA384","",""
 "clientsimulation-firefox_100_win10","testssl.sh/81.169.166.184","443","INFO","TLSv1.3 TLS_AES_256_GCM_SHA384","",""

@@ -17980,11 +17980,11 @@ run_breach() {
                     # warn_empty / warn_stalled
                     if [[ ${has_compression[@]} =~ warn_empty ]]; then
                          pr_warning "At least 1/4 checks failed (HTTP header request was empty, debug: ${has_compression[@]}"
-                         out ", debug: ${has_compression[@]})"
+                         outln ", debug: ${has_compression[@]})"
                          fileout "$jsonID" "WARN" "Test failed as HTTP response was empty, debug: ${has_compression[@]}" "$cve" "$cwe"
                     else # warn_stalled
                          pr_warning "At least 1/4 checks failed (HTTP header request stalled and was terminated"
-                         out ", debug: ${has_compression[@]})"
+                         outln ", debug: ${has_compression[@]})"
                          fileout "$jsonID" "WARN" "Test failed as HTTP request stalled and was terminated" "$cve" "$cwe"
                     fi
                else

@@ -6,7 +6,7 @@ testssl.sh uses the file `client-simulation.txt`. Previously we queried the SSLl
 
 * Start wireshark / tcpdump at a client or router. If it's too noisy better filter for the target of your choice.
 * Make sure you create a bit of encrypted traffic to your target. Attention, privacy: if you want to contribute, be aware that the ClientHello contains the target hostname (SNI).
-* Make sure the client traffic is specific: For just "Android" do not use an Android browser! Be also careful with factory installed Google Apps, especially on older devices as they might come with a different TLS stack.
+* Make sure the client traffic is specific: For just "Android" do not use an Android browser! Be also careful with factory installed Google Apps, especially on older devices as they might come with a different TLS stack. The play store or e.g. f-droid works.
 * Stop recording.
 * If needed sort for ClientHello.
 * Look for the ClientHello which matches the source IP + destination you had in mind. Check the destination hostname in the SNI extension so that you can be sure it's the right traffic.
