@@ -119,6 +119,9 @@ You can also debug yourself, see [here](https://github.com/testssl/testssl.sh/wi
 
 Please address questions not specifically to the code of testssl.sh to the respective projects below.
 
+#### AI powered docs @ DeepWiki
+* https://deepwiki.com/testssl/testssl.sh
+
 #### Web frontend
 * https://github.com/johannesschaefer/webnettools
 * https://github.com/TKCERT/testssl.sh-webfrontend
