@@ -5,12 +5,14 @@ on:
     branches:
       - 3.2
   workflow_dispatch:
+  # Every week at 8am on Mondays, publish the 3.2 branch:
+  # NOTE: `schedule` event is only triggered for the default branch:
+  # https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
   schedule:
     - cron: "0 8 * * 1"
 
 env:
-  BUILD_VERSION: "3.2"
-  DOCKER_CLI_EXPERIMENTAL: enabled
+  GIT_BRANCH: "3.2"
 
 jobs:
 
@@ -23,7 +25,7 @@ jobs:
 
       - name: Setup QEMU
         id: qemu
-        uses: docker/setup-qemu-action@v3.6.0
+        uses: docker/setup-qemu-action@v3
 
       - name: Setup Buildx
         id: buildx
@@ -35,29 +37,29 @@ jobs:
         with:
           images: ${{ github.repository }}
           labels: |
-            org.opencontainers.image.version=${{ env.BUILD_VERSION }}
+            org.opencontainers.image.version=${{ env.GIT_BRANCH }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=${{ github.repository }}
 
       - name: GitHub login
         if: ${{ github.event_name != 'pull_request' }}
-        uses: docker/login-action@v3.4.0
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6.16.0
+        uses: docker/build-push-action@v6
         with:
           push: ${{ github.event_name != 'pull_request' }}
           context: .
-          file: Dockerfile-alpine
+          file: Dockerfile.alpine
           platforms: linux/amd64,linux/386,linux/arm64,linux/arm/v7,linux/arm/v6,linux/ppc64le
-          build-args: BUILD_VERSION
+          build-args: GIT_BRANCH
           cache-from: type=gha, scope=${{ github.workflow }}
           cache-to: type=gha, scope=${{ github.workflow }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           tags: |
-            ghcr.io/${{ github.repository }}:${{ env.BUILD_VERSION }}
+            ghcr.io/${{ github.repository }}:${{ env.GIT_BRANCH }}
             ghcr.io/${{ github.repository }}:latest

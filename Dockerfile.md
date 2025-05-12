@@ -17,11 +17,13 @@ Use a volume bind mount to a local host directory to access the files outside of
 docker run --rm -it -v /tmp:/data --workdir /data ghcr.io/testssl/testssl.sh:3.2 --htmlfile ./ example.com
 ```
 
-**NOTE:**
-- The UID/GID ownership of the file will be created by the container user `testssl` (`1000:1000`), with permissions `644`.
-- Your host directory must permit the `testssl` container user or group to write to that host volume. You could alternatively use [`docker cp`](https://docs.docker.com/reference/cli/docker/container/cp/).
+> [!NOTE]
+> - The UID/GID ownership of the file will be created by the container user `testssl` (`1000:1000`), with permissions `644`.
+> - Your host directory must permit the `testssl` container user or group to write to that host volume. You could alternatively use [`docker cp`](https://docs.docker.com/reference/cli/docker/container/cp/).
 
-### From DockerHub or GHCR
+## Images
+
+### Available at DockerHub and GHCR
 
 You can pull the image from either of these registries:
 - DockerHub: [`drwetter/testssl.sh`](https://hub.docker.com/r/drwetter/testssl.sh)
@@ -31,7 +33,7 @@ Supported tags:
 - `3.2` / `latest`
 - `3.0` is the old stable version ([soon to become EOL](https://github.com/testssl/testssl.sh/tree/3.0#status))
 
-### Building
+### Building the `testssl.sh` container image
 
 You can build with a standard `git clone` + `docker build`. Tagging the image will make it easier to reference.
 
@@ -41,26 +43,30 @@ git clone --branch 3.2 --depth 1 https://github.com/testssl/testssl.sh .
 docker build --tag localhost/testssl.sh:3.2 .
 ```
 
-There are two base images available:
-- `Dockerfile` (openSUSE Leap), glibc-based + faster.
-- `Dockerfile-alpine` (Alpine), musl-based + half the size.
+There are two base images supported:
+- openSUSE Leap ([`Dockerfile`](./Dockerfile)), glibc-based + faster.
+- Alpine ([`Dockerfile`](./Dockerfile.alpine)), musl-based + half the size.
 
-Alpine is made available if you need broarder platform support or an image about 30MB smaller at the expense of speed.
+The Alpine variant is made available if you need broarder platform support, or an image about 30MB smaller at the expense of slightly slower performance.
 
-#### Remote build context + `Dockerfile`
+#### Tip - Remote build context + `Dockerfile`
+
 You can build with a single command instead via:
 
 ```bash
 docker build --tag localhost/testssl.sh:3.2 https://github.com/testssl/testssl.sh.git#3.2
 ```
 
-This will produce a slightly larger image however as `.dockerignore` is not supported with remote build contexts.
+> [!NOTE]
+> This will produce a slightly larger image as [`.dockerignore` is not supported with remote build contexts](https://github.com/docker/buildx/issues/3169).
 
-If you would like to build the Alpine image instead this way, just provide the alternative `Dockerfile` via `--file`:
+---
+
+To build the Alpine image instead, additionally provide the ([alternative `Dockerfile`](./Dockerfile.alpine)) via the `--file` option:
 
 ```bash
 docker build \
   --tag localhost/testssl.sh:3.2-alpine \
-  --file https://raw.githubusercontent.com/testssl/testssl.sh/3.2/Dockerfile-alpine \
+  --file https://raw.githubusercontent.com/testssl/testssl.sh/3.2/Dockerfile.alpine \
   https://github.com/testssl/testssl.sh.git#3.2
 ```
