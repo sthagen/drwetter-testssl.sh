@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      - name: lowercase the repository name
+        run: echo "REPO=${GITHUB_REPOSITORY@L}" >> "${GITHUB_ENV}"
+
       - name: Source checkout
         uses: actions/checkout@v4
 
@@ -35,11 +38,11 @@ jobs:
         id: docker_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ github.repository }}
+          images: ${{ env.REPO }}
           labels: |
             org.opencontainers.image.version=${{ env.GIT_BRANCH }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=${{ github.repository }}
+            org.opencontainers.image.title=${{ env.REPO }}
 
       - name: GitHub login
         if: ${{ github.event_name != 'pull_request' }}
@@ -61,5 +64,5 @@ jobs:
           cache-to: type=gha, scope=${{ github.workflow }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           tags: |
-            ghcr.io/${{ github.repository }}:${{ env.GIT_BRANCH }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ env.REPO }}:${{ env.GIT_BRANCH }}
+            ghcr.io/${{ env.REPO }}:latest
