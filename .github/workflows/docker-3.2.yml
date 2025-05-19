@@ -15,10 +15,8 @@ env:
   GIT_BRANCH: "3.2"
 
 jobs:
-
   deploy:
     runs-on: ubuntu-24.04
-
     steps:
       - name: lowercase the repository name
         run: echo "REPO=${GITHUB_REPOSITORY@L}" >> "${GITHUB_ENV}"
