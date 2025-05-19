@@ -12,12 +12,12 @@ CMD ["--help"]
 # Final image stage (add `testssl.sh` project files)
 # Choose either one as the final stage (defaults to last stage, `dist-git`)
 
-# 27MB Image (Local repo copy from build context, uses `.dockerignore`):
-FROM base-alpine AS dist-local
-COPY --chown=testssl:testssl . /home/testssl/
-
 # 35MB Image (Remote repo clone, cannot filter content through `.dockerignore`):
 FROM base-alpine AS dist-git
 ARG GIT_URL=https://github.com/testssl/testssl.sh.git
 ARG GIT_BRANCH
 ADD --chown=testssl:testssl ${GIT_URL}#${GIT_BRANCH?branch-required} /home/testssl
+
+# 27MB Image (Local repo copy from build context, uses `.dockerignore`):
+FROM base-alpine AS dist-local
+COPY --chown=testssl:testssl . /home/testssl/
