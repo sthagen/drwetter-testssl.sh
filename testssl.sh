@@ -17665,7 +17665,7 @@ run_renego() {
                          && [[ $(tail -1 $ERRFILE | grep -acE '^(RENEGOTIATING|depth|verify|notAfter)') -eq 1 ]] \
                          && [[ $k -lt 120 ]]; \
                        do sleep $ssl_reneg_wait; ((k++)); if (tail -5 $TMPFILE| grep -qa '^closed'); then break; fi; done; \
-               done) | \
+               done) 2> /dev/null | \
                $OPENSSL_NOTIMEOUT s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>$ERRFILE &
           pid=$!
           ( sleep $((ssl_reneg_attempts*3+3)) && kill $pid && touch $TEMPDIR/was_killed ) >&2 2>/dev/null &

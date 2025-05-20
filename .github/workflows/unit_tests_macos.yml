@@ -1,5 +1,5 @@
 ---
-name: CI run Ubuntu
+name: CI run MacOS
 
 on:
   pull_request:
@@ -18,26 +18,20 @@ on:
 permissions:
   contents: read
 
-# see https://github.com/shogo82148/actions-setup-perl
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: ['ubuntu-24.04']
-        perl: ['5.38']
-    name: Unit test on ${{ matrix.os }}
+    runs-on: macos-14
+
+    name: PoC unit test on MacOS
     steps:
-      - uses: actions/checkout@v4
+      - name: checkout
+        uses: actions/checkout@v4
 
-      - name: Set up perl
-        uses: shogo82148/actions-setup-perl@v1
-        with:
-          perl-version: ${{ matrix.perl }}
-
-      - name: Install OS dependencies
+      - name: Set up system (perl, curl is installed already)
         run: |
-          sudo apt install dnsutils jsonlint
+          brew install socat jsonlint cpanminus
+          printf "%s\n" "----------"
+          mv -v /opt/homebrew/bin/openssl /opt/homebrew/bin/openssl.NOPE
           printf "%s\n" "----------"
           perl -V
           printf "%s\n" "----------"

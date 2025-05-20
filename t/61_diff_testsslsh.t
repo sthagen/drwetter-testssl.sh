@@ -50,6 +50,24 @@ $baseline_csv =~ s/HTTP_headerTime.*\n//g;
 $cat_csv      =~ s/censys.io.*\n//g;
 $baseline_csv =~ s/censys.io.*\n//g;
 
+# MacOS / LibreSSL has different OpenSSL names for TLS 1.3 ciphers. That should be rather solved in
+#       testssl.sh, see #2763. But for now we do this here.
+$cat_csv      =~ s/AEAD-AES128-GCM-SHA256/TLS_AES_128_GCM_SHA256/g;
+$cat_csv      =~ s/AEAD-AES256-GCM-SHA384/TLS_AES_256_GCM_SHA384/g;
+# this is a bit ugly but otherwise the line cipher-tls1_3_x1303 with the CHACHA20 cipher misses a space
+$cat_csv      =~ s/x1303   AEAD-CHACHA20-POLY1305-SHA256/x1303   TLS_CHACHA20_POLY1305_SHA256 /g;
+# now the other lines, where we don't need to insert the additional space:
+$cat_csv      =~ s/AEAD-CHACHA20-POLY1305-SHA256/TLS_CHACHA20_POLY1305_SHA256/g;
+
+# Same with ECDH bit length
+$cat_csv      =~ s/ECDH 253/ECDH 256/g;
+$baseline_csv =~ s/ECDH 253/ECDH 256/g;
+
+
+# this could contain the openssl path
+$cat_csv      =~ s/"engine_problem.*\n//g;
+$baseline_csv =~ s/"engine_problem.*\n//g;
+
 $diff = diff \$cat_csv, \$baseline_csv;
 
 # Compare the differences to the baseline file -- and print differences if there were detected.
