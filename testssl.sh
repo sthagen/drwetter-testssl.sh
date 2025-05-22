@@ -17180,31 +17180,33 @@ run_ccs_injection(){
 # 0A:      Unexpected message
 # 28:      Handshake failure
      if [[ -z "${tls_hello_ascii:0:12}" ]]; then
-          # empty reply
+          # empty reply which is the normal case
           pr_svrty_best "not vulnerable (OK)"
           if [[ $retval -eq 3 ]]; then
                fileout "$jsonID" "OK" "not vulnerable (timed out)" "$cve" "$cwe"
           else
                fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
           fi
-     elif [[ "${tls_hello_ascii:0:4}" == "1503" ]]; then
-          if [[ ! "${tls_hello_ascii:5:2}" =~ 03|02|01|00 ]]; then
+     elif [[ "${tls_hello_ascii:0:4}" == 1503 ]]; then
+          # check for protocol. No protocol ==> test failed
+          if [[ ! "${tls_hello_ascii:4:2}" =~ 03|02|01|00 ]]; then
                pr_warning "test failed "
                out "no proper TLS reply (debug info: protocol sent: 1503${tls_hexcode#x03, x}, reply: ${tls_hello_ascii:0:14}"
                fileout "$jsonID" "DEBUG" "test failed, around line $LINENO, debug info (${tls_hello_ascii:0:14})" "$cve" "$cwe" "$hint"
                ret=1
-          elif [[ "$byte6" == "15" ]]; then
+          # now handle more TLS alerts (https://datatracker.ietf.org/doc/html/rfc5246#appendix-A.3)
+          elif [[ "$byte6" == 15 ]]; then
                # decryption failed received
                pr_svrty_critical "VULNERABLE (NOT ok)"
                fileout "$jsonID" "CRITICAL" "VULNERABLE" "$cve" "$cwe" "$hint"
                set_grade_cap "F" "Vulnerable to CCS injection"
-          elif [[ "$byte6" == "0A" ]] || [[ "$byte6" == "28" ]]; then
+          elif [[ "$byte6" == "0A" ]] || [[ "$byte6" == 28 ]]; then
                # Unexpected message / Handshake failure  received
                pr_warning "likely "
                out "not vulnerable (OK)"
                out " - alert description type: $byte6"
                fileout "$jsonID" "WARN" "probably not vulnerable but received 0x${byte6} instead of 0x15" "$cve" "$cwe" "$hint"
-          elif [[ "$byte6" == "14" ]]; then
+          elif [[ "$byte6" == 14 ]]; then
                # bad_record_mac -- this is not "not vulnerable"
                out "likely "
                pr_svrty_critical "VULNERABLE (NOT ok)"
@@ -17217,7 +17219,7 @@ run_ccs_injection(){
                out ", suspicious error code \"$byte6\" returned. Please report"
                fileout "$jsonID" "CRITICAL" "likely VULNERABLE with $byte6" "$cve" "$cwe" "$hint"
           fi
-     elif [[ $STARTTLS_PROTOCOL == "mysql" ]] && [[ "${tls_hello_ascii:14:12}" == "233038533031" ]]; then
+     elif [[ $STARTTLS_PROTOCOL == mysql ]] && [[ "${tls_hello_ascii:14:12}" == 233038533031 ]]; then
           # MySQL community edition (yaSSL) returns a MySQL error instead of a TLS Alert
           # Error: #08S01 Bad handshake
           pr_svrty_best "not vulnerable (OK)"
