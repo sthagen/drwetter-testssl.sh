@@ -6,6 +6,7 @@ use Data::Dumper;
 use JSON;
 
 my $tests = 0;
+my $prg="./testssl.sh";
 
 my (
 	$out,
@@ -14,14 +15,14 @@ my (
 );
 # OK
 pass("Running testssl.sh against badssl.com to create a baseline (may take 2~3 minutes)"); $tests++;
-my $okout = `./testssl.sh -S -e --freak --logjam --drown --rc4 --sweet32 --breach --winshock --crime --jsonfile tmp.json --color 0 badssl.com`;
+my $okout = `$prg -S -e --freak --logjam --drown --rc4 --sweet32 --breach --winshock --crime --jsonfile tmp.json --color 0 badssl.com`;
 my $okjson = json('tmp.json');
 unlink 'tmp.json';
 cmp_ok(@$okjson,'>',10,"We should have more then 10 findings"); $tests++;
 
 # Expiration
 pass("Running testssl against expired.badssl.com"); $tests++;
-$out = `./testssl.sh -S --jsonfile tmp.json --color 0 expired.badssl.com`;
+$out = `$prg -S --jsonfile tmp.json --color 0 expired.badssl.com`;
 like($out, qr/Chain of trust\s+NOT ok \(expired\)/,"The chain of trust should be expired"); $tests++;
 like($out, qr/Certificate Validity \(UTC\)\s+expired/,"The certificate should be expired"); $tests++;
 $json = json('tmp.json');
@@ -39,7 +40,7 @@ is($found,1,"We should have a finding for this in the JSON output"); $tests++;
 
 # Self signed and not-expired
 pass("Running testssl against self-signed.badssl.com"); $tests++;
-$out = `./testssl.sh -S --jsonfile tmp.json --color 0 self-signed.badssl.com`;
+$out = `$prg -S --jsonfile tmp.json --color 0 self-signed.badssl.com`;
 unlike($out, qr/Certificate Validity \(UTC\)s+expired/,"The certificate should not be expired"); $tests++;
 $json = json('tmp.json');
 unlink 'tmp.json';
@@ -98,7 +99,7 @@ is($found,1,"We should have a finding for this in the JSON output"); $tests++;
 
 # Incomplete chain
 pass("Running testssl against incomplete-chain.badssl.com"); $tests++;
-$out = `./testssl.sh -S --jsonfile tmp.json --color 0 incomplete-chain.badssl.com`;
+$out = `$prg -S --jsonfile tmp.json --color 0 incomplete-chain.badssl.com`;
 like($out, qr/Chain of trust.*?NOT ok\s+\(chain incomplete\)/,"Chain of trust should fail because of incomplete"); $tests++;
 $json = json('tmp.json');
 unlink 'tmp.json';

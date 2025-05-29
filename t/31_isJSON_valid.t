@@ -29,7 +29,7 @@ unlink 'tmp.json';
 
 #1
 printf "%s\n", ".. plain JSON --> $uri ";
-$out = `./testssl.sh $check2run --jsonfile tmp.json $uri`;
+$out = `$prg $check2run --jsonfile tmp.json $uri`;
 $json = json('tmp.json');
 unlink 'tmp.json';
 my @errors=eval { decode_json($json) };
@@ -39,7 +39,7 @@ $tests++;
 
 #2
 printf "%s\n", ".. pretty JSON --> $uri ";
-$out = `./testssl.sh $check2run --jsonfile-pretty tmp.json $uri`;
+$out = `$prg $check2run --jsonfile-pretty tmp.json $uri`;
 $json = json('tmp.json');
 unlink 'tmp.json';
 @errors=eval { decode_json($json) };
@@ -50,7 +50,7 @@ $tests++;
 #3
 my $uri = "smtp-relay.gmail.com:587";
 printf "%s\n", " .. plain JSON and STARTTLS --> $uri ...";
-$out = `./testssl.sh  --jsonfile tmp.json $check2run -t smtp $uri`;
+$out = `$prg --jsonfile tmp.json $check2run -t smtp $uri`;
 $json = json('tmp.json');
 unlink 'tmp.json';
 @errors=eval { decode_json($json) };
@@ -65,7 +65,7 @@ if ( $os eq "linux" ){
      # This testssl.sh run deliberately does NOT work as github actions block port 25 egress.
      # but the output should be fine. The idea is to have a unit test for a failed connection.
      printf "%s\n", ".. plain JSON for a failed run: '--mx $uri' ...";
-     $out = `./testssl.sh --ssl-native --openssl-timeout=10 $check2run --jsonfile tmp.json --mx $uri`;
+     $out = `$prg --ssl-native --openssl-timeout=10 $check2run --jsonfile tmp.json --mx $uri`;
      $json = json('tmp.json');
      unlink 'tmp.json';
      @errors=eval { decode_json($json) };
@@ -75,7 +75,7 @@ if ( $os eq "linux" ){
      #5
      # Same as above but with pretty JSON
      printf "%s\n", ".. pretty JSON for a failed run '--mx $uri' ...";
-     $out = `./testssl.sh --ssl-native --openssl-timeout=10 $check2run --jsonfile-pretty tmp.json --mx $uri`;
+     $out = `$prg --ssl-native --openssl-timeout=10 $check2run --jsonfile-pretty tmp.json --mx $uri`;
      $json = json('tmp.json');
      unlink 'tmp.json';
      @errors=eval { decode_json($json) };

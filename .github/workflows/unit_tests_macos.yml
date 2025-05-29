@@ -51,4 +51,4 @@ jobs:
 
       - name: run it
         run: |
-          prove -v t
+          prove -v t 2>&1

@@ -31,14 +31,14 @@ $uri="google.com";
 
 # unlink "tmp.json";
 printf "\n%s\n", "Client simulations unit test via sockets --> $uri ...";
-$socket_out = `./testssl.sh $check2run $uri 2>&1`;
+$socket_out = `$prg $check2run $uri 2>&1`;
 # $socket_json = json('tmp.json');
 unlike($socket_out, qr/$socket_regex_bl/, "");
 $tests++;
 
 # unlink "tmp.json";
 printf "\n%s\n", "Client simulations unit test via OpenSSL --> $uri ...";
-$openssl_out = `./testssl.sh $check2run --ssl-native $uri 2>&1`;
+$openssl_out = `$prg $check2run --ssl-native $uri 2>&1`;
 # $openssl_json = json('tmp.json');
 unlike($openssl_out, qr/$openssl_regex_bl/, "");
 $tests++;
@@ -48,7 +48,7 @@ $uri="smtp-relay.gmail.com:587";
 
 # unlink "tmp.json";
 printf "\n%s\n", "STARTTLS: Client simulations unit test via sockets --> $uri ...";
-$socket_out = `./testssl.sh $check2run -t smtp $uri 2>&1`;
+$socket_out = `$prg $check2run -t smtp $uri 2>&1`;
 # $socket_json = json('tmp.json');
 unlike($socket_out, qr/$socket_regex_bl/, "");
 $tests++;

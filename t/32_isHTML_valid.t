@@ -57,7 +57,7 @@ $tests++;
 #2
 printf "%s\n", " .. running again $prg against \"$uri\", now with --debug 4 to create HTML output (may take another ~2 minutes)";
 # Redirect stderr to /dev/null in order to avoid some unexplained "date: invalid date" error messages
-$out = `TERM_WIDTH=120 $prg $check2run --debug 4 $uri 2> /dev/null`;
+$out = `TERM_WIDTH=120 $prg $check2run --debug 4 $uri 2>/dev/null`;
 $debughtml = `cat $htmlfile`;
 unlink $htmlfile;
 
