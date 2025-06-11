@@ -13215,6 +13215,7 @@ chacha20_block() {
 }
 
 # See RFC 8439, Section 2.4
+#
 chacha20() {
      local key="$1"
      local -i counter=1
@@ -13223,15 +13224,18 @@ chacha20() {
      local -i i ciphertext_len num_blocks mod_check
      local -i i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16
      local keystream plaintext=""
+     local enc_chacha_used=false
 
      if "$HAS_CHACHA20"; then
-          plaintext="$(hex2binary "$ciphertext" | \
-                       $OPENSSL enc -chacha20 -K "$key" -iv "01000000$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
-          tm_out "$(strip_spaces "$plaintext")"
-          return 0
+          plaintext="$(hex2binary "$ciphertext" | $OPENSSL enc -chacha20 -K "$key" -iv "01000000$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          enc_chacha_used=true
      elif "$OPENSSL2_HAS_CHACHA20"; then
-          plaintext="$(hex2binary "$ciphertext" | \
-                       $OPENSSL2 enc -chacha20 -K "$key" -iv "01000000$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          # empty  OPENSSL_CONF temporarily as it might cause problems, see #2780
+          plaintext="$(hex2binary "$ciphertext" | OPENSSL_CONF='' $OPENSSL2 enc -chacha20 -K "$key" -iv "01000000$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+          enc_chacha_used=true
+     fi
+
+     if [[ -n "$plaintext" ]] && "$enc_chacha_used"; then
           tm_out "$(strip_spaces "$plaintext")"
           return 0
      fi
@@ -13913,31 +13917,36 @@ gcm() {
 # arg5: aad
 # arg6: expected tag
 # arg7: true if authentication tag should be checked. false otherwise.
+#
 gcm-decrypt() {
      local cipher="$1" key="$2" nonce="$3" ciphertext="$4" aad="$5" expected_tag="$(toupper "$6")"
      local compute_tag="$7"
-     local plaintext computed_tag tmp
+     local plaintext="" computed_tag tmp
+     local enc_aesgcm_used=false
 
      [[ ${#nonce} -ne 24 ]] && return 7
 
-     if [[ "$cipher" == TLS_AES_128_GCM_SHA256 ]] && "$HAS_AES128_GCM" && ! "$compute_tag"; then
-          plaintext="$(hex2binary "$ciphertext" | \
-                       $OPENSSL enc -aes-128-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
-          tm_out "$(strip_spaces "$plaintext")"
-          return 0
-     elif [[ "$cipher" == TLS_AES_128_GCM_SHA256 ]] && "$OPENSSL2_HAS_AES128_GCM" && ! "$compute_tag"; then
-          plaintext="$(hex2binary "$ciphertext" | \
-                       $OPENSSL2 enc -aes-128-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
-          tm_out "$(strip_spaces "$plaintext")"
-          return 0
-     elif [[ "$cipher" == TLS_AES_256_GCM_SHA384 ]] && "$HAS_AES256_GCM" && ! "$compute_tag"; then
-          plaintext="$(hex2binary "$ciphertext" | \
-                       $OPENSSL enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
-          tm_out "$(strip_spaces "$plaintext")"
-          return 0
-     elif [[ "$cipher" == TLS_AES_256_GCM_SHA384 ]] && "$OPENSSL2_HAS_AES256_GCM" && ! "$compute_tag"; then
-          plaintext="$(hex2binary "$ciphertext" | \
-                       $OPENSSL2 enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+     if [[ "$cipher" == TLS_AES_128_GCM_SHA256 ]] && ! "$compute_tag"; then
+          if "$HAS_AES128_GCM"; then
+               plaintext="$(hex2binary "$ciphertext" | $OPENSSL enc -aes-128-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+               enc_aesgcm_used=true
+          elif "$OPENSSL2_HAS_AES128_GCM"; then
+               # empty  OPENSSL_CONF temporarily as it might cause problems, see #2780
+               plaintext="$(hex2binary "$ciphertext" | OPENSSL_CONF='' $OPENSSL2 enc -aes-128-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+               enc_aesgcm_used=true
+          fi
+     elif [[ "$cipher" == TLS_AES_256_GCM_SHA384 ]] && ! "$compute_tag"; then
+          if "$HAS_AES256_GCM"; then
+               plaintext="$(hex2binary "$ciphertext" | $OPENSSL enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+               aesgcm_used=true
+          elif "$OPENSSL2_HAS_AES256_GCM"; then
+               # empty  OPENSSL_CONF temporarily as it might cause problems, see #2780
+               plaintext="$(hex2binary "$ciphertext" | OPENSSL_CONF='' $OPENSSL2 enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
+               enc_aesgcm_used=true
+          fi
+     fi
+
+     if [[ -n "$plaintext" ]] && "$enc_aesgcm_used"; then
           tm_out "$(strip_spaces "$plaintext")"
           return 0
      fi
@@ -13954,8 +13963,12 @@ gcm-decrypt() {
      plaintext="${tmp% $computed_tag}"
 
      if ! "$compute_tag" || [[ "$computed_tag" == $expected_tag ]]; then
-          tm_out "$plaintext"
-          return 0
+          if [[ -n "$plaintext" ]]; then
+               tm_out "$plaintext"
+               return 0
+          else
+               return 7
+          fi
      else
           return 7
      fi
@@ -13967,6 +13980,7 @@ gcm-decrypt() {
 # arg4: plaintext
 # arg5: aad
 # See Section 7.2 of SP 800-38D
+#
 gcm-encrypt() {
      local cipher
 
@@ -13988,6 +14002,7 @@ gcm-encrypt() {
 # arg5: aad
 # arg6: expected tag
 # arg7: true if authentication tag should be checked. false otherwise.
+#
 integrity_only_decrypt()
 {
      local cipher="$1" key="$2" nonce="$3" ciphertext="$4" aad="$5" expected_tag="$(toupper "$6")"
@@ -14015,6 +14030,7 @@ integrity_only_decrypt()
 # arg3: nonce
 # arg4: plaintext
 # arg5: additional authenticated data
+#
 integrity_only_encrypt() {
      local cipher="$1" key="$2" nonce="$3" plaintext="$4" aad="$5"
      local hash_fn
@@ -14033,6 +14049,7 @@ integrity_only_encrypt() {
 # arg3: nonce (must be 96 bits in length)
 # arg4: ciphertext
 # arg5: additional authenticated data
+#
 sym-decrypt() {
      local cipher="$1"
      local key="$2" nonce="$3"
@@ -14087,10 +14104,10 @@ sym-decrypt() {
 # arg3: nonce (must be 96 bits in length)
 # arg4: plaintext
 # arg5: additional authenticated data
+#
 sym-encrypt() {
      local cipher="$1" key="$2" nonce="$3" plaintext="$4" additional_data="$5"
      local ciphertext=""
-
 
      if [[ "$cipher" =~ CCM ]]; then
           ciphertext=$(ccm-encrypt "$cipher" "$key" "$nonce" "$plaintext" "$additional_data")
@@ -14104,6 +14121,7 @@ sym-encrypt() {
           return 7
      fi
      [[ $? -ne 0 ]] && return 7
+     [[ -n "$ciphertext" ]] && return 7
 
      tm_out "$(strip_spaces "$ciphertext")"
      return 0
@@ -14111,6 +14129,7 @@ sym-encrypt() {
 
 # arg1: iv
 # arg2: sequence number
+#
 get-nonce() {
      local iv="$1"
      local -i seq_num="$2"
@@ -14140,6 +14159,7 @@ get-nonce() {
 # arg3: TLS cipher for decrypting TLSv1.3 response
 # arg4: handshake secret
 # arg5: message transcript (up through ServerHello)
+#
 check_tls_serverhellodone() {
      local tls_hello_ascii="$1"
      local process_full="$2"
@@ -20922,26 +20942,28 @@ find_openssl_binary() {
 
      grep -qe '-enable_pha' $s_client_has && HAS_ENABLE_PHA=true
 
-     $OPENSSL enc -chacha20 -K 12345678901234567890123456789012 -iv 01000000123456789012345678901234 > /dev/null 2> /dev/null <<< "test"
+     $OPENSSL enc -chacha20 -K 12345678901234567890123456789012 -iv 01000000123456789012345678901234 >/dev/null 2>/dev/null <<< "test"
      [[ $? -eq 0 ]] && HAS_CHACHA20=true
 
-     $OPENSSL enc -aes-128-gcm -K 0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567  > /dev/null 2> /dev/null <<< "test"
+     $OPENSSL enc -aes-128-gcm -K 0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567 >/dev/null 2>/dev/null <<< "test"
      [[ $? -eq 0 ]] && HAS_AES128_GCM=true
 
-     $OPENSSL enc -aes-256-gcm -K 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567  > /dev/null 2> /dev/null <<< "test"
+     $OPENSSL enc -aes-256-gcm -K 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567 >/dev/null 2>/dev/null <<< "test"
      [[ $? -eq 0 ]] && HAS_AES256_GCM=true
 
+     # Although we didn't spot a problem here yet, we're resetting for each call OPENSSL_CONF, so that it doesn't point to the supplied file which
+     # works for old OpenSSL versions only. See #2780
      if [[ $OPENSSL2 != $OPENSSL ]] && [[ -x $OPENSSL2 ]]; then
           if ! "$HAS_CHACHA20"; then
-               $OPENSSL2 enc -chacha20 -K 12345678901234567890123456789012 -iv 01000000123456789012345678901234 > /dev/null 2> /dev/null <<< "test"
+               OPENSSL_CONF='' $OPENSSL2 enc -chacha20 -K 12345678901234567890123456789012 -iv 01000000123456789012345678901234 >/dev/null 2>/dev/null <<< "test"
                [[ $? -eq 0 ]] && OPENSSL2_HAS_CHACHA20=true
           fi
           if ! "$HAS_AES128_GCM"; then
-               $OPENSSL2 enc -aes-128-gcm -K 0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567  > /dev/null 2> /dev/null <<< "test"
+               OPENSSL_CONF='' $OPENSSL2 enc -aes-128-gcm -K 0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567 >/dev/null 2>/dev/null <<< "test"
                [[ $? -eq 0 ]] && OPENSSL2_HAS_AES128_GCM=true
           fi
           if ! "$HAS_AES256_GCM"; then
-               $OPENSSL2 enc -aes-256-gcm -K 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567  > /dev/null 2> /dev/null <<< "test"
+               OPENSSL_CONF='' $OPENSSL2 enc -aes-256-gcm -K 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -iv 0123456789abcdef01234567 >/dev/null 2>/dev/null <<< "test"
                [[ $? -eq 0 ]] && OPENSSL2_HAS_AES256_GCM=true
           fi
 
@@ -20950,13 +20972,13 @@ find_openssl_binary() {
           # every openssl feature. At some point we need to decide which with openssl version we go.
           # We also check, whether there's $OPENSSL2 which has TLS 1.3
           if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
-               $OPENSSL2 s_client -help 2>$s_client_has2
-               $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
+               OPENSSL_CONF='' $OPENSSL2 s_client -help 2>$s_client_has2
+               OPENSSL_CONF='' $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
                grep -q 'Unix-domain socket' $s_client_has2 && HAS_UDS2=true
                grep -q 'xmpp-server' $s_client_starttls_has2 && HAS_XMPP_SERVER2=true
                # Likely we don't need the following second check here, see 6 lines above
                if grep -wq 'tls1_3' $s_client_has2; then
-                    OPENSSL2_HAS_TLS_1_3=true
+                    OPENSSL_CONF='' OPENSSL2_HAS_TLS_1_3=true
                fi
           fi
      fi
@@ -20998,15 +21020,16 @@ find_openssl_binary() {
 find_socat() {
      local result""
 
-     result=$(type -p socat)
-     if [[ $? -ne 0 ]]; then
-          return 1
-     else
-          if [[ -x $result ]] && $result -V 2>&1 | grep -iaq 'socat version' ; then
-               SOCAT=$result
-               return 0
-          fi
+     if [[ -x $SOCAT ]] && $SOCAT -V 2>&1 | grep -iaq 'socat version' ; then
+          # set by ENV
+          return 0
      fi
+     result=$(type -p socat)
+     if [[ -x $result ]] && $result -V 2>&1 | grep -iaq 'socat version' ; then
+          SOCAT=$result
+          return 0
+     fi
+     return 1
 }
 
 
@@ -21294,6 +21317,12 @@ OPENSSL_NR_CIPHERS: $OPENSSL_NR_CIPHERS
 OPENSSL_CONF: $OPENSSL_CONF
 HAS_CURVES: $HAS_CURVES
 OSSL_SUPPORTED_CURVES: $OSSL_SUPPORTED_CURVES
+
+OPENSSL2: $OPENSSL2 ($($OPENSSL2 version -v 2>/dev/null))
+OPENSSL2_HAS_TLS_1_3: $OPENSSL2_HAS_TLS_1_3
+OPENSSL2_HAS_CHACHA20: $OPENSSL2_HAS_CHACHA20
+OPENSSL2_HAS_AES128_GCM: $OPENSSL2_HAS_AES128_GCM
+OPENSSL2_HAS_AES256_GCM: $OPENSSL2_HAS_AES256_GCM
 
 HAS_IPv6: $HAS_IPv6
 HAS_SSL2: $HAS_SSL2
