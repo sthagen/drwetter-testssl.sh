@@ -26,8 +26,8 @@ my $openssl_json="";
 #       @args="$prg $check2run $uri >/dev/null";
 #       system("@args") == 0
 #           or die ("FAILED: \"@args\" ");
-my $socket_errors='(e|E)rror|\.\/testssl\.sh: line |(f|F)atal|(c|C)ommand not found';
-my $openssl_errors='(e|E)rror|(f|F)atal|\.\/testssl\.sh: line |Oops|s_client connect problem|(c|C)ommand not found';
+my $socket_errors='(e|E)rror|FIXME|\.\/testssl\.sh: line |(f|F)atal|(c|C)ommand not found';
+my $openssl_errors='(e|E)rror|FIXME|(f|F)atal|\.\/testssl\.sh: line |Oops|s_client connect problem|(c|C)ommand not found';
 my $json_errors='(id".*:\s"scanProblem"|severity".*:\s"FATAL"|"Scan interrupted")';
 
 

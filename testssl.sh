@@ -3231,7 +3231,7 @@ run_server_banner() {
           run_http_header "$1" || return 1
      fi
      pr_bold " Server banner                "
-     grep -ai '^Server' $HEADERFILE >$TMPFILE
+     grep -wEai '^Server[^-]' $HEADERFILE >$TMPFILE
      if [[ $? -eq 0 ]]; then
           serverbanner=$(sed -e 's/^Server: //' -e 's/^server: //' $TMPFILE)
           serverbanner=${serverbanner//$'\r'}
@@ -10121,9 +10121,12 @@ certificate_info() {
                expok="OK"
           fi
           out " ($enddate). "
-          # Match on Subject/Issuer plus next 3 lines
-          cn="$(awk '/Subject:/{stop=NR+3}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
-          issuer_CN="$(awk '/Issuer:/{stop=NR+3}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
+          # Match Subject/Issuer on next 5 lines, where the CN is (4 lines is fine in most cases, 5 should suffice for all certs)
+          cn="$(awk '/Subject:/{stop=NR+5}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
+          issuer_CN="$(awk '/Issuer:/{stop=NR+5}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
+          # to catch errors like #2789 during unit test:
+          [[ -z "$cn" ]] && cn="FIXME: cn error"
+          [[ -z "$issuer_CN" ]] && issuer_CN="FIXME: issuer_CN error"
           pr_italic "$(strip_leading_space "$cn")"; out " <-- "; prln_italic "$(strip_leading_space "$issuer_CN")"
           fileout "intermediate_cert_notAfter <#${i}>${json_postfix}" "$expok" "$enddate"
           fileout "intermediate_cert_expiration <#${i}>${json_postfix}" "$expok" "$cn_finding"
