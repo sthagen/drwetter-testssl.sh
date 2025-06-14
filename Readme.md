@@ -101,7 +101,7 @@ This is the stable version 3.2. Please use it **now**, as 3.0.x will not get any
 
 * .. it is there for reading. Please do so :-) -- at least before asking questions. See man page in groff, html and markdown format in `~/doc/`.
 * [https://testssl.sh/](https://testssl.sh/) will help to get you started.
-* There's also a [https://deepwiki.com/testssl/testssl.sh](AI generated doc), see also below.
+* There's also an [AI generated doc](https://deepwiki.com/testssl/testssl.sh), see also below.
 * Will Hunt provides a longer [description](https://www.4armed.com/blog/doing-your-own-ssl-tls-testing/) for an older version (2.8), including useful background information.
 
 ### Contributing
