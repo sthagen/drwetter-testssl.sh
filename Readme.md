@@ -54,26 +54,35 @@ but you can also use any LibreSSL or OpenSSL version.
 (silent) check for binaries is done when you start testssl.sh . System V needs probably
 to have GNU grep installed. Windows (using MSYS2, Cygwin or WSL) work too.
 
-Update notification can be found here or most important ones @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
+Update notifications can be found at [github](https://github.com/testssl/testssl.sh) or most important ones @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
 
 ### Installation
 
-You can download testssl.sh branch 3.2 just by cloning this git repository:
+You can download testssl.sh branch 3.3dev just by cloning this git repository:
 
-    git clone --depth 1 https://github.com/testssl/testssl.sh.git
+    git clone --depth 1 https://github.com/testssl/testssl.sh.git --branch 3.3dev
 
-3.2 is now the latest stable branch which evolved from 3.1dev. There will be one last bugfix release for the former stable version named old-stable, which will be 3.0.10.
-<!--  please help yourself by downloading the [ZIP](https://codeload.github.com/testssl/testssl.sh/zip/v3.0.9) or [tar.gz](https://codeload.github.com/testssl/testssl.sh/tar.gz/v3.0.9) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there. -->
+3.3dev is the latest development branch which evolved from 3.2 stable. We're trying not to do big experiments in the dev branch, however the point of development is that there will be changes and changes might need a bit time to mature.
+
+
 
 #### Docker
 
+
+
 Testssl.sh has minimal requirements. As stated you don't have to install or build anything. You can just run it from the pulled/cloned directory. Still if you don't want to pull the GitHub repo to your directory of choice you can pull a container from dockerhub and run it:
+
+<!--
+
+#FIXME: 3.3dev @ dockerhib to be created
 
 ```
 docker run --rm -ti  drwetter/testssl.sh <your_cmd_line>
 ```
 
 or from GHCR (GitHub Container Registry which supports more platforms: linux/amd64, linux/386, linux/arm64, linux/arm/v7, linux/arm/v6, linux/ppc64le):
+
+-->
 
 ```
 docker run --rm -it ghcr.io/testssl/testssl.sh <your_cmd_line>
@@ -85,7 +94,10 @@ Or if you have cloned this repo you also can just ``cd`` to the INSTALLDIR and r
 docker build . -t imagefoo && docker run --rm -t imagefoo testssl.net
 ```
 
-For more please consult [Dockerfile.md](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md).
+For more please consult [Dockerfile.md](https://github.com/testssl/testssl.sh/blob/3.3dev/Dockerfile.md).
+
+
+
 
 ### No Warranty
 
@@ -95,7 +107,8 @@ Testssl.sh is intended to be used as a standalone CLI tool. While we tried to ap
 
 ### Status
 
-This is the stable version 3.2. Please use it **now**, as 3.0.x will not get any updates after 3.0.10, with the current manpower we only support n-1 versions. There will be soon a separate 3.3.dev branch where further development takes place before 3.4 becomes the stable version and 3.2 becomes old-stable.
+Given the current manpower we only support n-1 versions. You're looking at the 3.3.dev branch where further development takes place before 3.4 becomes the stable version and 3.2 becomes old-stable. If you are hestitant with respect to changes, you need to use 3.2. The version 3.0.10 was the last one, there will not be any updates.
+
 
 ### Documentation
 
