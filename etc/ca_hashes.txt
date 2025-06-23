@@ -516,3 +516,4 @@ ZUT/mttkLEw2mKYNgUO2uTvO8BNltUD2FNzCpFq5TTE= subject=C=JP, O=SECOM Trust Systems
 zwnuZ5fhfFhTML7kCk2/oJaZFFxGxTrFppvmOeuJImY= SAPO Class 2 Root CA, emailAddress=pkiadmin@trustcentre.co.za
 zwtHSs6Eafq6QC8C7r354XANnL6L5OQ0hAe2ndMZbpQ= ComSign Secured CA, O=ComSign, C=IL
 ZZyzaKxWmYvQevLK/F+5P455R0rMwqbPGsnyGS0TY2A= Autoridad de Certificacion Raiz del Estado Venezolano, C=VE, L=Caracas, ST=Distrito Capital, O=Sistema Nacional de Certificacion Electronica, OU=Superintendencia de Servicios de Certificacion Electronica, emailAddress=acraiz@suscerte.gob.ve
+

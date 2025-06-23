@@ -11,6 +11,7 @@ on:
       - '**.pem'
       - '**.pdf'
       - '**.html'
+      - '**.yml'
       - 'LICENSE'
       - 'Dockerfile'
       - 'Dockerfile.alpine'

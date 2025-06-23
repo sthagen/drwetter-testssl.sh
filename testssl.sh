@@ -7814,7 +7814,11 @@ determine_trust() {
                     out "$code"
                fi
                fileout "${jsonID}${json_postfix}" "CRITICAL" "failed $code. $addtl_warning"
-               set_grade_cap "T" "Issues with the chain of trust $code"
+               if [[ "$code" =~ "chain incomplete" ]]; then 
+                  set_grade_cap "B" "Issues with chain of trust $code"
+               else
+                  set_grade_cap "T" "Issues with chain of trust $code"
+               fi
           else
                # alt least one ok and other(s) not ==> display the culprit store(s)
                if "$some_ok"; then
@@ -7834,7 +7838,11 @@ determine_trust() {
                               if ! [[ ${certificate_file[i]} =~ Java ]]; then
                                    # Exemption for Java AND rating, as this store doesn't seem to be as complete.
                                    # We won't penalize this but we still need to raise a red flag. See #1648
-                                   set_grade_cap "T" "Issues with chain of trust $code"
+                                   if [[ "$code" =~ "chain incomplete" ]]; then
+                                      set_grade_cap "B" "Issues with chain of trust $code"
+                                   else
+                                      set_grade_cap "T" "Issues with chain of trust $code"
+                                   fi
                               fi
                          fi
                     done
