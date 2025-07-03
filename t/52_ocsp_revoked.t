@@ -31,8 +31,8 @@ system("@args") == 0
      or die ("FAILED: \"@args\" ");
 $cat_csv=`cat $csv`;
 
-# Is the certificate revoked?
-like($cat_csv, qr/"cert_ocspRevoked".*"CRITICAL","revoked"/,"The certificate should be revoked");
+# Is the certificate revoked? (formerly: OCSP, now: CRL)
+like($cat_csv, qr/"cert_crlRevoked".*"CRITICAL","revoked"/,"The certificate should be revoked");
 $tests++;
 unlink $csv;
 

@@ -22468,6 +22468,9 @@ sclient_auth() {
 #   (3) This is not a TLS/SSL enabled server.
 # This information can be used by determine_optimal_proto() to help distinguish between a server
 # that is not TLS/SSL enabled and one that is not compatible with the version of OpenSSL being used.
+# The function sets the global ALL_FAILED_SOCKETS. It is mandatory to be set to true unless the user
+# wants to do pure openssl based tests.
+#
 determine_optimal_sockets_params() {
      local -i ret1=1 ret2=1 ret3=1
      local i proto cipher_offered
@@ -22623,7 +22626,8 @@ determine_optimal_sockets_params() {
 # This function determines (STARTTLS_)OPTIMAL_PROTO. It is basically a workaround function as under certain
 # circumstances a ClientHello without specifying a protocol will fail.
 # Circumstances observed so far: 1.) IIS 6 and openssl 1.0.2 as opposed to 1.0.1  2.) starttls + dovecot imap.
-# Independent on the server side it seems reasonable to to know upfront which protocol always works
+# Independent on the server side it seems reasonable to to know upfront which protocol always works.
+# All clientHellos are openssl based here as opposed to determine_optimal_sockets_params() .
 #
 # arg1: if empty: no STARTTLS, else: STARTTLS protocol
 # The first try in the loop is empty as we prefer not to specify always a protocol if we can get along w/o it
@@ -22770,13 +22774,13 @@ determine_optimal_proto() {
           elif ! "$HAS_SSL3" && [[ "$(has_server_protocol "ssl3")" -eq 0 ]] && [[ "$(has_server_protocol "tls1_3")" -ne 0 ]] && \
                [[ "$(has_server_protocol "tls1_2")" -ne 0 ]] && [[ "$(has_server_protocol "tls1_1")" -ne 0 ]] &&
                [[ "$(has_server_protocol "tls1")" -ne 0 ]]; then
-               prln_magenta " $NODE:$PORT appears to support SSLv3 ONLY. You better use --openssl=<path_to_openssl_supporting_SSL_3>"
+               prln_warning " $NODE:$PORT appears to support SSLv3 ONLY. You better use --openssl=<path_to_openssl_supporting_SSL_3>"
                fileout "$jsonID" "WARN" "$NODE:$PORT appears to support SSLv3 ONLY, but $OPENSSL does not support SSLv3."
                ignore_no_or_lame " Type \"yes\" to proceed and accept all scan problems" "yes"
                [[ $? -ne 0 ]] && exit $ERR_CLUELESS
                MAX_OSSL_FAIL=10
           else
-               prln_bold " Your OpenSSL cannot connect to $NODEIP:$PORT"
+               prln_warning " Your OpenSSL cannot connect to $NODEIP:$PORT"
                fileout "$jsonID" "WARN" "Your OpenSSL cannot connect to $NODEIP:$PORT."
                ignore_no_or_lame " The results might look ok but they could be nonsense. Really proceed ? (\"yes\" to continue)" "yes"
                [[ $? -ne 0 ]] && exit $ERR_CLUELESS
@@ -22795,12 +22799,13 @@ determine_optimal_proto() {
           ignore_no_or_lame " The results might look ok but they could be nonsense. Really proceed ? (\"yes\" to continue)" "yes"
           [[ $? -ne 0 ]] && exit $ERR_CLUELESS
      elif ! "$all_failed" && "$ALL_FAILED_SOCKETS" && ! "$SSL_NATIVE"; then
-          # For some reason connecting with tls_sockets/sslv2_sockets didn't work, but connecting
-          # with $OPENSSL s_client did.
-          # FIXME: Should we include some sort of "please report" note here?
-          prln_magenta " Testing with $NODE:$PORT only worked using $OPENSSL."
-          prln_magenta " Test results may be somewhat better if the --ssl-native option is used."
-          fileout "$jsonID" "WARN" "Testing with $NODE:$PORT only worked using $OPENSSL."
+          # Edge case: connecting with tls_sockets/sslv2_sockets didn't work, but connecting with $OPENSSL s_client did.
+          # See #2807
+          prln_warning "This shouldn't happen (pls report): Testing $NODE:$PORT only succeeded using $OPENSSL."
+          prln_warning "But testssl.sh also needs bash sockets to perform its checks correctly.\n"
+          outln "You can try to continue using the --ssl-native option but the results are likely not complete."
+          outln "Or you can restart using --ssl-native with another openssl version (--openssl <PATH>)."
+          fileout "$jsonID" "WARN" "Sockets didn't work. Testing NODE:$PORT only succeeded using $OPENSSL."
           ignore_no_or_lame " Type \"yes\" to proceed and accept false negatives or positives" "yes"
           [[ $? -ne 0 ]] && exit $ERR_CLUELESS
      fi
