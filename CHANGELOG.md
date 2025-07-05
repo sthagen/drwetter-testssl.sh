@@ -1,6 +1,10 @@
 
 ## Change Log
 
+### Features implemented / improvements in 3.3dev
+
+* QUIC protocol check
+
 ### Features implemented / improvements in 3.2
 
 * Rating (SSL Labs)

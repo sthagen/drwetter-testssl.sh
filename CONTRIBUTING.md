@@ -5,7 +5,7 @@ Contributing / participating is always welcome!
 
 Please note the following:
 
-* Please read the [coding convention](https://github.com/testssl/testssl.sh/blob/3.2/Coding_Convention.md).
+* Please read the [coding convention](https://github.com/testssl/testssl.sh/blob/3.3dev/Coding_Convention.md).
 * If you have something new and/or bigger which you like to contribute, better open an issue first before you get frustrated.
 * Please one pull request per feature or bug fix or improvement. Please do not mix issues.
 * Documentation pays off in the long run. So please your document your code and the pull request and/or commit message.

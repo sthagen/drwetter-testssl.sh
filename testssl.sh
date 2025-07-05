@@ -122,7 +122,7 @@ trap "child_error" USR1
 
 ########### Internal definitions
 #
-declare -r VERSION="3.2.1"
+declare -r VERSION="3.3dev"
 declare -r SWCONTACT="dirk aet testssl dot sh"
 [[ "$VERSION" =~ dev|rc|beta ]] && \
      SWURL="https://testssl.sh/dev/" ||
@@ -205,6 +205,7 @@ MAX_OSSL_FAIL=${MAX_OSSL_FAIL:-2}       # If this many failures for s_client con
 MAX_STARTTLS_FAIL=${MAX_STARTTLS_FAIL:-2}   # max number of STARTTLS handshake failures in plaintext phase
 MAX_HEADER_FAIL=${MAX_HEADER_FAIL:-2}   # If this many failures for HTTP GET are encountered we don't try again to get the header
 MAX_WAITSOCK=${MAX_WAITSOCK:-10}        # waiting at max 10 seconds for socket reply. There shouldn't be any reason to change this.
+QUIC_WAIT=${QUIC_WAIT:-3}               # QUIC is UDP. Thus we run the connect in the background. This is how long to wait
 CCS_MAX_WAITSOCK=${CCS_MAX_WAITSOCK:-5} # for the two CCS payload (each). There shouldn't be any reason to change this.
 HEARTBLEED_MAX_WAITSOCK=${HEARTBLEED_MAX_WAITSOCK:-8}      # for the heartbleed payload. There shouldn't be any reason to change this.
 STARTTLS_SLEEP=${STARTTLS_SLEEP:-10}    # max time wait on a socket for STARTTLS. MySQL has a fixed value of 1 which can't be overwritten (#914)
@@ -339,6 +340,8 @@ HAS_TLS1=false
 HAS_TLS11=false
 HAS_TLS12=false
 HAS_TLS13=false
+HAS_QUIC=false
+HAS2_QUIC=false                         # for automagically determined second OPENSSL version
 HAS_X448=false
 HAS_X25519=false
 HAS_SIGALGS=false
@@ -367,7 +370,7 @@ HAS_AES128_GCM=false
 HAS_AES256_GCM=false
 HAS_ZLIB=false
 HAS_UDS=false
-HAS_UDS2=false
+HAS2_UDS=false
 HAS_ENABLE_PHA=false
 HAS_DIG=false
 HAS_DIG_R=true
@@ -5468,6 +5471,7 @@ add_proto_offered() {
 # arg1:    protocol string or hex code for TLS protocol
 # echos:   0 if proto known being offered, 1: known not being offered, 2: we don't know yet whether proto is being offered
 # return value is always zero
+#
 has_server_protocol() {
      local proto
      local proto_val_pair
@@ -5502,6 +5506,7 @@ has_server_protocol() {
 
 
 # the protocol check needs to be revamped. It sucks, see above
+#
 run_protocols() {
      local using_sockets=true
      local supported_no_ciph1="supported but couldn't detect a cipher (may need debugging)"
@@ -6125,7 +6130,56 @@ run_protocols() {
           [[ $? -ne 0 ]] && exit $ERR_CLUELESS
      fi
 
+     sub_quic
+
      return $ret
+}
+
+
+# We do QUIC check first purely via OpenSSL, supposed it is supported by openssl
+#
+sub_quic() {
+     local alpn=""
+     local use_openssl=""
+     local proxy_hint_str=""
+     local sclient_outfile="$TEMPDIR/$NODEIP.quic_connect.txt"
+     local sclient_errfile="$TEMPDIR/$NODEIP.quic_connect_err.txt"
+     local jsonID="QUIC"
+
+     [[ $DEBUG -ne 0 ]] && sclient_errfile=/dev/null
+
+     pr_bold " QUIC       ";
+
+     if "$HAS2_QUIC" || "$HAS_QUIC"; then
+          # Proxying QUIC is not supported
+          # The s_client call would block if either the remote side doesn't support QUIC or outbound traffic is blocked
+          if "$HAS2_QUIC"; then
+               use_openssl="$OPENSSL2"
+          else
+               use_openssl="$OPENSSL"
+          fi
+          OPENSSL_CONF='' $use_openssl s_client -quic -alpn h3 -connect $NODEIP:$PORT -servername $NODE </dev/null \
+               2>$sclient_errfile  >$sclient_outfile &
+          wait_kill $! $QUIC_WAIT
+          if [[ $? -ne 0 ]]; then
+               if [[ -n "$PROXY" ]]; then
+                    proxy_hint_str="(tried directly, is not proxyable):"
+               fi
+               outln "$proxy_hint_str not offered or timed out"
+               fileout "$jsonID" "INFO" "$proxy_hint_str not offered"
+          else
+               pr_svrty_best "offered (OK)"
+               fileout "$jsonID" "OK" "offered"
+               alpn="$(awk -F':' '/^ALPN protocol/ { print $2 }' < $sclient_outfile)"
+               alpn="$(strip_spaces $alpn)"
+               outln ": $(awk '/^Protocol:/ { print $2 }'  < $sclient_outfile) ($alpn)"
+          fi
+     else
+          prln_local_problem "No OpenSSL QUIC support"
+          fileout "$jsonID" "WARN" "not tested due to lack of local OpenSSL support"
+     fi
+
+     return 0
 }
 
 
@@ -19900,7 +19954,7 @@ run_starttls_injection() {
           outln "Need socat for this check"
           return 1
      fi
-     if ! "$HAS_UDS2" && ! "$HAS_UDS"; then
+     if ! "$HAS2_UDS" && ! "$HAS_UDS"; then
           fileout "$jsonID" "WARN" "Need OpenSSL with Unix-domain socket s_client support for this check" "$cve" "$cwe" "$hint"
           outln "Need an OpenSSL with Unix-domain socket s_client support for this check"
           return 1
@@ -19926,7 +19980,7 @@ run_starttls_injection() {
 
      if "$HAS_UDS"; then
           openssl_bin="$OPENSSL"
-     elif "$HAS_UDS2"; then
+     elif "$HAS2_UDS"; then
           openssl_bin="$OPENSSL2"
      fi
      # normally the interesting fallback we grep later for is in fd2 but we'll catch also stdout here
@@ -20684,7 +20738,7 @@ find_openssl_binary() {
      local s_client_has=$TEMPDIR/s_client_has.txt
      local s_client_has2=$TEMPDIR/s_client_has2.txt
      local s_client_starttls_has=$TEMPDIR/s_client_starttls_has.txt
-     local s_client_starttls_has2=$TEMPDIR/s_client_starttls_has2
+     local s_client2_starttls_has=$TEMPDIR/s_client2_starttls_has
      local openssl_location="" cwd=""
      local curve="" ossl_tls13_supported_curves
      local ossl_line1="" yr=""
@@ -20831,7 +20885,7 @@ find_openssl_binary() {
      HAS_AES256_GCM=false
      HAS_ZLIB=false
      HAS_UDS=false
-     HAS_UDS2=false
+     HAS2_UDS=false
      TRUSTED1ST=""
      HAS_ENABLE_PHA=false
 
@@ -20868,16 +20922,20 @@ find_openssl_binary() {
           $OPENSSL s_client -tls1_3 -sigalgs PSS+SHA256:PSS+SHA384 $NXCONNECT </dev/null 2>&1 | grep -aiq "unknown option" || HAS_SIGALGS=true
      fi
 
+     if [[ -x $OPENSSL2 ]] && OPENSSL_CONF='' $OPENSSL2 s_client -quic 2>&1 | grep -qi 'QUIC requires ALPN'; then
+          HAS2_QUIC="true"
+     elif OPENSSL_CONF='' $OPENSSL s_client -quic 2>&1 | grep -qi 'QUIC requires ALPN'; then
+          HAS_QUIC="true"
+     fi
+
      $OPENSSL s_client -noservername </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NOSERVERNAME=true
      $OPENSSL s_client -ciphersuites </dev/null 2>&1 | grep -aiq "unknown option" || HAS_CIPHERSUITES=true
-
-     $OPENSSL ciphers @SECLEVEL=0:ALL > /dev/null 2> /dev/null && HAS_SECLEVEL=true
-
      $OPENSSL s_client -comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_COMP=true
      $OPENSSL s_client -no_comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_COMP=true
 
-     OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
+     $OPENSSL ciphers @SECLEVEL=0:ALL > /dev/null 2> /dev/null && HAS_SECLEVEL=true
 
+     OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
      if [[ $OPENSSL_NR_CIPHERS -le 140 ]]; then
           [[ "$OSSL_NAME" =~ LibreSSL ]] && [[ ${OSSL_VER//./} -ge 210 ]] && HAS_DH_BITS=true
           if "$SSL_NATIVE"; then
@@ -20981,9 +21039,9 @@ find_openssl_binary() {
           # We also check, whether there's $OPENSSL2 which has TLS 1.3
           if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
                OPENSSL_CONF='' $OPENSSL2 s_client -help 2>$s_client_has2
-               OPENSSL_CONF='' $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
-               grep -q 'Unix-domain socket' $s_client_has2 && HAS_UDS2=true
-               grep -q 'xmpp-server' $s_client_starttls_has2 && HAS_XMPP_SERVER2=true
+               OPENSSL_CONF='' $OPENSSL2 s_client -starttls foo 2>$s_client2_starttls_has
+               grep -q 'Unix-domain socket' $s_client_has2 && HAS2_UDS=true
+               grep -q 'xmpp-server' $s_client2_starttls_has && HAS_XMPP_SERVER2=true
                # Likely we don't need the following second check here, see 6 lines above
                if grep -wq 'tls1_3' $s_client_has2; then
                     OPENSSL_CONF='' OPENSSL2_HAS_TLS_1_3=true
@@ -21179,7 +21237,7 @@ single check as <options>  ("$PROG_NAME URI" does everything except -E and -g):
      -E, --cipher-per-proto        checks those per protocol
      -s, --std, --categories       tests standard cipher categories by strength
      -f, --fs, --forward-secrecy   checks forward secrecy settings
-     -p, --protocols               checks TLS/SSL protocols (including SPDY/HTTP2)
+     -p, --protocols               checks TLS/SSL protocols, for HTTP: including QUIC/HTTP/3 and ALPN/HTTP2 (and SPDY)
      -g, --grease                  tests several server implementation bugs like GREASE and size limitations
      -S, --server-defaults         displays the server's default picks and certificate info
      -P, --server-preference       displays the server's picks: protocol+cipher
@@ -21339,6 +21397,8 @@ HAS_TLS1: $HAS_TLS1
 HAS_TLS11: $HAS_TLS11
 HAS_TLS12: $HAS_TLS12
 HAS_TLS13: $HAS_TLS13
+HAS_QUIC: $HAS_QUIC
+HAS2_QUIC: $HAS2_QUIC
 HAS_X448: $HAS_X448
 HAS_X25519: $HAS_X25519
 HAS_SIGALGS: $HAS_SIGALGS
@@ -21363,7 +21423,7 @@ HAS_SIEVE: $HAS_SIEVE
 HAS_NNTP: $HAS_NNTP
 HAS_IRC: $HAS_IRC
 HAS_UDS: $HAS_UDS
-HAS_UDS2: $HAS_UDS2
+HAS2_UDS: $HAS2_UDS
 HAS_ENABLE_PHA: $HAS_ENABLE_PHA
 
 HAS_DIG: $HAS_DIG

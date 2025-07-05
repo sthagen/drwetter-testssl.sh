@@ -175,7 +175,7 @@ Any single check switch supplied as an argument prevents testssl.sh from doing a
 
 `-f, --fs, --nsa, --forward-secrecy` Checks robust forward secrecy key exchange. "Robust" means that ciphers having intrinsic severe weaknesses like Null Authentication or Encryption, 3DES and RC4 won't be considered here. There shouldn't be the wrong impression that a secure key exchange has been taking place and everything is fine when in reality the encryption sucks. Also this section lists the available elliptical curves and Diffie Hellman groups, as well as FFDHE groups (TLS 1.2 and TLS 1.3).
 
-`-p, --protocols`  checks TLS/SSL protocols SSLv2, SSLv3, TLS 1.0 through TLS 1.3 and for HTTP: SPDY (NPN) and ALPN, a.k.a. HTTP/2. For TLS 1.3 several drafts (from 18 on) and final are supported and being tested for. Note the supplied openssl-bad version doesn't support TLS 1.3 . As the check for TLS 1.3 will be done in sockets this normally does not pose a problem. However if a TLS-1.3-only host is encountered and to have a complete test coverage (e.g. header checks) `/usr/bin/openssl` (or the content of `OPENSSL2`) is checked for existence and support of TLS 1.3 and if those tests succeeded it will be switched to this binary. A message will notify you.
+`-p, --protocols` checks TLS/SSL protocols SSLv2, SSLv3, TLS 1.0 through TLS 1.3. And for HTTP also QUIC (HTTP/3), SPDY (NPN) and ALPN (HTTP/2). For TLS 1.3 the final version and several drafts (from 18 on) are tested. QUIC needs OpenSSL >= 3.2 which can be automatically picked up when in `/usr/bin/openssl` (or when defined environment variable OPENSSL2). If a TLS-1.3-only host is encountered and the openssl-bad version is used testssl.sh will e.g. for HTTP header checks switch to `/usr/bin/openssl` (or when defined via ENV to OPENSSL2). Also this will be tried for the QUIC check.
 
 `-P, --server-preference, --preference`  displays the servers preferences: cipher order, with used openssl client: negotiated protocol and cipher. If there's a cipher order enforced by the server it displays it for each protocol (openssl+sockets). If there's not, it displays instead which ciphers from the server were picked with each protocol.
 
@@ -520,6 +520,7 @@ Please note that for plain TLS-encrypted ports you must not specify the protocol
 * RFC 8143: Using Transport Layer Security (TLS) with Network News Transfer Protocol (NNTP)
 * RFC 8446: The Transport Layer Security (TLS) Protocol Version 1.3
 * RFC 8701: Applying Generate Random Extensions And Sustain Extensibility (GREASE) to TLS Extensibility
+* RFC 9000: QUIC: A UDP-Based Multiplexed and Secure Transport
 * W3C CSP: Content Security Policy Level 1-3
 * TLSWG Draft: The Transport Layer Security (TLS) Protocol Version 1.3
 

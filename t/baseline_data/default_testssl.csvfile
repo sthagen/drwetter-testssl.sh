@@ -8,6 +8,7 @@
 "TLS1_1","testssl.sh/81.169.166.184","443","LOW","offered (deprecated)","",""
 "TLS1_2","testssl.sh/81.169.166.184","443","OK","offered","",""
 "TLS1_3","testssl.sh/81.169.166.184","443","OK","offered with final","",""
+"QUIC","testssl.sh/81.169.166.184","443","WARN","not tested due to lack of local OpenSSL support","",""
 "NPN","testssl.sh/81.169.166.184","443","INFO","offered with h2, http/1.1 (advertised)","",""
 "ALPN_HTTP2","testssl.sh/81.169.166.184","443","OK","h2","",""
 "ALPN","testssl.sh/81.169.166.184","443","INFO","http/1.1","",""
