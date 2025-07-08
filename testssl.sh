@@ -1128,6 +1128,7 @@ f5_port_decode() {
 # Sets the grade cap to ARG1
 # arg1: A grade to set ("A", "B", "C", "D", "E", "F", "M", or "T")
 # arg2: A reason why (e.g. "Vulnerable to CRIME")
+#
 set_grade_cap() {
      "$do_rating" || return 0
      GRADE_CAP_REASONS+=("Grade capped to $1. $2")
@@ -1144,6 +1145,7 @@ set_grade_cap() {
 
 # Sets a grade warning, as specified by the grade specification
 # arg1: A warning message
+#
 set_grade_warning() {
      "$do_rating" || return 0
      GRADE_WARNINGS+=("$1")
@@ -1153,6 +1155,7 @@ set_grade_warning() {
 # Sets the score for Category 2 (Key Exchange Strength)
 # arg1: Short key algorithm ("EC", "DH", "RSA", ...), or "DHE" for ephemeral key size
 # arg2: key size (number of bits)
+#
 set_key_str_score() {
      local type=$1
      local size=$2
@@ -1190,6 +1193,7 @@ set_key_str_score() {
 # Sets the best and worst bit size key, used to grade Category 3 (Cipher Strength)
 # This function itself doesn't actually set a score; its just in the name to keep it logical (score == rating function)
 # arg1: a bit size
+#
 set_ciph_str_score() {
      local size=$1
 
@@ -23935,6 +23939,7 @@ run_rating() {
 # Rating needs a mix of certificate and vulnerabilities checks, in order to give out proper grades.
 # This function disables rating, if not all required checks are enabled
 # Returns "0" if rating is enabled, and "1" if rating is disabled
+#
 set_rating_state() {
      local gbl
      local -i nr_enabled=0
@@ -23960,9 +23965,9 @@ set_rating_state() {
      return 0
 }
 
-
 # This initializes boolean global do_* variables. They keep track of what to do
 # -- as the name insinuates
+#
 initialize_globals() {
      do_allciphers=false
      do_vulnerabilities=false
@@ -24009,6 +24014,7 @@ initialize_globals() {
 
 
 # Set default scanning options for the boolean global do_* variables.
+#
 set_scanning_defaults() {
      do_allciphers=false
      do_vulnerabilities=true
@@ -24376,9 +24382,9 @@ parse_cmd_line() {
                     do_grease=true
                     ;;
                --disable-rating|--no-rating)
-                    SKIP_TESTS+=("rating")
                     # TODO: a generic thing would be --disable-* / --no-* ,
                     # catch $1 and add it to the array ( #1502 )
+                    SKIP_TESTS+=("rating")
                     ;;
                -9|--full)
                     set_scanning_defaults
@@ -24791,9 +24797,11 @@ parse_cmd_line() {
      set_skip_tests
      [[ "$DEBUG" -ge 5 ]] && debug_globals
 
-     # Unless explicit disabled, check if rating can be enabled
-     # Should be called after set_scanning_defaults
-     ! "$do_rating" && set_rating_state
+     # Unless explicit disabled, check if rating can or should be enabled.
+     # Should be called after set_scanning_defaults() and set_skip_tests()
+     if [[ ! ${SKIP_TESTS[@]} =~ rating ]] ; then
+          set_rating_state
+     fi
 
      CMDLINE_PARSED=true
 }
