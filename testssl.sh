@@ -6167,9 +6167,9 @@ sub_quic() {
           wait_kill $! $QUIC_WAIT
           if [[ $? -ne 0 ]]; then
                if [[ -n "$PROXY" ]]; then
-                    proxy_hint_str="(tried directly, is not proxyable):"
+                    proxy_hint_str="(tried directly, is not proxyable): "
                fi
-               outln "$proxy_hint_str not offered or timed out"
+               outln "${proxy_hint_str}not offered or timed out"
                fileout "$jsonID" "INFO" "$proxy_hint_str not offered"
           else
                pr_svrty_best "offered (OK)"
