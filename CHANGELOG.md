@@ -4,6 +4,7 @@
 ### Features implemented / improvements in 3.3dev
 
 * QUIC protocol check
+* bump SSLlabs rating guide to 2009r
 
 ### Features implemented / improvements in 3.2
 

@@ -2820,6 +2820,7 @@ run_hsts() {
           if ! is_number "$hsts_age_sec"; then
                pr_svrty_medium "misconfiguration: \'"$hsts_age_sec"\' is not a valid max-age specification"
                fileout "${jsonID}_time" "MEDIUM" "misconfiguration, specified not a number for max-age"
+               set_grade_warning "HSTS max-age is misconfigured"
           else
                if [[ -n $hsts_age_sec ]]; then
                     hsts_age_days=$(( hsts_age_sec / 86400))
@@ -2829,18 +2830,18 @@ run_hsts() {
                if [[ $hsts_age_days -eq -1 ]]; then
                     pr_svrty_medium "misconfiguration: HSTS max-age (recommended > $HSTS_MIN seconds = $((HSTS_MIN/86400)) days ) is required but missing"
                     fileout "${jsonID}_time" "MEDIUM" "misconfiguration, parameter max-age (recommended > $HSTS_MIN seconds = $((HSTS_MIN/86400)) days) missing"
-                    set_grade_cap "A" "HSTS max-age is misconfigured"
+                    set_grade_warning "HSTS max-age is misconfigured"
                elif [[ $hsts_age_sec -eq 0 ]]; then
                     pr_svrty_low "HSTS max-age is set to 0. HSTS is disabled"
                     fileout "${jsonID}_time" "LOW" "0. HSTS is disabled"
-                    set_grade_cap "A" "HSTS is disabled"
+                    set_grade_warning "HSTS is disabled"
                elif [[ $hsts_age_sec -ge $HSTS_MIN ]]; then
                     pr_svrty_good "$hsts_age_days days" ; out "=$hsts_age_sec s"
                     fileout "${jsonID}_time" "OK" "$hsts_age_days days (=$hsts_age_sec seconds) > $HSTS_MIN seconds"
                else
                     pr_svrty_medium "$hsts_age_sec s = $hsts_age_days days is too short ( >= $HSTS_MIN seconds recommended)"
                     fileout "${jsonID}_time" "MEDIUM" "max-age too short. $hsts_age_days days (=$hsts_age_sec seconds) < $HSTS_MIN seconds"
-                    set_grade_cap "A" "HSTS max-age is too short"
+                    set_grade_warning "HSTS max-age is too short"
                fi
           fi
           if includeSubDomains "$TMPFILE"; then
@@ -2859,7 +2860,6 @@ run_hsts() {
      else
           pr_svrty_low "not offered"
           fileout "$jsonID" "LOW" "not offered"
-          set_grade_cap "A" "HSTS is not offered"
      fi
      outln
 
@@ -6073,6 +6073,7 @@ run_protocols() {
                     fileout "$jsonID" "CRITICAL" "connection failed rather than downgrading to $latest_supported_string"
                fi
                add_proto_offered tls1_3 no
+               set_grade_warning "TLS 1.3 is not supported"
                ;;
           2)   if [[ "$DETECTED_TLS_VERSION" == 0300 ]]; then
                     detected_version_string="SSLv3"
@@ -6096,16 +6097,19 @@ run_protocols() {
                     fileout "$jsonID" "CRITICAL" "server responded with version number ${DETECTED_TLS_VERSION:0:2}.${DETECTED_TLS_VERSION:2:2}"
                fi
                add_proto_offered tls1_3 no
+               set_grade_warning "TLS 1.3 is not supported"
                ;;
           3)   out "not offered  "
                fileout "$jsonID" "INFO" "not offered"
                add_proto_offered tls1_3 no
+               set_grade_warning "TLS 1.3 is not supported"
                pr_warning "TLS downgraded to STARTTLS plaintext"; outln
                fileout "$jsonID" "WARN" "TLS downgraded to STARTTLS plaintext"
                ;;
           4)   out "likely not offered, "              # STARTTLS problem
                fileout "$jsonID" "INFO" "likely not offered"
                add_proto_offered tls1_3 no
+               set_grade_warning "TLS 1.3 is not supported"
                pr_warning "received 4xx/5xx after STARTTLS handshake"; outln "$debug_recomm"
                fileout "$jsonID" "WARN" "received 4xx/5xx after STARTTLS handshake${debug_recomm}"
                ;;
@@ -8124,6 +8128,7 @@ determine_cert_compression() {
           tls_sockets "04" "$TLS13_CIPHER" "all+" "00,1b, 00,$len2, $len1$methods_to_test"
           if [[ $? -ne 0 ]]; then
                add_proto_offered tls1_3 no
+               set_grade_warning "TLS 1.3 is not supported"
                return 1
           fi
           add_proto_offered tls1_3 yes
@@ -18549,8 +18554,6 @@ run_tls_fallback_scsv() {
                     pr_svrty_medium "Downgrade attack prevention NOT supported"
                     fileout "$jsonID" "MEDIUM" "NOT supported"
                fi
-               set_grade_cap "A" "Does not support TLS_FALLBACK_SCSV"
-
           elif grep -qa "alert inappropriate fallback" "$TMPFILE"; then
                pr_svrty_good "Downgrade attack prevention supported (OK)"
                fileout "$jsonID" "OK" "supported"
@@ -22561,6 +22564,7 @@ determine_optimal_sockets_params() {
                all_failed=false
           else
                add_proto_offered tls1_3 no
+               set_grade_warning "TLS 1.3 is not supported"
                KEY_SHARE_EXTN_NR="33"
           fi
      fi
@@ -23728,10 +23732,10 @@ run_rating() {
      # For other than SMTP on port 25 and port 587 and SIEVE (there's no implicit TLS port) you should use implicit TLS as per RFC 8314.
      # Instead of port 587 (STARTTLS) implicit TLS on port 465 should be considered.
 
-     pr_bold " Rating specs"; out " (not complete)  "; outln "SSL Labs's 'SSL Server Rating Guide' (version 2009q from 2020-01-30)"
+     pr_bold " Rating specs"; out " (not complete)  "; outln "SSL Labs's 'SSL Server Rating Guide' (version 2009r from 2025-05-16)"
      pr_bold " Specification documentation  "; pr_url "https://github.com/ssllabs/research/wiki/SSL-Server-Rating-Guide"
      outln
-     fileout "rating_spec" "INFO" "SSL Labs's 'SSL Server Rating Guide' (version 2009q from 2020-01-30)"
+     fileout "rating_spec" "INFO" "SSL Labs's 'SSL Server Rating Guide' (version 2009r from 2025-05-16)"
      fileout "rating_doc" "INFO" "https://github.com/ssllabs/research/wiki/SSL-Server-Rating-Guide"
 
      # No point in calculating a score, if a cap of "F", "T", or "M" has been set
