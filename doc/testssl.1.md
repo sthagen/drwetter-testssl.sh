@@ -236,9 +236,11 @@ Also for multiple server certificates are being checked for as well as for the c
 
 `-T, --ticketbleed`             Checks for Ticketbleed memory leakage in BigIP loadbalancers.
 
-`--BB, --robot`          Checks for vulnerability to ROBOT / (*Return Of Bleichenbacher's Oracle Threat*) attack.
+`--OP, --opossum`               Checks for HTTP to HTTPS upgrade vulnerability named Opossum.
 
-`--SI, --starttls-injection`          Checks for STARTTLS injection vulnerabilities (SMTP, IMAP, POP3 only). `socat` and OpenSSL >=1.1.0 is needed.
+`--BB, --robot`                 Checks for vulnerability to ROBOT / (*Return Of Bleichenbacher's Oracle Threat*) attack.
+
+`--SI, --starttls-injection`    Checks for STARTTLS injection vulnerabilities (SMTP, IMAP, POP3 only). `socat` and OpenSSL >=1.1.0 is needed.
 
 `-R, --renegotiation`           Tests renegotiation vulnerabilities. Currently there's a check for *Secure Renegotiation* and for *Secure Client-Initiated Renegotiation*. Please be aware that vulnerable servers to the latter can likely be DoSed very easily (HTTP). A check for *Insecure Client-Initiated Renegotiation* is not yet implemented.
 
@@ -490,6 +492,7 @@ Please note that for plain TLS-encrypted ports you must not specify the protocol
 
 * RFC 2246: The TLS Protocol Version 1.0
 * RFC 2595: Using TLS with IMAP, POP3 and ACAP
+* RFC 2817: Upgrading to TLS Within HTTP/1.1
 * RFC 2818: HTTP Over TLS
 * RFC 2830: Lightweight Directory Access Protocol (v3): Extension for Transport Layer Security
 * RFC 3207: SMTP Service Extension for Secure SMTP over Transport Layer Security
@@ -550,7 +553,6 @@ Please note that for plain TLS-encrypted ports you must not specify the protocol
 **etc/\*pem**               are the certificate stores from Apple, Linux, Mozilla Firefox, Windows and Java.
 
 **etc/client-simulation.txt**  contains client simulation data.
-
 
 **etc/cipher-mapping.txt**  provides a mandatory file with mapping from OpenSSL cipher suites names to the ones from IANA / used in the RFCs.
 

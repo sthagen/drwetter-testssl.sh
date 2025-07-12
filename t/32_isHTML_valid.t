@@ -48,7 +48,7 @@ $edited_html =~ s/&apos;/'/g;
 
 $diff = diff \$edited_html, \$out;
 
-cmp_ok($edited_html, "eq", $out, "Checking if HTML file matches terminal output") or
+ok($edited_html eq $out, "Checking if HTML file matches terminal output") or
      diag ("\n%s\n", "$diff");
 
 $tests++;
@@ -82,7 +82,7 @@ $debughtml =~ s/.*Using bash .*\n//g;
 
 $diff = diff \$debughtml, \$html;
 
-cmp_ok($debughtml, "eq", $html, "Checking if HTML file created with --debug 4 matches HTML file created without --debug") or
+ok($debughtml eq $html, "Checking if HTML file created with --debug 4 matches HTML file created without --debug") or
      diag ("\n%s\n", "$diff");
 $tests++;
 
