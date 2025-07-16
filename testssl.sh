@@ -20946,7 +20946,12 @@ find_openssl_binary() {
      initialize_engine
 
      openssl_location="$(type -p $OPENSSL)"
-     
+
+     # kludge for e.g. MacOS and brew
+     if [[ $OPENSSL == $OPENSSL2 ]]; then
+          OPENSSL2=$(type -a openssl | grep -v /usr/bin/openssl | awk '{ print $NF }')
+     fi
+
      [[ -n "$GIT_REL" ]] && \
           cwd="$PWD" || \
           cwd="$RUN_DIR"
@@ -23284,7 +23289,12 @@ run_mx_all_ips() {
                determine_ip_addresses || continue
                if [[ $(count_words "$IPADDRs") -gt 1 ]]; then    # we have more than one ipv4 address to check
                     MULTIPLE_CHECKS=true
-                    pr_bold "Testing all IPv4 addresses (port $PORT): "; outln "$IPADDRs"
+                    if [[ "$HAS_IPv6" ]]; then
+                    pr_bold "Testing all IP addresses (port $PORT): "
+               else
+                    pr_bold "Testing all IPv4 addresses (port $PORT): "
+               fi
+               outln "$IPADDRs"
                     for ip in $IPADDRs; do
                          NODEIP="$ip"
                          lets_roll "${STARTTLS_PROTOCOL}"
@@ -25213,7 +25223,12 @@ lets_roll() {
           determine_ip_addresses
           if [[ $(count_words "$IPADDRs") -gt 1 ]]; then    # we have more than one ipv4 address to check
                MULTIPLE_CHECKS=true
-               pr_bold "Testing all IPv4 addresses (port $PORT): "; outln "$IPADDRs"
+               if [[ "$HAS_IPv6" ]]; then
+                    pr_bold "Testing all IP addresses (port $PORT): "
+               else
+                    pr_bold "Testing all IPv4 addresses (port $PORT): "
+               fi
+               outln "$IPADDRs"
                for ip in $IPADDRs; do
                     draw_line "-" $((TERM_WIDTH * 2 / 3))
                     outln
