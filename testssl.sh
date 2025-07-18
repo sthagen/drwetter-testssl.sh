@@ -381,6 +381,7 @@ HAS_NSLOOKUP=false
 HAS_IDN=false
 HAS_IDN2=false
 HAS_AVAHIRESOLVE=false
+HAS_DSCACHEUTIL=false
 HAS_DIG_NOIDNOUT=false
 HAS_XXD=false
 
@@ -21550,6 +21551,7 @@ HAS_NSLOOKUP: $HAS_NSLOOKUP
 HAS_IDN: $HAS_IDN
 HAS_IDN2: $HAS_IDN2
 HAS_AVAHIRESOLVE: $HAS_AVAHIRESOLVE
+HAS_DSCACHEUTIL: $HAS_DSCACHEUTIL
 HAS_DIG_NOIDNOUT: $HAS_DIG_NOIDNOUT
 HAS_DIG_R: $HAS_DIG_R
 HAS_XXD: $HAS_XXD
@@ -22049,6 +22051,7 @@ check_resolver_bins() {
      type -p avahi-resolve &>/dev/null && HAS_AVAHIRESOLVE=true
      type -p idn  &>/dev/null && HAS_IDN=true
      type -p idn2 &>/dev/null && HAS_IDN2=true
+     type -p dscacheutil &> /dev/null && HAS_DSCACHEUTIL=true
 
      if ! "$HAS_DIG" && ! "$HAS_HOST" && ! "$HAS_DRILL" && ! "$HAS_NSLOOKUP"; then
           fatal "Neither \"dig\", \"host\", \"drill\" nor \"nslookup\" is present" $ERR_DNSBIN
@@ -22088,16 +22091,21 @@ get_a_record() {
      fi
      OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      if [[ "$NODE" == *.local ]]; then
-          if "$HAS_AVAHIRESOLVE"; then
+          if "$HAS_DSCACHEUTIL"; then
+               ip4=$(filter_ip4_address $(dscacheutil -q host -a name "$1" | awk '/^ip_address:/ { print $2 }'))
+          elif "$HAS_AVAHIRESOLVE"; then
                ip4=$(filter_ip4_address $(avahi-resolve -4 -n "$1" 2>/dev/null | awk '{ print $2 }'))
           elif "$HAS_DIG"; then
                ip4=$(filter_ip4_address $(dig $DIG_R @224.0.0.251 -p 5353 +short -t a +notcp "$1" 2>/dev/null | sed '/^;;/d'))
           elif "$HAS_DRILL"; then
                ip4=$(filter_ip4_address $(drill @224.0.0.251 -p 5353 "$1" 2>/dev/null | awk '/ANSWER SECTION/,/AUTHORITY SECTION/ { print $NF }' | awk '/^[0-9]/'))
           else
-               fatal "Local hostname given but neither 'avahi-resolve', 'dig' nor 'drill' is available." $ERR_DNSBIN
+               fatal "Local hostname given but neither 'dscacheutil', 'avahi-resolve', 'dig' nor 'drill' is available." $ERR_DNSBIN
           fi
           [[ -z "$ip4" ]] && debugme echo ".local IP address requested but mDNS resolution (IPv4) failed"
+     fi
+     if [[ -z "$ip4" ]] && "$HAS_DSCACHEUTIL"; then
+          ip4=$(filter_ip4_address $(dscacheutil -q host -a name "$1" | awk '/^ip_address:/ { print $2 }'))
      fi
      if [[ -z "$ip4" ]] && "$HAS_DIG"; then
           ip4=$(filter_ip4_address $(dig +search $DIG_R +short +timeout=2 +tries=2 $noidnout -t a "$1" 2>/dev/null | awk '/^[0-9]/ { print $1 }'))
@@ -22135,20 +22143,24 @@ get_aaaa_record() {
      fi
      if [[ -z "$ip6" ]]; then
           if [[ "$NODE" == *.local ]]; then
-               if "$HAS_AVAHIRESOLVE"; then
+               if "$HAS_DSCACHEUTIL"; then
+                    ip6=$(filter_ip6_address $(dscacheutil -q host -a name "$1" | awk '/^ipv6_address:/ { print $2 }'))
+               elif "$HAS_AVAHIRESOLVE"; then
                     ip6=$(filter_ip6_address $(avahi-resolve -6 -n "$1" 2>/dev/null | awk '{ print $2 }'))
                elif "$HAS_DIG"; then
                     ip6=$(filter_ip6_address $(dig $DIG_R @ff02::fb -p 5353 -t aaaa +short +notcp "$NODE" 2>/dev/null))
                elif "$HAS_DRILL"; then
                     ip6=$(filter_ip6_address $(drill @ff02::fb -p 5353 "$1" 2>/dev/null | awk '/ANSWER SECTION/,/AUTHORITY SECTION/ { print $NF }' | awk '/^[a-f0-9]/'))
                else
-                    fatal "Local hostname given but neither 'avahi-resolve', 'dig' nor 'drill' is available." $ERR_DNSBIN
+                    fatal "Local hostname given but neither 'dscacheutil', 'avahi-resolve', 'dig' nor 'drill' is available." $ERR_DNSBIN
                fi
                [[ -z "$ip6" ]] && debugme echo ".local IP address requested but mDNS resolution (IPv6) failed"
           fi
      fi
      if [[ -z "$ip6" ]]; then
-          if "$HAS_DIG"; then
+          if "$HAS_DSCACHEUTIL"; then
+               ip6=$(filter_ip6_address $(dscacheutil -q host -a name "$1" | awk '/^ipv6_address:/ { print $2 }'))
+          elif "$HAS_DIG"; then
                ip6=$(filter_ip6_address $(dig +search $DIG_R +short +timeout=2 +tries=2 $noidnout -t aaaa "$1" 2>/dev/null | awk '/^[a-f0-9]/ { print $1 }'))
           elif "$HAS_HOST"; then
                ip6=$(filter_ip6_address $(host -t aaaa "$1" | awk '/address/ { print $NF }'))
@@ -22382,11 +22394,15 @@ determine_rdns() {
      local nodeip="$(tr -d '[]' <<< $NODEIP)"               # for DNS we do not need the square brackets of IPv6 addresses
      OPENSSL_CONF=""                                        # see https://github.com/testssl/testssl.sh/issues/134
      if [[ "$NODE" == *.local ]]; then
-          if "$HAS_AVAHIRESOLVE"; then
+          if "$HAS_DSCACHEUTIL"; then
+               rDNS=$(dscacheutil -q host -a ip_address $nodeip | awk '/^name:/ { print $2 }')
+          elif "$HAS_AVAHIRESOLVE"; then
                rDNS=$(avahi-resolve -a $nodeip 2>/dev/null | awk '{ print $2 }')
           elif "$HAS_DIG"; then
                rDNS=$(dig $DIG_R -x $nodeip @224.0.0.251 -p 5353 +notcp +noall +answer +short | awk '{ print $1 }')
           fi
+     elif "$HAS_DSCACHEUTIL"; then
+          rDNS=$(dscacheutil -q host -a ip_address $nodeip | awk '/^name:/ { print $2 }')
      elif "$HAS_DIG"; then
           # 1+2 should suffice. It's a compromise for if e.g. network is down but we have a docker/localhost server
           rDNS=$(dig $DIG_R -x $nodeip +timeout=1 +tries=2 +noall +answer +short | awk '{ print $1 }')    # +short returns also CNAME, e.g. openssl.org
