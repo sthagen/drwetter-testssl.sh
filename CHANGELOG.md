@@ -4,8 +4,9 @@
 ### Features implemented / improvements in 3.3dev
 
 * QUIC protocol check
-* bump SSLlabs rating guide to 2009r
+* Bump SSLlabs rating guide to 2009r
 * Check for Opossum vulnerability
+* Enable IPv6 automagically, i.e. if target via IPv6 is reachable just (also) scan it
 
 ### Features implemented / improvements in 3.2
 

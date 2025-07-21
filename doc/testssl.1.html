@@ -99,6 +99,14 @@
         <li><p>client simulation</p></li>
         <li><p>rating</p></li>
         </ol>
+        <p>If a target FQDN has multiple IPv4 and/or multiple IPv6
+        addresses, it scans all IPs with the specified options or using
+        the default run - unless specified otherwise, see
+        <code>--ip</code>, <code>-4</code> and <code>-6</code>. IPv6
+        connectivity is automagically checked. If there’s noch such
+        thing you will see a banner <em>Testing all
+        <strong>IPv4</strong> addresses</em> and all IPv6 addresses will
+        appear in round brackets.</p>
         <h2 id="options-and-parameters">OPTIONS AND PARAMETERS</h2>
         <p>Options are either short or long options. Any long or short
         option requiring a value can be called with or without an equal
@@ -216,15 +224,16 @@
         will be made in the future as a best guess by testssl.sh. The
         same can be achieved by setting the environment variable
         <code>WARNINGS</code>.</p>
-        <p><code>--connect-timeout &lt;seconds&gt;</code> This is useful
+        <p><code>--socket-timeout &lt;seconds&gt;</code> This is useful
         for socket TCP connections to a node. If the node does not
         complete a TCP handshake (e.g. because it is down or behind a
         firewall or there’s an IDS or a tarpit) testssl.sh may usually
         hang for around 2 minutes or even much more. This parameter
         instructs testssl.sh to wait at most <code>seconds</code> for
         the handshake to complete before giving up. This option only
-        works if your OS has a timeout binary installed. CONNECT_TIMEOUT
-        is the corresponding environment variable.</p>
+        works if your OS has a timeout binary installed. SOCKET_TIMEOUT
+        is the corresponding environment variable. This doesn’t work on
+        Macs out of the box.</p>
         <p><code>--openssl-timeout &lt;seconds&gt;</code> This is
         especially useful for all connects using openssl and practically
         useful for mass testing. It avoids the openssl connect to hang
@@ -234,7 +243,8 @@
         timeout binary installed. As there are different implementations
         of <code>timeout</code>: It automatically calls the binary with
         the right parameters. OPENSSL_TIMEOUT is the equivalent
-        environment variable.</p>
+        environment variable. This doesn’t work on Macs out of the
+        box.</p>
         <p><code>--basicauth &lt;user:pass&gt;</code> This can be set to
         provide HTTP basic auth credentials which are used during checks
         for security headers. BASICAUTH is the ENV variable you can use
@@ -301,17 +311,15 @@
         <code>IGN_OCSP_PROXY=true</code> has been supplied it will be
         tried directly. Authentication to the proxy is not supported,
         also no HTTPS or SOCKS proxy.</p>
-        <p><code>-6</code> does (also) IPv6 checks. Please note that
-        testssl.sh doesn’t perform checks on an IPv6 address
-        automatically, because of two reasons: testssl.sh does no
-        connectivity checks for IPv6 and it cannot determine reliably
-        whether the OpenSSL binary you’re using has IPv6 s_client
-        support. <code>-6</code> assumes both is the case. If both
-        conditions are met and you in general prefer to test for IPv6
-        branches as well you can add <code>HAS_IPv6</code> to your shell
-        environment. Besides the OpenSSL binary supplied IPv6 is known
-        to work with vanilla OpenSSL &gt;= 1.1.0 and older versions
-        &gt;=1.0.2 in RHEL/CentOS/FC and Gentoo.</p>
+        <p><code>-6</code> scans only IPv6 addresses of the target.
+        Besides the OpenSSL binary supplied IPv6 is known to work with
+        vanilla OpenSSL &gt;= 1.1.0 and older versions &gt;=1.0.2 in
+        RHEL/CentOS/FC and Gentoo. Scans are somewhat in line with tools
+        like curl or wget, i.e. if there’s an IPv6 address of the target
+        which can be reached, it just uses them. If you don’t want this
+        behavior, you need to supply <code>-4.</code></p>
+        <p><code>-4</code> scans only IPv4 addresses of the target, IPv6
+        addresses of the target won’t be scanned.</p>
         <p><code>--ssl-native</code> Instead of using a mixture of bash
         sockets and a few openssl s_client connects, testssl.sh uses the
         latter (almost) only. This is faster but provides less accurate
@@ -649,7 +657,7 @@
         vulnerability. It tests for the absence of a lot of ciphers,
         some TLS extensions and ec curves which were introduced later in
         Windows. In the end the server banner is being looked at.</p>
-        <p><code>-4, --rc4, --appelbaum</code> Checks which RC4 stream
+        <p><code>--rc4, --appelbaum</code> Checks which RC4 stream
         ciphers are being offered.</p>
         <h3 id="output-options">OUTPUT OPTIONS</h3>
         <p><code>-q, --quiet</code> Normally testssl.sh displays a

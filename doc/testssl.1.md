@@ -36,7 +36,7 @@ linked OpenSSL binaries for major operating systems are supplied in `./bin/`.
 
 `testssl.sh URI` as the default invocation does the so-called default run which does a number of checks and puts out the results colorized (ANSI and termcap) on the screen. It does every check listed below except `-E` which are (order of appearance):
 
-0) displays a banner (see below), does a DNS lookup also for further IP addresses and does for the returned IP address a reverse lookup. Last but not least a service check is being done.
+0) displays a banner (see below), does a DNS lookup also for further IP addresses and does for the returned IP address a reverse lookup. Last but not least a service check is being done. 
 
 1) SSL/TLS protocol check
 
@@ -58,6 +58,7 @@ linked OpenSSL binaries for major operating systems are supplied in `./bin/`.
 
 10) rating
 
+If a target FQDN has multiple IPv4 and/or multiple IPv6 addresses, it scans all IPs with the specified options or using the default run - unless specified otherwise, see `--ip`, `-4` and `-6`. IPv6 connectivity is automagically checked. If there's noch such thing you will see a banner *Testing all **IPv4** addresses* and all IPv6 addresses will appear in round brackets.
 
 
 ## OPTIONS AND PARAMETERS
@@ -105,9 +106,9 @@ Please note that `fname` has to be in Unix format. DOS carriage returns won't be
 `--warnings <batch|off>`.  The warnings parameter determines how testssl.sh will deal with situations where user input normally will be necessary. There are two options. `batch` doesn't wait for a confirming keypress when a client- or server-side problem is encountered. As of 3.0 it just then terminates the particular scan.  This is automatically chosen for mass testing (`--file`). `off` just skips the warning, the confirmation but continues the scan, independent whether it makes sense or not. Please note that there are conflicts where testssl.sh will still ask for confirmation which are the ones which otherwise would have a drastic impact on the results. Almost any other decision will be made in the future as a best guess by testssl.sh.
 The same can be achieved by setting the environment variable `WARNINGS`.
 
-`--connect-timeout <seconds>`  This is useful for socket TCP connections to a node. If the node does not complete a TCP handshake (e.g. because it is down or behind a firewall or there's an IDS or a tarpit) testssl.sh may usually hang for around 2 minutes or even much more. This parameter instructs testssl.sh to wait at most `seconds` for the handshake to complete before giving up. This option only works if your OS has a timeout binary installed. CONNECT_TIMEOUT is the corresponding environment variable.
+`--socket-timeout <seconds>`  This is useful for socket TCP connections to a node. If the node does not complete a TCP handshake (e.g. because it is down or behind a firewall or there's an IDS or a tarpit) testssl.sh may usually hang for around 2 minutes or even much more. This parameter instructs testssl.sh to wait at most `seconds` for the handshake to complete before giving up. This option only works if your OS has a timeout binary installed. SOCKET_TIMEOUT is the corresponding environment variable. This doesn't work on Macs out of the box.
 
-`--openssl-timeout <seconds>` This is especially useful for all connects using openssl and practically useful for mass testing. It avoids the openssl connect to hang for ~2 minutes. The expected parameter `seconds` instructs testssl.sh to wait before the openssl connect will be terminated. The option is only available if your OS has a timeout binary installed. As there are different implementations of `timeout`: It automatically calls the binary with the right parameters. OPENSSL_TIMEOUT is the equivalent environment variable.
+`--openssl-timeout <seconds>` This is especially useful for all connects using openssl and practically useful for mass testing. It avoids the openssl connect to hang for ~2 minutes. The expected parameter `seconds` instructs testssl.sh to wait before the openssl connect will be terminated. The option is only available if your OS has a timeout binary installed. As there are different implementations of `timeout`: It automatically calls the binary with the right parameters. OPENSSL_TIMEOUT is the equivalent environment variable. This doesn't work on Macs out of the box.
 
 `--basicauth <user:pass>` This can be set to provide HTTP basic auth credentials which are used during checks for security headers. BASICAUTH is the ENV variable you can use instead.
 
@@ -124,11 +125,13 @@ The same can be achieved by setting the environment variable `WARNINGS`.
 
 `--mx <domain|host>` tests all MX records (STARTTLS on port 25) from high to low priority, one after the other.
 
-`--ip <ip>` tests either the supplied IPv4 or IPv6 address instead of resolving host(s) in `<URI>`. IPv6 addresses need to be supplied in square brackets. `--ip=one` means: just test the first A record DNS returns (useful for multiple IPs). If `-6` and  `--ip=one` was supplied an AAAA record will be picked if available. The ``--ip`` option might be also useful if you want to resolve the supplied hostname to a different IP, similar as if you would edit `/etc/hosts` or `/c/Windows/System32/drivers/etc/hosts`. `--ip=proxy` tries a DNS resolution via proxy. `--ip=proxy` plus `--nodns=min` is useful for situations with no local DNS as there'll be no DNS timeouts when trying to resolve CAA, TXT and MX records.
+`--ip <ip>` tests either the supplied IPv4 or IPv6 address instead of resolving host(s) in `<URI>`. IPv6 addresses need to be supplied in square brackets. `--ip=one` means: just test the first A record DNS returns (useful for multiple IPs). If `-6` and  `--ip=one` was supplied an AAAA record will be picked if available. The `--ip` option might be also useful if you want to resolve the supplied hostname to a different IP, similar as if you would edit `/etc/hosts` or `/c/Windows/System32/drivers/etc/hosts`. `--ip=proxy` tries a DNS resolution via proxy. `--ip=proxy` plus `--nodns=min` is useful for situations with no local DNS as there'll be no DNS timeouts when trying to resolve CAA, TXT and MX records.
 
 `--proxy <host>:<port>`  does ANY check via the specified proxy. `--proxy=auto` inherits the proxy setting from the environment. Any hostname supplied will be resolved to the first A record, if it does not exist the AAAA record is used. IPv4 and IPv6 addresses can be passed too, the latter *also* with square bracket notation. Please note that you need a newer OpenSSL or LibreSSL version for IPv6 proxy functionality. In addition if you want lookups via proxy you can specify `DNS_VIA_PROXY=true`. OCSP revocation checking (`-S --phone-out`) is not supported by OpenSSL via proxy. As supplying a proxy is an indicator for port 80 and 443 outgoing being blocked in your network an OCSP revocation check won't be performed. However if `IGN_OCSP_PROXY=true` has been supplied it will be tried directly. Authentication to the proxy is not supported, also no HTTPS or SOCKS proxy.
 
-`-6` does (also) IPv6 checks. Please note that testssl.sh doesn't perform checks on an IPv6 address automatically, because of two reasons: testssl.sh does no connectivity checks for IPv6 and it cannot determine reliably whether the OpenSSL binary you're using has IPv6 s_client support. `-6` assumes both is the case. If both conditions are met and you in general prefer to test for IPv6 branches as well you can add `HAS_IPv6` to your shell environment. Besides the OpenSSL binary supplied IPv6 is known to work with vanilla OpenSSL >= 1.1.0 and older versions >=1.0.2 in RHEL/CentOS/FC and Gentoo.
+`-6` scans only IPv6 addresses of the target. Besides the OpenSSL binary supplied IPv6 is known to work with vanilla OpenSSL >= 1.1.0 and older versions >=1.0.2 in RHEL/CentOS/FC and Gentoo. Scans are somewhat in line with tools like curl or wget, i.e. if there's an IPv6 address of the target which can be reached, it just uses them. If you don't want this behavior, you need to supply `-4.`
+
+`-4` scans only IPv4 addresses of the target, IPv6 addresses of the target won't be scanned.
 
 `--ssl-native`  Instead of using a mixture of bash sockets and a few openssl s_client connects, testssl.sh uses the latter (almost) only. This is faster but provides less accurate results, especially for the client simulation and for cipher support. For all checks you will see a warning if testssl.sh cannot tell if a particular check cannot be performed. For some checks however you might end up getting false negatives without a warning. Thus it is not recommended to use. It should only be used if you prefer speed over accuracy or you know that your target has sufficient overlap with the protocols and cipher provided by your openssl binary.
 
@@ -266,7 +269,7 @@ Also for multiple server certificates are being checked for as well as for the c
 
 `-WS, --winshock`               Checks for Winshock vulnerability. It tests for the absence of a lot of ciphers, some TLS extensions and ec curves which were introduced later in Windows. In the end the server banner is being looked at.
 
-`-4, --rc4, --appelbaum`        Checks which RC4 stream ciphers are being offered.
+`--rc4, --appelbaum`        Checks which RC4 stream ciphers are being offered.
 
 
 ### OUTPUT OPTIONS
