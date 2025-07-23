@@ -22385,23 +22385,19 @@ determine_ip_addresses() {
 
      # first, try to get IP addresses from /etc/hosts
      # Local_A[AAA] is for our UI
+
      ip4=$(get_local_a "$NODE")
+     ip6=$(get_local_aaaa "$NODE")
+
      if [[ -n "$ip4" ]]; then
           LOCAL_A=true
      else
           ip4="$(get_a_record "$NODE")"
      fi
-     ip6=$(get_local_aaaa "$NODE")
      if [[ -n "$ip6" ]]; then
           LOCAL_AAAA=true
      else
           ip6=$(get_aaaa_record "$NODE")
-     fi
-     IPADDRs2SHOW=$(newline_to_spaces "$ip4 $ip6")
-
-     if [[ -n "$ip6" ]]; then
-          # sets IPv6_OK
-          shouldwedo_ipv6 $(head -1 <<< "$ip6")
      fi
 
      if [[ -n "$CMDLINE_IP" ]]; then
@@ -22436,6 +22432,13 @@ determine_ip_addresses() {
      fi
      IPADDRs2SHOW=$(newline_to_spaces "$ip4 $ip6")
 
+     # If $ip4 was empty, remove the leading blank
+     [[ ${IPADDRs2SHOW:0:1} == \   ]] && IPADDRs2SHOW=${IPADDRs2SHOW:1}
+     if [[ -n "$ip6" ]]; then
+          # sets IPv6_OK
+          shouldwedo_ipv6 $(head -1 <<< "$ip6")
+     fi
+
      if "$do_ipv4_only"; then
           if [[ -z "$ip4" ]]; then
                 fatal_cmd_line "No IPv4 addresses available, but IPv4-only scan requested" $ERR_CMDLINE
@@ -22456,13 +22459,29 @@ determine_ip_addresses() {
                [[ -z $IPADDRs2CHECK ]] && IPADDRs2CHECK="${addr}" || IPADDRs2CHECK="${IPADDRs2CHECK} ${addr}"
           done
      fi
-     # If scanning IPV6 doesn't work, put the address to show in round brackets to
+     # If scanning IPv6 doesn't work, put the address to show in round brackets to
      # signal the user / UI that those won't be scanned. We don't do that for IPv4, yet
      for addr in $IPADDRs2SHOW; do
           if is_ipv6addr $addr && ! "$IPv6_OK" ; then
                IPADDRs2SHOW=${IPADDRs2SHOW/$addr/($addr)}
           fi
      done
+     if [[ -z "$IPADDRs2CHECK" ]]; then
+          fatal_cmd_line "No IP address can be used" $ERR_RESOURCE
+     fi
+
+     # (Loose) check whether we have IPv6/IPv4 addresses to check and set the do_* variables correctly
+     # so that the output "Testing all IP** addresses" is correct
+     if [[ "$IPADDRs2CHECK" =~ ^([0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4} ]]; then
+          if ! [[ "$IPADDRs2CHECK" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9].{1,3}[0-9]{1,3}$ ]]; then
+               do_ipv6_only=true
+          fi
+     elif [[ "$IPADDRs2CHECK" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9].{1,3}[0-9]{1,3}$ ]]; then
+          if ! [[ "$IPADDRs2CHECK" =~ ([0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4} ]]; then
+               do_ipv4_only=true
+          fi
+     fi
+
      return 0
 }
 
