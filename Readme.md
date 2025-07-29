@@ -7,8 +7,8 @@
 ![GitHub Created At](https://img.shields.io/github/created-at/testssl/testssl.sh)
 ![GitHub last commit](https://img.shields.io/github/last-commit/testssl/testssl.sh)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/testssl/testssl.sh)
-[![CI test Ubuntu](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml/badge.svg?branch=3.2)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml?branch=3.2)
-[![CI test MacOS](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_macos.yml/badge.svg?branch=3.2)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_macos.yml?branch=3.2)
+[![CI test Ubuntu](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml/badge.svg?branch=3.3edv)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml)
+[![CI test MacOS](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_macos.yml/badge.svg?branch=3.3dev)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_macos.yml)
 [![Docker](https://img.shields.io/docker/pulls/drwetter/testssl.sh)](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md)
 ![Mastodon Follow](https://img.shields.io/mastodon/follow/109319848143024146?domain=infosec.exchange)
 [![Bluesky](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpublic.api.bsky.app%2Fxrpc%2Fapp.bsky.actor.getProfile%2F%3Factor%3Dtestssl.bsky.social&query=%24.followersCount&style=social&logo=bluesky&label=Follow%20%40testssl.sh)
@@ -23,7 +23,7 @@ cryptographic flaws.
 * Clear output: you can tell easily whether anything is good or bad.
 * Machine readable output (CSV, two JSON formats), also HTML output.
 * No need to install or to configure something.  No gems, CPAN, pip or the like.
-* Works out of the box: Linux, OSX/Darwin, FreeBSD, NetBSD, MSYS2/Cygwin, WSL (bash on Windows). Only OpenBSD needs bash.
+* Works out of the box: Linux, MacOS, FreeBSD, NetBSD, WSL2, MSYS2/Cygwin, OpenBSD needs bash.
 * A Dockerfile is provided, there's also an official container build @ dockerhub and GHCR.
 * Flexibility: You can test any SSL/TLS enabled and STARTTLS service, not only web servers at port 443.
 * Toolbox: Several command line options help you to run *your* test and configure *your* output.
