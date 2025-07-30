@@ -22383,7 +22383,7 @@ shouldwedo_ipv6() {
           # was killed, so this got stuck
           IPv6_OK=false
           "$do_ipv6_only" && connectivity_problem 1 1 "" "IPv6 connect got stuck when IPv6-only scan requested"
-          do_ipv6_only=false                # this ensures we have round brackets and we don't try IPv6 anymore
+          do_ipv6_only=false                 # Ensures round brackets enclosing IPv6 addresses and we don't try IPv6 anymore
      else
           # we're trying in the foreground again, only to get the return code
           bash -c "exec 5<>/dev/tcp/$1/$PORT" &>/dev/null
@@ -22392,9 +22392,9 @@ shouldwedo_ipv6() {
           else
                IPv6_OK=false
                if "$do_ipv6_only"; then
-                    connectivity_problem 2 2 $MAX_SOCKET_FAIL "" "repeated IPv6 connect problems when IPv6-only scan requested"
+                    connectivity_problem 2 2 "" "repeated IPv6 connect problems when IPv6-only scan requested"
                else
-                    do_ipv6_only=false       #FIXME: wrong variable. It ensures we have round brackets enclosing IPv6 addresses + we don't try it anymore
+                    do_ipv6_only=false       # Ensures round brackets for IPv6 addresses + we don't try IPv6 anymore. Better other var
                fi
           fi
      fi
