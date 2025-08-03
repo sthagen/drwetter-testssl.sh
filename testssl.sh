@@ -196,16 +196,16 @@ ADDTL_CA_FILES="${ADDTL_CA_FILES:-""}"  # single file with a CA in PEM format or
 TESTSSL_INSTALL_DIR="${TESTSSL_INSTALL_DIR:-""}"  # If you run testssl.sh and it doesn't find it necessary file automagically set TESTSSL_INSTALL_DIR
 CA_BUNDLES_PATH="${CA_BUNDLES_PATH:-""}"          # You can have your CA stores some place else
 EXPERIMENTAL=${EXPERIMENTAL:-false}     # a development hook which allows us to disable code
-PROXY_WAIT=${PROXY_WAIT:-20}            # waiting at max 20 seconds for socket reply through proxy
+PROXY_WAIT=${PROXY_WAIT:-10}            # waiting at max 10 seconds for socket reply through proxy
 DNS_VIA_PROXY=${DNS_VIA_PROXY:-false}   # do DNS lookups via proxy. --ip=proxy reverses this
 IGN_OCSP_PROXY=${IGN_OCSP_PROXY:-false} # Also when --proxy is supplied it is ignored when testing for revocation via OCSP via --phone-out
-HEADER_MAXSLEEP=${HEADER_MAXSLEEP:-5}   # we wait this long before killing the process to retrieve a service banner / http header
+HEADER_MAXSLEEP=${HEADER_MAXSLEEP:-5}   # we wait this long sec before killing the process to retrieve a service banner / http header
 MAX_SOCKET_FAIL=${MAX_SOCKET_FAIL:-2}   # If this many failures for TCP socket connects are reached we terminate
 MAX_OSSL_FAIL=${MAX_OSSL_FAIL:-2}       # If this many failures for s_client connects are reached we terminate
 MAX_STARTTLS_FAIL=${MAX_STARTTLS_FAIL:-2}   # max number of STARTTLS handshake failures in plaintext phase
 MAX_HEADER_FAIL=${MAX_HEADER_FAIL:-2}   # If this many failures for HTTP GET are encountered we don't try again to get the header
 MAX_WAITSOCK=${MAX_WAITSOCK:-5}         # waiting at max 5 seconds for socket reply. There shouldn't be any reason to change this.
-QUIC_WAIT=${QUIC_WAIT:-3}               # QUIC is UDP. Thus we run the connect in the background. This is how long to wait
+QUIC_WAIT=${QUIC_WAIT:-3}               # QUIC is UDP. Thus we run the connect in the background. This is how long in sec to wait
 CCS_MAX_WAITSOCK=${CCS_MAX_WAITSOCK:-5} # for the two CCS payload (each). There shouldn't be any reason to change this.
 HEARTBLEED_MAX_WAITSOCK=${HEARTBLEED_MAX_WAITSOCK:-8}      # for the heartbleed payload. There shouldn't be any reason to change this.
 STARTTLS_SLEEP=${STARTTLS_SLEEP:-10}    # max time wait on a socket for STARTTLS. MySQL has a fixed value of 1 which can't be overwritten (#914)
@@ -1948,7 +1948,7 @@ http_head_printf() {
      # $node works here good as it connects via IPv6 first, then IPv4.
      # This is a subshell, so fd 8 is not inherited
      bash -c "exec 8<>/dev/tcp/$node/80" 2>/dev/null &
-     wait_kill $! $HEADER_MAXSLEEP
+     wait_kill $! $((HEADER_MAXSLEEP * 10))
      if [[ $? -ne 3 ]]; then
           # process with pid !$ wasn't killed but was that a reject? So we try again
           # to make sure there wasn't a TCP reset
@@ -2234,30 +2234,31 @@ check_revocation_ocsp() {
      fi
 }
 
-# waits maxsleep seconds (arg2) until process with arg1 (pid) will be killed
+# waits maxsleep 1/10 seconds (arg2) until process with arg1 (pid) will be killed
 #
 # return values
 #         0: process terminated before be killed
 #         3: was killed
 #
 wait_kill(){
-     local pid=$1             # pid we wait for or kill
-     local maxsleep=$2        # how long we wait before killing
+     local pid=$1                  # pid we wait for or kill
+     local maxsleep=$2             # how long we wait before killing
 
      HAD_SLEPT=0
      while true; do
           if ! ps $pid >/dev/null ; then
-               return 0       # process terminated before didn't reach $maxsleep
+               return 0            # process terminated before didn't reach $maxsleep
           fi
           [[ "$DEBUG" -ge 6 ]] && ps $pid
-          sleep 1
+          sleep 0.1
           maxsleep=$((maxsleep - 1))
           HAD_SLEPT=$((HAD_SLEPT + 1))
           test $maxsleep -le 0 && break
-     done                     # needs to be killed:
+     done                          # needs to be killed:
      kill $pid >&2 2>/dev/null
-     wait $pid 2>/dev/null    # make sure pid terminated, see wait(1p)
-     return 3                 # means killed
+     wait $pid 2>/dev/null         # make sure pid terminated, see wait(1p)
+     HAD_SLEPT=$((HAD_SLEPT/10))   # correct HAD_SLEPT. #FIXME: is only being used by run_http_header()
+     return 3                      # means killed
 }
 
 # Convert date formats -- we always use GMT=UTC here
@@ -2499,7 +2500,7 @@ service_detection() {
           else
                # SNI is not standardized for !HTTPS but fortunately for other protocols s_client doesn't seem to care
                tm_out "$GET_REQ11" | $OPENSSL s_client $(s_client_options "$1 -quiet $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>$ERRFILE &
-               wait_kill $! $HEADER_MAXSLEEP
+               wait_kill $! $((HEADER_MAXSLEEP * 10))
                was_killed=$?
           fi
           head $TMPFILE | grep -aq '^HTTP/' && SERVICE=HTTP
@@ -2613,7 +2614,7 @@ run_http_header() {
      [[ -z "$1" ]] && url="/" || url="$1"
 
      tm_out "$GET_REQ11" | $OPENSSL s_client $(s_client_options "$OPTIMAL_PROTO $BUGS -quiet -ign_eof -connect $NODEIP:$PORT $PROXY $SNI") >$HEADERFILE 2>$ERRFILE &
-     wait_kill $! $HEADER_MAXSLEEP
+     wait_kill $! $((HEADER_MAXSLEEP * 10))
      if [[ $? -eq 0 ]]; then
           # Issue HTTP GET again as it properly finished within $HEADER_MAXSLEEP and didn't hang.
           # Doing it again in the foreground to get an accurate header time
@@ -6245,7 +6246,7 @@ sub_quic() {
           fi
           OPENSSL_CONF='' $use_openssl s_client -quic -alpn h3 -connect $NODEIP:$PORT -servername $NODE </dev/null \
                2>$sclient_errfile  >$sclient_outfile &
-          wait_kill $! $QUIC_WAIT
+          wait_kill $! $((QUIC_WAIT * 10))
           ret=$?
           if [[ $ret -eq 3 ]]; then
                # process was killed
@@ -11783,16 +11784,17 @@ starttls_just_send(){
 }
 
 # arg1: (optional): wait time
+#
 starttls_just_read(){
-     local waitsleep=$STARTTLS_SLEEP
-     [[ -n "$1" ]] && waitsleep=$1
+     local waitsleep=${1:-$STARTTLS_SLEEP}
+
      if [[ "$DEBUG" -ge 2 ]]; then
           echo "=== just read banner ==="
           cat <&5 &
      else
           dd of=/dev/null count=8 <&5 2>/dev/null &
      fi
-     wait_kill $! $waitsleep
+     wait_kill $! $((waitsleep * 10))
      return 0
 }
 
@@ -12363,7 +12365,7 @@ sockread() {
      [[ -z "$2" ]] && maxsleep=$MAX_WAITSOCK || maxsleep=$2
      SOCK_REPLY_FILE=$(mktemp $TEMPDIR/ddreply.XXXXXX) || return 7
      dd bs=$1 of=$SOCK_REPLY_FILE count=1 <&5 2>/dev/null &
-     wait_kill $! $maxsleep
+     wait_kill $! $((maxsleep * 10))
      return $?
 }
 
@@ -18120,13 +18122,14 @@ run_crime() {
 # when GET command was stalled or killed (which is no not always used)
 # and echos "warn_*". It return 0 when everything went ok and echos the
 # compression if any.
+#
 sub_breach_helper() {
      local get_command="$1"
      local detected_compression=""
      local -i was_killed=0
 
      safe_echo "$get_command" | $OPENSSL s_client $(s_client_options "$OPTIMAL_PROTO $BUGS -quiet -ign_eof -connect $NODEIP:$PORT $PROXY $SNI") 1>$TMPFILE 2>$ERRFILE &
-     wait_kill $! $HEADER_MAXSLEEP
+     wait_kill $! $((HEADER_MAXSLEEP * 10))
      was_killed=$?                 # !=0 when it was killed
      detected_compression=$(grep -ia ^Content-Encoding: $TMPFILE)
      detected_compression="$(strip_lf "$detected_compression")"
@@ -22378,7 +22381,7 @@ get_txt_record() {
 shouldwedo_ipv6() {
      "$do_ipv4_only" && return 0
      bash -c "exec 5<>/dev/tcp/$1/$PORT" &>/dev/null &
-     wait_kill $! $MAX_WAITSOCK
+     wait_kill $! $((MAX_WAITSOCK * 10))
      if [[ $? -eq 3 ]]; then
           # was killed, so this got stuck
           IPv6_OK=false
@@ -22990,7 +22993,7 @@ determine_optimal_proto() {
                     $OPENSSL s_client $(s_client_options "$proto $BUGS -connect "$NODEIP:$PORT" -msg $PROXY $SNI") </dev/null >$TMPFILE 2>>$ERRFILE
                else
                     safe_echo "$GET_REQ11" | $OPENSSL s_client $(s_client_options "$proto $BUGS -connect "$NODEIP:$PORT" -msg $PROXY $SNI -ign_eof -enable_pha") >$TMPFILE 2>>$ERRFILE &
-                    wait_kill $! $HEADER_MAXSLEEP
+                    wait_kill $! $((HEADER_MAXSLEEP * 10))
                     if [[ $? -eq 0 ]]; then
                          # Issue HTTP GET again as it properly finished within $HEADER_MAXSLEEP and didn't hang.
                          # Doing it again in the foreground to get an accurate return code.
@@ -23028,7 +23031,7 @@ determine_optimal_proto() {
                          if [[ "$(has_server_protocol "tls1_2")" -eq 0 ]] || [[ "$(has_server_protocol "tls1_1")" -eq 0 ]] || \
                             [[ "$(has_server_protocol "tls1")" -eq 0 ]] || [[ "$(has_server_protocol "ssl3")" -eq 0 ]]; then
                               safe_echo "$GET_REQ11" | $OPENSSL s_client $(s_client_options "$BUGS -connect "$NODEIP:$PORT" -msg $PROXY $SNI -ign_eof -no_tls1_3") >$TEMPDIR/client_auth_test.txt 2>>$ERRFILE &
-                              wait_kill $! $HEADER_MAXSLEEP
+                              wait_kill $! $((HEADER_MAXSLEEP * 10))
                               # If the HTTP properly finished within $HEADER_MAXSLEEP and didn't hang, then
                               # do it again in the foreground to get an accurate return code. If it did hang,
                               # there is no way to test for client authentication, so don't try.
