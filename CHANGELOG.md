@@ -7,6 +7,7 @@
 * Bump SSLlabs rating guide to 2009r
 * Check for Opossum vulnerability
 * Enable IPv6 automagically, i.e. if target via IPv6 is reachable just (also) scan it
+* Provide an FAQ
 
 ### Features implemented / improvements in 3.2
 
