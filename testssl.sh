@@ -10277,7 +10277,7 @@ certificate_info() {
                out "$indent"; pr_bold " Intermediate cert validity   "
                first=false
           else
-               out "$indent$spaces"
+               out "$spaces"
           fi
           out "#${i}: "
           if ! [[ "$($OPENSSL x509 -checkend 1 2>>$ERRFILE <<< "$cert")" =~ \ not\  ]]; then
