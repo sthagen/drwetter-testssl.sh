@@ -209,6 +209,7 @@ MAX_WAITSOCK=${MAX_WAITSOCK:-5}         # waiting at max 5 seconds for socket re
 QUIC_WAIT=${QUIC_WAIT:-3}               # QUIC is UDP. Thus we run the connect in the background. This is how long in sec to wait
 CCS_MAX_WAITSOCK=${CCS_MAX_WAITSOCK:-5} # for the two CCS payload (each). There shouldn't be any reason to change this.
 HEARTBLEED_MAX_WAITSOCK=${HEARTBLEED_MAX_WAITSOCK:-8}      # for the heartbleed payload. There shouldn't be any reason to change this.
+ROBOT_TIMEOUT=${ROBOT_TIMEOUT:5}        # Initial timeout for ROBOT check
 STARTTLS_SLEEP=${STARTTLS_SLEEP:-10}    # max time wait on a socket for STARTTLS. MySQL has a fixed value of 1 which can't be overwritten (#914)
 FAST_STARTTLS=${FAST_STARTTLS:-true}    # at the cost of reliability decrease the handshakes for STARTTLS
 USLEEP_SND=${USLEEP_SND:-0.1}           # sleep time for general socket send
@@ -6588,10 +6589,10 @@ run_cipherlists() {
      # # Now all AES, CAMELLIA, ARIA and SEED CBC ciphers plus GOST
      ossl_obsoleted_ciphers='HIGH:MEDIUM:AES:CAMELLIA:ARIA:!IDEA:!CHACHA20:!3DES:!RC2:!RC4:!AESCCM8:!AESCCM:!AESGCM:!ARIAGCM:!aNULL:!MD5'
      # grep -Ew "256|128" etc/cipher-mapping.txt | grep -Ev "Au=None|AEAD|RC2|RC4|IDEA|MD5"
-     obsoleted_ciphers="00,2F, 00,30, 00,31, 00,32, 00,33, 00,35, 00,36, 00,37, 00,38, 00,39, 00,3C, 00,3D, 00,3E, 00,3F, 00,40, 00,41, 00,42, 00,43, 00,44, 00,45, 00,67, 00,68, 00,69, 00,6A, 00,6B, 00,84, 00,85, 00,86, 00,87, 00,88, 00,8C, 00,8D, 00,90, 00,91, 00,94, 00,95, 00,96, 00,97, 00,98, 00,99, 00,9A, 00,AE, 00,AF, 00,B2, 00,B3, 00,B6, 00,B7, 00,BA, 00,BB, 00,BC, 00,BD, 00,BE, 00,C0, 00,C1, 00,C2, 00,C3, 00,C4, C0,04, C0,05, C0,09, C0,0A, C0,0E, C0,0F, C0,13, C0,14, C0,1D, C0,1E, C0,1F, C0,20, C0,21, C0,22, C0,23, C0,24, C0,25, C0,26, C0,27, C0,28, C0,29, C0,2A, C0,35, C0,36, C0,37, C0,38, C0,3C, C0,3D, C0,3E, C0,3F, C0,40, C0,41, C0,42, C0,43, C0,44, C0,45, C0,48, C0,49, C0,4A, C0,4B, C0,4C, C0,4D, C0,4E, C0,4F, C0,64, C0,65, C0,66, C0,67, C0,68, C0,69, C0,70, C0,71, C0,72, C0,73, C0,74, C0,75, C0,76, C0,77, C0,78, C0,79, C0,94, C0,95, C0,96, C0,97, C0,98, C0,99, C0,9A, C0,9B"
-     # Workaround: If we use sockets and in order not to hit 131+1 ciphers we omit the GOST ciphers if SERVER_SIZE_LIMIT_BUG is true.
-     # This won't be supported by Cisco ACE anyway.
-     "$SERVER_SIZE_LIMIT_BUG" || obsoleted_ciphers="${obsoleted_ciphers}, 00,80, 00,81, FF,01, FF,02, FF,03, FF,85"
+     obsoleted_ciphers="00,2F, 00,30, 00,31, 00,32, 00,33, 00,35, 00,36, 00,37, 00,38, 00,39, 00,3C, 00,3D, 00,3E, 00,3F, 00,40, 00,41, 00,42, 00,43, 00,44, 00,45, 00,67, 00,68, 00,69, 00,6A, 00,6B, 00,84, 00,85, 00,86, 00,87, 00,88, 00,8C, 00,8D, 00,90, 00,91, 00,94, 00,95, 00,96, 00,97, 00,98, 00,99, 00,9A, 00,AE, 00,AF, 00,B2, 00,B3, 00,B6, 00,B7, 00,BA, 00,BB, 00,BC, 00,BD, 00,BE, 00,C0, 00,C1, 00,C2, 00,C3, 00,C4, C0,04, C0,05, C0,09, C0,0A, C0,0E, C0,0F, C0,13, C0,14, C0,1D, C0,1E, C0,1F, C0,20, C0,21, C0,22, C0,23, C0,24, C0,25, C0,26, C0,27, C0,28, C0,29, C0,2A, C0,35, C0,36, C0,37, C0,38, C0,3C, C0,3D, C0,3E, C0,3F, C0,40, C0,41, C0,42, C0,43, C0,44, C0,45, C0,48, C0,49, C0,4A, C0,4B, C0,4C, C0,4D, C0,4E, C0,4F, C0,66, C0,67, C0,68, C0,69, C0,70, C0,71, C0,72, C0,73, C0,74, C0,75, C0,76, C0,77, C0,78, C0,79, C0,94, C0,95, C0,96, C0,97, C0,98, C0,99, C0,9A, C0,9B"
+     # Workaround: If we use sockets and in order not to hit 131+1 ciphers we omit the GOST ciphers and the
+     # ARIA PSK-only ciphers if SERVER_SIZE_LIMIT_BUG is true. These won't be supported by Cisco ACE anyway.
+     "$SERVER_SIZE_LIMIT_BUG" || obsoleted_ciphers="${obsoleted_ciphers}, C0,64, C0,65, 00,80, 00,81, FF,01, FF,02, FF,03, FF,85"
      obsoleted_ciphers="${obsoleted_ciphers}, 00,FF"
 
      ossl_good_ciphers='AESGCM:CHACHA20:CamelliaGCM:AESCCM:ARIAGCM:!kEECDH:!kEDH:!kDHE:!kDHEPSK:!kECDHEPSK:!aNULL'
@@ -10106,8 +10107,9 @@ certificate_info() {
           check_pwnedkeys "$HOSTCERT" "$cert_key_algo" "$cert_keysize"
           case "$?" in
                0) outln "not checked"; fileout "pwnedkeys${json_postfix}" "INFO" "not checked" ;;
-               1) pr_svrty_good "not in database"; fileout "pwnedkeys${json_postfix}" "OK" "not in database" ;;
-               2) pr_svrty_critical "NOT ok --"; outln " key appears in database"; fileout "pwnedkeys${json_postfix}" "CRITICAL" "private key is known" ;;
+               1) prln_svrty_good "not in database"; fileout "pwnedkeys${json_postfix}" "OK" "not in database" ;;
+               2) pr_svrty_critical "NOT ok --"; outln " key appears in database"
+                    fileout "pwnedkeys${json_postfix}" "CRITICAL" "private key is known" ;;
                7) prln_warning "error querying https://v1.pwnedkeys.com"; fileout "pwnedkeys${json_postfix}" "WARN" "connection error" ;;
           esac
      fi
@@ -10115,7 +10117,9 @@ certificate_info() {
      out "$indent"; pr_bold " Certificate Revocation List  "
      jsonID="cert_crlDistributionPoints"
      # ~ get next 50 lines after pattern , strip until Signature Algorithm and retrieve URIs
-     crl="$(awk '/X509v3 CRL Distribution/{i=50} i&&i--' <<< "$cert_txt" | awk '/^$|^.*Name.*$|^.*Reasons.*$|^.*CRL Issuer.*$/,/^            [a-zA-Z0-9]+|^    Signature Algorithm:/' | awk -F'URI:' '/URI/ { print $2 }')"
+     crl="$(awk '/X509v3 CRL Distribution/{i=50} i&&i--' <<< "$cert_txt" | \
+          awk '/^$|^.*Name.*$|^.*Reasons.*$|^.*CRL Issuer.*$/,/^            [a-zA-Z0-9]+|^    Signature Algorithm:/' | \
+          awk -F'URI:' '/URI/ { print $2 }')"
      if [[ -z "$crl" ]] ; then
           fileout "${jsonID}${json_postfix}" "INFO" "--"
           outln "--"
@@ -10446,6 +10450,11 @@ run_server_defaults() {
      certificate_type[7]="" ; certificate_type[8]="RSASig"
      certificate_type[9]="ECDSA" ; certificate_type[10]="EdDSA"
      certificate_type[11]="MLDSA"
+
+     if "$SERVER_SIZE_LIMIT_BUG"; then
+          ciphers_to_test[3]="aDSS:aDH:aECDH"
+          ciphers_to_test[6]="aECDSA:aGOST"
+     fi
 
      for (( n=1; n <= 18 ; n++ )); do
           # Some servers use a different certificate if the ClientHello
@@ -11427,11 +11436,14 @@ run_fs() {
                     fi
                fi
           done
+          pr_bold " KEMs offered                 "
           if [[ -n "$kems_offered" ]]; then
-               pr_bold " KEMs offered                 "
                out_row_aligned_max_width_by_entry "$kems_offered" "                              " $TERM_WIDTH pr_kem_param_set_quality
                outln
                fileout "${jsonID}_KEMs" "OK" "$kems_offered"
+          else
+               prln_svrty_low "None"
+               fileout "${jsonID}_KEMs" "LOW" "No KEMs offered"
           fi
           if [[ -n "$curves_offered" ]]; then
                pr_bold " Elliptic curves offered:     "
@@ -17288,7 +17300,6 @@ run_heartbleed(){
      local cwe="CWE-119"
      local hint=""
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for heartbleed vulnerability " && outln
      pr_bold " Heartbleed"; out " ($cve)                "
 
      if [[ "$STARTTLS_PROTOCOL" =~ irc ]]; then
@@ -17398,7 +17409,6 @@ run_ccs_injection(){
      local cwe="CWE-310"
      local hint=""
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for CCS injection vulnerability " && outln
      pr_bold " CCS"; out " ($cve)                       "
 
      if [[ "$STARTTLS_PROTOCOL" =~ irc ]]; then
@@ -17594,7 +17604,6 @@ run_ticketbleed() {
      local hint=""
 
      [[ -n "$STARTTLS" ]] && return 0
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for Ticketbleed vulnerability " && outln
      pr_bold " Ticketbleed"; out " ($cve), experiment.  "
 
      if [[ "$SERVICE" != HTTP ]] && [[ "$CLIENT_AUTH" != required ]]; then
@@ -17874,7 +17883,6 @@ run_opossum() {
      local response=""
 
      [[ -n "$STARTTLS" ]] && return 0
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for Opossum vulnerability " && outln
      pr_bold " Opossum"; out " ($cve)                  "
 
      # we're trying to connect also if ASSUME_HTTP is not set, there should be either one of following hints though
@@ -17936,8 +17944,6 @@ run_renego() {
      # In cases where there's no default host configured we need SNI here as openssl then would return otherwise an error and the test will fail
 
      "$HAS_TLS13" && [[ -z "$proto" ]] && proto="-no_tls1_3"
-
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for Renegotiation vulnerabilities " && outln
 
      pr_bold " Secure Renegotiation (RFC 5746)           "
      jsonID="secure_renego"
@@ -18151,7 +18157,6 @@ run_crime() {
      #
      # https://blog.qualys.com/ssllabs/2012/09/14/crime-information-leakage-attack-against-ssltls
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for CRIME vulnerability " && outln
      pr_bold " CRIME, TLS " ; out "($cve)                "
      jsonID="CRIME_TLS"
 
@@ -18304,7 +18309,6 @@ run_breach() {
 
      [[ $SERVICE != HTTP ]] && [[ "$CLIENT_AUTH" != required ]] && return 7
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for BREACH (HTTP compression) vulnerability " && outln
      pr_bold " BREACH"; out " ($cve)                    "
      if [[ "$CLIENT_AUTH" == required ]] && [[ -z "$MTLS" ]]; then
           prln_warning "not having provided client certificate and private key file, the client x509-based authentication prevents this from being tested"
@@ -18419,7 +18423,6 @@ run_sweet32() {
      local using_sockets=true
      local tls1_1_vulnerable=false
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for SWEET32 (Birthday Attacks on 64-bit Block Ciphers)       " && outln
      pr_bold " SWEET32"; out " (${cve// /, })    "
 
      if "$TLS13_ONLY"; then
@@ -18550,7 +18553,6 @@ run_ssl_poodle() {
      local cwe="CWE-310"
      local jsonID="POODLE_SSL"
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for SSLv3 POODLE (Padding Oracle On Downgraded Legacy Encryption) " && outln
      pr_bold " POODLE, SSL"; out " ($cve)               "
 
      if "$TLS13_ONLY" || [[ $(has_server_protocol ssl3) -eq 1 ]]; then
@@ -18636,7 +18638,6 @@ run_tls_fallback_scsv() {
 
      "$SSL_NATIVE" && using_sockets=false
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for TLS_FALLBACK_SCSV Protection " && outln
      pr_bold " TLS_FALLBACK_SCSV"; out " (RFC 7507)              "
 
      # First check we have support for TLS_FALLBACK_SCSV in our local OpenSSL
@@ -18896,7 +18897,6 @@ run_freak() {
      local hint=""
      local jsonID="FREAK"
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for FREAK attack " && outln
      pr_bold " FREAK"; out " ($cve)                     "
 
      if "$TLS13_ONLY"; then
@@ -19106,7 +19106,6 @@ run_logjam() {
      local jsonID="LOGJAM"
      local jsonID2="${jsonID}-common_primes"
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for LOGJAM vulnerability " && outln
      pr_bold " LOGJAM"; out " ($cve), experimental      "
 
      "$SSL_NATIVE" && using_sockets=false
@@ -19275,11 +19274,6 @@ run_drown() {
      local jsonID="DROWN"
      local censys_host_url="https://search.censys.io/search?resource=hosts&virtual_hosts=INCLUDE"
 
-     if [[ $VULN_COUNT -le $VULN_THRESHLD ]]; then
-          outln
-          pr_headlineln " Testing for DROWN vulnerability "
-          outln
-     fi
 # if we want to use OPENSSL: check for < openssl 1.0.2g, openssl 1.0.1s if native openssl
      pr_bold " DROWN"; out " (${cve// /, })      "
 
@@ -19368,7 +19362,7 @@ run_beast(){
      local first=true
      local continued=false
      local cbc_cipher_list="EXP-RC2-CBC-MD5:IDEA-CBC-SHA:EXP-DES-CBC-SHA:DES-CBC-SHA:DES-CBC3-SHA:EXP-DH-DSS-DES-CBC-SHA:DH-DSS-DES-CBC-SHA:DH-DSS-DES-CBC3-SHA:EXP-DH-RSA-DES-CBC-SHA:DH-RSA-DES-CBC-SHA:DH-RSA-DES-CBC3-SHA:EXP-EDH-DSS-DES-CBC-SHA:EDH-DSS-DES-CBC-SHA:EDH-DSS-DES-CBC3-SHA:EXP-EDH-RSA-DES-CBC-SHA:EDH-RSA-DES-CBC-SHA:EDH-RSA-DES-CBC3-SHA:EXP-ADH-DES-CBC-SHA:ADH-DES-CBC-SHA:ADH-DES-CBC3-SHA:KRB5-DES-CBC-SHA:KRB5-DES-CBC3-SHA:KRB5-IDEA-CBC-SHA:KRB5-DES-CBC-MD5:KRB5-DES-CBC3-MD5:KRB5-IDEA-CBC-MD5:EXP-KRB5-DES-CBC-SHA:EXP-KRB5-RC2-CBC-SHA:EXP-KRB5-DES-CBC-MD5:EXP-KRB5-RC2-CBC-MD5:AES128-SHA:DH-DSS-AES128-SHA:DH-RSA-AES128-SHA:DHE-DSS-AES128-SHA:DHE-RSA-AES128-SHA:ADH-AES128-SHA:AES256-SHA:DH-DSS-AES256-SHA:DH-RSA-AES256-SHA:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:ADH-AES256-SHA:CAMELLIA128-SHA:DH-DSS-CAMELLIA128-SHA:DH-RSA-CAMELLIA128-SHA:DHE-DSS-CAMELLIA128-SHA:DHE-RSA-CAMELLIA128-SHA:ADH-CAMELLIA128-SHA:EXP1024-RC2-CBC-MD5:EXP1024-DES-CBC-SHA:EXP1024-DHE-DSS-DES-CBC-SHA:CAMELLIA256-SHA:DH-DSS-CAMELLIA256-SHA:DH-RSA-CAMELLIA256-SHA:DHE-DSS-CAMELLIA256-SHA:DHE-RSA-CAMELLIA256-SHA:ADH-CAMELLIA256-SHA:PSK-3DES-EDE-CBC-SHA:PSK-AES128-CBC-SHA:PSK-AES256-CBC-SHA:DHE-PSK-3DES-EDE-CBC-SHA:DHE-PSK-AES128-CBC-SHA:DHE-PSK-AES256-CBC-SHA:RSA-PSK-3DES-EDE-CBC-SHA:RSA-PSK-AES128-CBC-SHA:RSA-PSK-AES256-CBC-SHA:SEED-SHA:DH-DSS-SEED-SHA:DH-RSA-SEED-SHA:DHE-DSS-SEED-SHA:DHE-RSA-SEED-SHA:ADH-SEED-SHA:PSK-AES128-CBC-SHA256:PSK-AES256-CBC-SHA384:DHE-PSK-AES128-CBC-SHA256:DHE-PSK-AES256-CBC-SHA384:RSA-PSK-AES128-CBC-SHA256:RSA-PSK-AES256-CBC-SHA384:ECDH-ECDSA-DES-CBC3-SHA:ECDH-ECDSA-AES128-SHA:ECDH-ECDSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA:ECDH-RSA-DES-CBC3-SHA:ECDH-RSA-AES128-SHA:ECDH-RSA-AES256-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:AECDH-DES-CBC3-SHA:AECDH-AES128-SHA:AECDH-AES256-SHA:SRP-3DES-EDE-CBC-SHA:SRP-RSA-3DES-EDE-CBC-SHA:SRP-DSS-3DES-EDE-CBC-SHA:SRP-AES-128-CBC-SHA:SRP-RSA-AES-128-CBC-SHA:SRP-DSS-AES-128-CBC-SHA:SRP-AES-256-CBC-SHA:SRP-RSA-AES-256-CBC-SHA:SRP-DSS-AES-256-CBC-SHA:ECDHE-PSK-3DES-EDE-CBC-SHA:ECDHE-PSK-AES128-CBC-SHA:ECDHE-PSK-AES256-CBC-SHA:ECDHE-PSK-AES128-CBC-SHA256:ECDHE-PSK-AES256-CBC-SHA384:PSK-CAMELLIA128-SHA256:PSK-CAMELLIA256-SHA384:DHE-PSK-CAMELLIA128-SHA256:DHE-PSK-CAMELLIA256-SHA384:RSA-PSK-CAMELLIA128-SHA256:RSA-PSK-CAMELLIA256-SHA384:ECDHE-PSK-CAMELLIA128-SHA256:ECDHE-PSK-CAMELLIA256-SHA384"
-     local cbc_ciphers_hex="00,06, 00,07, 00,08, 00,09, 00,0A, 00,0B, 00,0C, 00,0D, 00,0E, 00,0F, 00,10, 00,11, 00,12, 00,13, 00,14, 00,15, 00,16, 00,19, 00,1A, 00,1B, 00,1E, 00,1F, 00,21, 00,22, 00,23, 00,25, 00,26, 00,27, 00,29, 00,2A, 00,2F, 00,30, 00,31, 00,32, 00,33, 00,34, 00,35, 00,36, 00,37, 00,38, 00,39, 00,3A, 00,41, 00,42, 00,43, 00,44, 00,45, 00,46, 00,61, 00,62, 00,63, 00,84, 00,85, 00,86, 00,87, 00,88, 00,89, 00,8B, 00,8C, 00,8D, 00,8F, 00,90, 00,91, 00,93, 00,94, 00,95, 00,96, 00,97, 00,98, 00,99, 00,9A, 00,9B, 00,AE, 00,AF, 00,B2, 00,B3, 00,B6, 00,B7, C0,03, C0,04, C0,05, C0,08, C0,09, C0,0A, C0,0D, C0,0E, C0,0F, C0,12, C0,13, C0,14, C0,17, C0,18, C0,19, C0,1A, C0,1B, C0,1C, C0,1D, C0,1E, C0,1F, C0,21, C0,22, C0,34, C0,35, C0,36, C0,37, C0,38, C0,64, C0,65, C0,66, C0,67, C0,68, C0,69, C0,70, C0,71, C0,94, C0,95, C0,96, C0,97, C0,98, C0,99, C0,9A, C0,9B, FE,FE, FE,FF, FF,E0, FF,E1"
+     local cbc_ciphers_hex="00,06, 00,07, 00,08, 00,09, 00,0A, 00,0B, 00,0C, 00,0D, 00,0E, 00,0F, 00,10, 00,11, 00,12, 00,13, 00,14, 00,15, 00,16, 00,19, 00,1A, 00,1B, 00,1E, 00,1F, 00,21, 00,22, 00,23, 00,25, 00,26, 00,27, 00,29, 00,2A, 00,2F, 00,30, 00,31, 00,32, 00,33, 00,34, 00,35, 00,36, 00,37, 00,38, 00,39, 00,3A, 00,41, 00,42, 00,43, 00,44, 00,45, 00,46, 00,61, 00,62, 00,63, 00,84, 00,85, 00,86, 00,87, 00,88, 00,89, 00,8B, 00,8C, 00,8D, 00,8F, 00,90, 00,91, 00,93, 00,94, 00,95, 00,96, 00,97, 00,98, 00,99, 00,9A, 00,9B, 00,AE, 00,AF, 00,B2, 00,B3, 00,B6, 00,B7, C0,03, C0,04, C0,05, C0,08, C0,09, C0,0A, C0,0D, C0,0E, C0,0F, C0,12, C0,13, C0,14, C0,17, C0,18, C0,19, C0,1B, C0,1C, C0,1E, C0,1F, C0,21, C0,22, C0,34, C0,35, C0,36, C0,37, C0,38, C0,64, C0,65, C0,66, C0,67, C0,68, C0,69, C0,70, C0,71, C0,94, C0,95, C0,96, C0,97, C0,98, C0,99, C0,9A, C0,9B, FE,FE, FE,FF, FF,E0, FF,E1"
      local has_dh_bits="$HAS_DH_BITS"
      local using_sockets=true
      local cve="CVE-2011-3389"
@@ -19376,11 +19370,6 @@ run_beast(){
      local hint=""
      local jsonID="BEAST"
 
-     if [[ $VULN_COUNT -le $VULN_THRESHLD ]]; then
-          outln
-          pr_headlineln " Testing for BEAST vulnerability "
-          outln
-     fi
      pr_bold " BEAST"; out " ($cve)                     "
 
      if "$TLS13_ONLY" || [[ $(has_server_protocol ssl3) -eq 1 && $(has_server_protocol tls1) -eq 1 ]]; then
@@ -19400,9 +19389,10 @@ run_beast(){
           outln " Test skipped"
           return 1
      fi
-     # $cbc_ciphers_hex has 126 ciphers, we omitted SRP-AES-256-CBC-SHA bc the trailing 00,ff below will pose
-     # a problem for ACE loadbalancers otherwise. So in case we know this is not true, we'll re-add it
-     ! "$SERVER_SIZE_LIMIT_BUG" && "$using_sockets" && cbc_ciphers_hex="$cbc_ciphers_hex, C0,20"
+     # $cbc_ciphers_hex has 124 ciphers, we omitted SRP-3DES-EDE-CBC-SHA, SRP-AES-128-CBC-SHA, and 
+     # SRP-AES-256-CBC-SHA bc the trailing 00,ff below will pose a problem for ACE loadbalancers
+     # otherwise. So in case we know this is not true, we'll re-add it
+     ! "$SERVER_SIZE_LIMIT_BUG" && "$using_sockets" && cbc_ciphers_hex="$cbc_ciphers_hex, C0,1A, C0,1D, C0,20"
 
      [[ $TLS_NR_CIPHERS == 0 ]] && using_sockets=false
      if "$using_sockets" || [[ $OSSL_VER_MAJOR -lt 1 ]]; then
@@ -19699,11 +19689,6 @@ run_winshock() {
      local cwe="CWE-94"
      local jsonID="winshock"
 
-     if [[ $VULN_COUNT -le $VULN_THRESHLD ]]; then
-          outln
-          pr_headlineln " Testing for winshock vulnerability "
-          outln
-     fi
      pr_bold " Winshock"; out " ($cve), experimental    "
 
      if [[ "$(has_server_protocol "tls1_3")" -eq 0 ]] ; then
@@ -19886,11 +19871,6 @@ run_lucky13() {
      local hint=""
      local jsonID="LUCKY13"
 
-     if [[ $VULN_COUNT -le $VULN_THRESHLD ]]; then
-          outln
-          pr_headlineln " Testing for LUCKY13 vulnerability "
-          outln
-     fi
      pr_bold " LUCKY13"; out " ($cve), experimental     "
 
      if "$TLS13_ONLY"; then
@@ -20501,7 +20481,7 @@ run_grease() {
 #TODO: we need to clarify whether the mit is hit at 128 or 129 ciphers.
      if "$normal_hello_ok" && [[ "$proto" == 03 ]]; then
           debugme echo -e "\nSending ClientHello with 129 cipher suites."
-          tls_sockets "$proto" "00,27, $cipher_list"
+          tls_sockets "$proto" "c0,86, c0,88, c0,8a, c0,8c, c0,8e, c0,90, c0,92, fe,ff, ff,e0, 00,1e, 00,22, $cipher_list"
           success=$?
           if [[ $success -ne 0 ]] && [[ $success -ne 2 ]]; then
                prln_svrty_medium " Server fails if ClientHello includes more than 128 cipher suites."
@@ -20690,12 +20670,11 @@ run_robot() {
      local -i i subret len iteration testnum pubkeybytes
      local pubkeybits
      local vulnerable=false send_ccs_finished=true
-     local -i start_time end_time robottimeout=$MAX_WAITSOCK
+     local -i start_time end_time robottimeout=$ROBOT_TIMEOUT
      local cve="CVE-2017-17382 CVE-2017-17427 CVE-2017-17428 CVE-2017-13098 CVE-2017-1000385 CVE-2017-13099 CVE-2016-6883 CVE-2012-5081 CVE-2017-6168"
      local cwe="CWE-203"
      local jsonID="ROBOT"
 
-     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for Return of Bleichenbacher's Oracle Threat (ROBOT) vulnerability " && outln
      pr_bold " ROBOT                                     "
 
      if [[ "$STARTTLS_PROTOCOL" =~ irc ]]; then
@@ -20861,6 +20840,11 @@ run_robot() {
                     end_time=$(LC_ALL=C date "+%s")
                     resp=$(hexdump -v -e '16/1 "%02x"' "$SOCK_REPLY_FILE")
                     response[testnum]="${resp%%[!0-9A-F]*}"
+                    # TLS alert length seems to vary sometimes within this loop which leads to
+                    # wrong test results, see #2083. Thus we cut this here to length 14, if
+                    # it's a TLS alert with the length of 2
+                    [[ ${response[testnum]::2} == 15 ]] && [[ ${response[testnum]:10:2} == 02 ]] &&
+                          response[testnum]=${response[testnum]::14}
                     # The first time a response is received to a client key
                     # exchange message, measure the amount of time it took to
                     # receive a response and set the timeout value for future
@@ -23424,8 +23408,8 @@ determine_service() {
 # Return value is 0 unless we have a problem executing
 #
 determine_sizelimitbug() {
-     # overflow_cipher must be some cipher that does not appear in TLS12_CIPHER.
-     local overflow_cipher='C0,86'
+     # overflow_cipher must be 11 ciphers that do not appear in TLS12_CIPHER.
+     local overflow_cipher='C0,86, C0,88, C0,8A, C0,8C, C0,8E, C0,90, C0,92, FE,FF, FF,E0, 00,1E, 00,22'
      local -i nr_ciphers
 
      # For STARTTLS protocols not being implemented yet via sockets this is a bypass otherwise it won't be usable at all (e.g. LDAP)
@@ -24732,6 +24716,7 @@ parse_cmd_line() {
                     ;;
                -BB|--BB|--robot)
                     do_robot=true
+                    ((VULN_COUNT++))
                     ;;
                -R|--renegotiation)
                     do_renego=true
@@ -25413,7 +25398,7 @@ lets_roll() {
                fi
 
                # vulnerabilities
-               if [[ $VULN_COUNT -gt $VULN_THRESHLD ]] || "$do_vulnerabilities"; then
+               if [[ $VULN_COUNT -ge 1 ]] || "$do_vulnerabilities"; then
                     outln; pr_headlineln " Testing vulnerabilities "
                     outln
                fi
