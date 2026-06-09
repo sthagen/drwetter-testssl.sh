@@ -3609,7 +3609,14 @@ run_security_headers() {
                              "Referrer-Policy INFO" \
                              "X-UA-Compatible INFO" \
                              "Cache-Control INFO" \
-                             "Pragma INFO"; do
+                             "Pragma INFO" \
+                             "X-Permitted-Cross-Domain-Policies INFO" \
+                             "Origin-Agent-Cluster INFO" \
+                             "Document-Policy INFO" \
+                             "Clear-Site-Data INFO" \
+                             "Reporting-Endpoints INFO" \
+                             "Report-To INFO" \
+                             "NEL INFO"; do
           read header svrty <<< "${header_and_svrty}"
           [[ "$DEBUG" -ge 5 ]] &&  echo "testing \"$header\" (severity \"$svrty\")"
           match_httpheader_key "$header" "$header" "$spaces" "$first"
@@ -23652,21 +23659,27 @@ draw_line() {
 
 run_mx_all_ips() {
      local fname_date="$1"
+     local domain="$2"
      local mxs mx
-     local mxport
+     local mxport=${3:-25}
      local -i ret=0
      local word=""
 
      STARTTLS_PROTOCOL="smtp"
+     # A port may be appended to the domain, e.g. "--mx example.com:587" (#2986).
+     # Strip it off before the MX DNS lookup and use it as the port to test.
+     if [[ "$domain" =~ :[0-9]+$ ]]; then
+          mxport="${domain##*:}"
+          domain="${domain%:*}"
+     fi
      # test first higher priority servers
-     mxs=$(get_mx_record "$2" | sort -n | sed -e 's/^.* //' -e 's/\.$//' | tr '\n' ' ')
+     mxs=$(get_mx_record "$domain" | sort -n | sed -e 's/^.* //' -e 's/\.$//' | tr '\n' ' ')
      if [[ $CMDLINE_IP == one ]]; then
           word="as instructed one"                               # with highest priority
           mxs=${mxs%% *}
      else
           word="the only"
      fi
-     mxport=${3:-25}
      if [[ -n "$LOGFILE" ]] || [[ -n "$PARENT_LOGFILE" ]]; then
           prepare_logging "${fname_date}"
      else
@@ -23707,7 +23720,7 @@ run_mx_all_ips() {
           outln
           pr_bold "Done testing all MX records (on port $mxport): "; outln "$mxs"
      else
-          prln_bold " $1 has no MX records(s)"
+          prln_bold " $domain has no MX record(s)"
      fi
      return $ret
 }
