@@ -122,14 +122,17 @@ $socket_out =~ s/ error querying OCSP responder .*\n//g;
 unlike($socket_out, qr/$socket_regex_bl/, "");
 $tests++;
 
-#7
-# https://ldapwiki.com/wiki/Public%20LDAP%20Servers
-$uri="db.debian.org:389";
-printf "\n%s\n", "STARTTLS LDAP unit tests via sockets --> $uri ...";
-$socket_out = `$prg $check2run -t ldap $uri 2>&1`;
-# $socket_json = json('tmp.json');
-unlike($socket_out, qr/$socket_regex_bl/, "");
-$tests++;
+# /usr/bin/openssl on MacOS doesn't seem to be available (anymore)
+if ( $os ne "darwin" ){
+     #7
+     # https://ldapwiki.com/wiki/Public%20LDAP%20Servers
+     $uri="db.debian.org:389";
+     printf "\n%s\n", "STARTTLS LDAP unit tests via sockets --> $uri ...";
+     $socket_out = `$prg $check2run -t ldap $uri 2>&1`;
+     # $socket_json = json('tmp.json');
+     unlike($socket_out, qr/$socket_regex_bl/, "");
+     $tests++;
+}
 
 # For NNTP there doesn't seem to be reliable host out there
 #$uri="144.76.182.167:119";

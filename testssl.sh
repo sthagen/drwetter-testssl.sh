@@ -361,6 +361,7 @@ HAS_ALPN=false
 HAS_NPN=false
 HAS_FALLBACK_SCSV=false
 HAS_PROXY=false
+HAS_LDAP=false
 HAS_XMPP=false
 HAS_XMPP_SERVER=false
 HAS_POSTGRES=false
@@ -446,7 +447,7 @@ KEY_EXCH_SCORE=100                      # Keeps track of the score for category 
 CIPH_STR_BEST=0                         # Keeps track of the best bit size for category 3 "Cipher Strength"
 CIPH_STR_WORST=100000                   # Keeps track of the worst bit size for category 3 "Cipher Strength"
                                         # Intentionally set very high, so it can be set to 0, if necessary
-TRUSTED1ST=""                           # Contains the `-trusted_first` flag, if this version of openssl supports it
+TRUSTED1ST=""                           # Contains the "-trusted_first" flag, if this version of openssl supports it
 
 ########### Global variables for parallel mass testing
 #
@@ -2623,13 +2624,13 @@ service_detection() {
      fi
 
      jsonID="service"
+     if [[ $SERVICE == HTTP ]] || "$ASSUME_HTTP" || [[ -n "$MTLS" ]]; then
+          dns_https_rr
+     fi
      case $SERVICE in
           HTTP)
-               if [[ $SERVICE == HTTP ]]; then
-                    dns_https_rr
-               fi
                pr_bold " Service detected"
-               out ":      $CORRECT_SPACES $SERVICE"
+               outln ":      $CORRECT_SPACES $SERVICE"
                fileout "${jsonID}" "INFO" "$SERVICE"
                ;;
           IMAP|POP|SMTP|NNTP|MongoDB)
@@ -2637,32 +2638,28 @@ service_detection() {
                out ":     $CORRECT_SPACES $SERVICE, thus skipping HTTP specific checks"
                fileout "${jsonID}" "INFO" "$SERVICE, thus skipping HTTP specific checks"
                ;;
-#FIXME:        \/     \/  dns_https_rr
           *)   pr_bold " Service detected:"; out "      $CORRECT_SPACES"
-               if [[ ! -z $MTLS ]]; then
-                    out " not identified, but mTLS authentication is set ==> trying HTTP checks"
+               if [[ -n "$MTLS" ]]; then
+                    outln " not identified, but mTLS authentication is set ==> trying HTTP checks"
                     SERVICE=HTTP
                     fileout "${jsonID}" "DEBUG" "Couldn't determine service -- ASSUME_HTTP set"
-                    dns_https_rr
                elif [[ "$CLIENT_AUTH" == required ]] && [[ -z $MTLS ]]; then
-                    out " certificate-based authentication without providing client certificate and private key => skipping all HTTP checks" | tee $TMPFILE
+                    outln " certificate-based authentication without providing client certificate and private key => skipping all HTTP checks" | tee $TMPFILE
                     fileout "${jsonID}" "INFO" "certificate-based authentication without providing client certificate and private key  => skipping all HTTP checks"
                else
                     out " Couldn't determine what's running on port $PORT"
                     if "$ASSUME_HTTP"; then
                          SERVICE=HTTP
-                         out " -- ASSUME_HTTP set though"
+                         outln " -- ASSUME_HTTP set though"
                          fileout "${jsonID}" "DEBUG" "Couldn't determine service -- ASSUME_HTTP set"
-                         dns_https_rr
                     else
-                         out ", assuming no HTTP service => skipping all HTTP checks"
+                         outln ", assuming no HTTP service => skipping all HTTP checks"
                          fileout "${jsonID}" "DEBUG" "Couldn't determine service, skipping all HTTP checks"
                     fi
                fi
                ;;
      esac
 
-     outln
      tmpfile_handle ${FUNCNAME[0]}.txt
      return 0
 }
@@ -10204,7 +10201,7 @@ certificate_info() {
           out "${spaces}"
           pr_svrty_low "wildcard certificate" ; outln " could be problematic, see other hosts at"
           outln "${spaces}https://search.censys.io/search?resource=hosts&virtual_hosts=INCLUDE&q=$cert_fingerprint_sha2"
-          fileout "cert_trust${json_postfix}_wildcard" "LOW" "trust is via wildcard"
+          fileout "cert_trust_wildcard${json_postfix}" "LOW" "trust is via wildcard"
      fi
 
 
@@ -14553,7 +14550,7 @@ gcm-decrypt() {
      elif [[ "$cipher" == TLS_AES_256_GCM_SHA384 ]] && ! "$compute_tag"; then
           if "$HAS_AES256_GCM"; then
                plaintext="$(hex2binary "$ciphertext" | $OPENSSL enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
-               aesgcm_used=true
+               enc_aesgcm_used=true
           elif "$HAS2_AES256_GCM"; then
                # empty  OPENSSL_CONF temporarily as it might cause problems, see #2780
                plaintext="$(hex2binary "$ciphertext" | OPENSSL_CONF='' $OPENSSL2 enc -aes-256-gcm -K "$key" -iv "$nonce" 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
@@ -14738,7 +14735,7 @@ sym-encrypt() {
           return 7
      fi
      [[ $? -ne 0 ]] && return 7
-     [[ -n "$ciphertext" ]] && return 7
+     [[ -z "$ciphertext" ]] && return 7
 
      tm_out "$(strip_spaces "$ciphertext")"
      return 0
@@ -18422,7 +18419,7 @@ run_renego() {
                tmp_result=2
                rm -f $TEMPDIR/was_killed
           fi
-          if [[ $tmp_result -eq 1 ]] && [[ loop_reneg -eq 1 ]]; then
+          if [[ $tmp_result -eq 1 ]] && [[ $loop_reneg -eq 1 ]]; then
                tmp_result=3
           fi
           if [[ $SERVICE != HTTP ]]; then
@@ -19633,7 +19630,7 @@ run_drown() {
      if [[ $(has_server_protocol ssl2) -ne 1 ]]; then
           sslv2_sockets
      else
-          [[ aaa == bbb ]]    # provoke return code=1
+          false
      fi
 
      case $? in
@@ -21490,6 +21487,7 @@ find_openssl_binary() {
      HAS_NPN=false
      HAS_FALLBACK_SCSV=false
      HAS_PROXY=false
+     HAS_LDAP=false
      HAS_XMPP=false
      HAS_XMPP_SERVER=false
      HAS_XMPP_SERVER2=false
@@ -21625,6 +21623,8 @@ find_openssl_binary() {
      grep -q 'xmpp' $s_client_starttls_has && HAS_XMPP=true
      grep -Eq 'xmpp-server|xmpp\[-server\]' $s_client_starttls_has && HAS_XMPP_SERVER=true
 
+     # Seems like LibreSSL on MacOS somehow lost this with 26.5.2?
+     grep -q 'ldap' $s_client_starttls_has && HAS_LDAP=true
      grep -q 'postgres' $s_client_starttls_has && HAS_POSTGRES=true
      grep -q 'mysql' $s_client_starttls_has && HAS_MYSQL=true
      grep -q 'lmtp' $s_client_starttls_has && HAS_LMTP=true
@@ -22817,6 +22817,7 @@ get_caa_rrecord() {
 # https://www.rfc-editor.org/rfc/rfc9460.html
 #    arg1: domain to check for
 #    returns: string for record
+#    return value: !=0 if error encountered
 #
 get_https_rrecord() {
      local raw_https=""
@@ -22891,13 +22892,13 @@ get_https_rrecord() {
           raw_https="$(strip_lf "$(nslookup -type=type65 "$1" | awk '/'"^${1}"'.*rdata_65/ { print substr($0,index($0,$4)) }' )")"
           # empty if there's no such record
      else
-          return 1
-          # No dig, drill, host, or nslookup --> complaint was elsewhere already
+          return 6
+          # No dig, drill, host, or nslookup --> complaint should have been before already
      fi
      OPENSSL_CONF="$saved_openssl_conf"      # We're done now with openssl, see https://github.com/drwetter/testssl.sh/issues/134
 
      if [[ -z "$raw_https" ]]; then
-          return 1
+          return 0
      fi
 
      # Now comes the third, tricky part (old dig for Macs e.g.) --> parsing the hex stream which was returned if it was returned.
@@ -23890,80 +23891,80 @@ determine_optimal_proto() {
           TLS12_CIPHER_OFFERED="$(get_cipher $TMPFILE)"
           TLS12_CIPHER_OFFERED="$(openssl2hexcode "$TLS12_CIPHER_OFFERED")"
           [[ ${#TLS12_CIPHER_OFFERED} -eq 9 ]] && TLS12_CIPHER_OFFERED="${TLS12_CIPHER_OFFERED:2:2},${TLS12_CIPHER_OFFERED:7:2}" || TLS12_CIPHER_OFFERED=""
-     fi
 
-     if [[ "$optimal_proto" == -ssl2 ]]; then
-          prln_magenta "$NODEIP:$PORT appears to only support SSLv2."
-          fileout "$jsonID" "WARN" "$NODEIP:$PORT appears to only support SSLv2."
-          ignore_no_or_lame " Type \"yes\" to proceed and accept false negatives or positives" "yes"
-          [[ $? -ne 0 ]] && exit $ERR_CLUELESS
-     elif "$all_failed" && ! "$ALL_FAILED_SOCKETS"; then
-          if ! "$HAS_TLS13" && "$TLS13_ONLY"; then
-               if "$HAS2_TLS13"; then
-                    if "$OSSL_SHORTCUT" || [[ "$WARNINGS" == batch ]]; then
-                         # switch w/o asking
-                         OPEN_MSG=" $NODE:$PORT appeared to support TLS 1.3 ONLY. Thus switched automagically from\n \"$OPENSSL\" to \"$OPENSSL2\"."
-                         fileout "$jsonID" "INFO" "$NODE:$PORT appears to support TLS 1.3 ONLY, switching from $OPENSSL to $OPENSSL2 automagically"
-                         OPENSSL="$OPENSSL2"
-                         find_openssl_binary
-                         prepare_arrays
-                    else
-                         # now we need to ask the user
-                         ignore_no_or_lame " Type \"yes\" to proceed with \"$OPENSSL2\" OR accept all scan problems" "yes"
-                         if [[ $? -eq 0 ]]; then
-                              fileout "$jsonID" "INFO" "$NODE:$PORT appears to support TLS 1.3 ONLY, switching from $OPENSSL to $OPENSSL2 by the user"
+          if [[ "$optimal_proto" == -ssl2 ]]; then
+               prln_magenta "$NODEIP:$PORT appears to only support SSLv2."
+               fileout "$jsonID" "WARN" "$NODEIP:$PORT appears to only support SSLv2."
+               ignore_no_or_lame " Type \"yes\" to proceed and accept false negatives or positives" "yes"
+               [[ $? -ne 0 ]] && exit $ERR_CLUELESS
+          elif "$all_failed" && ! "$ALL_FAILED_SOCKETS"; then
+               if ! "$HAS_TLS13" && "$TLS13_ONLY"; then
+                    if "$HAS2_TLS13"; then
+                         if "$OSSL_SHORTCUT" || [[ "$WARNINGS" == batch ]]; then
+                              # switch w/o asking
+                              OPEN_MSG=" $NODE:$PORT appeared to support TLS 1.3 ONLY. Thus switched automagically from\n \"$OPENSSL\" to \"$OPENSSL2\"."
+                              fileout "$jsonID" "INFO" "$NODE:$PORT appears to support TLS 1.3 ONLY, switching from $OPENSSL to $OPENSSL2 automagically"
                               OPENSSL="$OPENSSL2"
                               find_openssl_binary
                               prepare_arrays
                          else
-                              fileout "$jsonID" "WARN" "$NODE:$PORT appears to support TLS 1.3 ONLY, switching from $OPENSSL to $OPENSSL2 was denied by user"
+                              # now we need to ask the user
+                              ignore_no_or_lame " Type \"yes\" to proceed with \"$OPENSSL2\" OR accept all scan problems" "yes"
+                              if [[ $? -eq 0 ]]; then
+                                   fileout "$jsonID" "INFO" "$NODE:$PORT appears to support TLS 1.3 ONLY, switching from $OPENSSL to $OPENSSL2 by the user"
+                                   OPENSSL="$OPENSSL2"
+                                   find_openssl_binary
+                                   prepare_arrays
+                              else
+                                   fileout "$jsonID" "WARN" "$NODE:$PORT appears to support TLS 1.3 ONLY, switching from $OPENSSL to $OPENSSL2 was denied by user"
+                              fi
                          fi
                     fi
-               fi
-          elif ! "$HAS_SSL3" && [[ "$(has_server_protocol "ssl3")" -eq 0 ]] && [[ "$(has_server_protocol "tls1_3")" -ne 0 ]] && \
-               [[ "$(has_server_protocol "tls1_2")" -ne 0 ]] && [[ "$(has_server_protocol "tls1_1")" -ne 0 ]] &&
-               [[ "$(has_server_protocol "tls1")" -ne 0 ]]; then
-               prln_warning " $NODE:$PORT appears to support SSLv3 ONLY. You better use --openssl=<path_to_openssl_supporting_SSL_3>"
-               fileout "$jsonID" "WARN" "$NODE:$PORT appears to support SSLv3 ONLY, but $OPENSSL does not support SSLv3."
-               ignore_no_or_lame " Type \"yes\" to proceed and accept all scan problems" "yes"
-               [[ $? -ne 0 ]] && exit $ERR_CLUELESS
-               MAX_OSSL_FAIL=10
-          else
-               outln
-               prln_warning " Your $OPENSSL cannot connect to $NODEIP:$PORT."
-               if [[ -x $OPENSSL2 ]] ; then
-                    outln " Restarting with --openssl=$OPENSSL2 likely helps"
-                    fileout "$jsonID" "WARN" "$OPENSSL cannot connect to $NODEIP:$PORT. Recommended using --openssl=$OPENSSL2"
+               elif ! "$HAS_SSL3" && [[ "$(has_server_protocol "ssl3")" -eq 0 ]] && [[ "$(has_server_protocol "tls1_3")" -ne 0 ]] && \
+                    [[ "$(has_server_protocol "tls1_2")" -ne 0 ]] && [[ "$(has_server_protocol "tls1_1")" -ne 0 ]] &&
+                    [[ "$(has_server_protocol "tls1")" -ne 0 ]]; then
+                    prln_warning " $NODE:$PORT appears to support SSLv3 ONLY. You better use --openssl=<path_to_openssl_supporting_SSL_3>"
+                    fileout "$jsonID" "WARN" "$NODE:$PORT appears to support SSLv3 ONLY, but $OPENSSL does not support SSLv3."
+                    ignore_no_or_lame " Type \"yes\" to proceed and accept all scan problems" "yes"
+                    [[ $? -ne 0 ]] && exit $ERR_CLUELESS
+                    MAX_OSSL_FAIL=10
                else
-                    fileout "$jsonID" "WARN" "Your $OPENSSL cannot connect to $NODEIP:$PORT."
+                    outln
+                    prln_warning " Your $OPENSSL cannot connect to $NODEIP:$PORT."
+                    if [[ -x $OPENSSL2 ]] ; then
+                         outln " Restarting with --openssl=$OPENSSL2 likely helps"
+                         fileout "$jsonID" "WARN" "$OPENSSL cannot connect to $NODEIP:$PORT. Recommended using --openssl=$OPENSSL2"
+                    else
+                         fileout "$jsonID" "WARN" "Your $OPENSSL cannot connect to $NODEIP:$PORT."
+                    fi
+                    outln
+                    ignore_no_or_lame " If you continue the results are likely not correct. Really proceed ? (\"yes\" to continue)" "yes"
+                    [[ $? -ne 0 ]] && exit $ERR_CLUELESS
                fi
+          elif "$all_failed"; then
                outln
-               ignore_no_or_lame " If you continue the results are likely not correct. Really proceed ? (\"yes\" to continue)" "yes"
+               if "$IPv6_OK"; then
+                    pr_bold " Your $OPENSSL is not IPv6 aware, or $NODEIP:$PORT "
+                    fileout "$jsonID" "WARN" "Your $OPENSSL is not IPv6 aware, or $NODEIP:$PORT doesn't seem to be a TLS/SSL enabled server."
+               else
+                    pr_bold " $NODEIP:$PORT "
+                    fileout "$jsonID" "WARN" "$NODEIP:$PORT doesn't seem to be a TLS/SSL enabled server."
+               fi
+               tmpfile_handle ${FUNCNAME[0]}.txt
+               prln_bold "doesn't seem to be a TLS/SSL enabled server";
+               ignore_no_or_lame " The results might look ok but they could be nonsense. Really proceed ? (\"yes\" to continue)" "yes"
+               [[ $? -ne 0 ]] && exit $ERR_CLUELESS
+          elif ! "$all_failed" && "$ALL_FAILED_SOCKETS" && ! "$SSL_NATIVE"; then
+               # Edge case: connecting with tls_sockets/sslv2_sockets didn't work, but connecting with $OPENSSL s_client did.
+               # See #2807
+               prln_warning "This shouldn't happen (pls report): Testing $NODE:$PORT only succeeded using $OPENSSL."
+               prln_warning "But testssl.sh also needs bash sockets to perform its checks correctly.\n"
+               outln "You can try to continue using the --ssl-native option but the results are likely not complete."
+               outln "Or you can restart using --ssl-native with another openssl version (--openssl <PATH>)."
+               fileout "$jsonID" "WARN" "Sockets didn't work. Testing NODE:$PORT only succeeded using $OPENSSL."
+               ignore_no_or_lame " Type \"yes\" to proceed and accept false negatives or positives" "yes"
                [[ $? -ne 0 ]] && exit $ERR_CLUELESS
           fi
-     elif "$all_failed"; then
-          outln
-          if "$IPv6_OK"; then
-               pr_bold " Your $OPENSSL is not IPv6 aware, or $NODEIP:$PORT "
-               fileout "$jsonID" "WARN" "Your $OPENSSL is not IPv6 aware, or $NODEIP:$PORT doesn't seem to be a TLS/SSL enabled server."
-          else
-               pr_bold " $NODEIP:$PORT "
-               fileout "$jsonID" "WARN" "$NODEIP:$PORT doesn't seem to be a TLS/SSL enabled server."
-          fi
-          tmpfile_handle ${FUNCNAME[0]}.txt
-          prln_bold "doesn't seem to be a TLS/SSL enabled server";
-          ignore_no_or_lame " The results might look ok but they could be nonsense. Really proceed ? (\"yes\" to continue)" "yes"
-          [[ $? -ne 0 ]] && exit $ERR_CLUELESS
-     elif ! "$all_failed" && "$ALL_FAILED_SOCKETS" && ! "$SSL_NATIVE"; then
-          # Edge case: connecting with tls_sockets/sslv2_sockets didn't work, but connecting with $OPENSSL s_client did.
-          # See #2807
-          prln_warning "This shouldn't happen (pls report): Testing $NODE:$PORT only succeeded using $OPENSSL."
-          prln_warning "But testssl.sh also needs bash sockets to perform its checks correctly.\n"
-          outln "You can try to continue using the --ssl-native option but the results are likely not complete."
-          outln "Or you can restart using --ssl-native with another openssl version (--openssl <PATH>)."
-          fileout "$jsonID" "WARN" "Sockets didn't work. Testing NODE:$PORT only succeeded using $OPENSSL."
-          ignore_no_or_lame " Type \"yes\" to proceed and accept false negatives or positives" "yes"
-          [[ $? -ne 0 ]] && exit $ERR_CLUELESS
      fi
 
      tmpfile_handle ${FUNCNAME[0]}.txt
@@ -23996,6 +23997,7 @@ dns_https_rr () {
           if [[ $? -ne 0 ]]; then
                prln_warning "$HTTPS_RR"
                fileout "${jsonID}" "WARN" "$HTTPS_RR"
+               return 1
           elif [[ -n "$HTTPS_RR" ]]; then
                pr_svrty_good "yes" ; out ": "
                prln_italic "$(out_row_aligned_max_width "$HTTPS_RR" "$indent                              " $TERM_WIDTH)"
@@ -24005,6 +24007,7 @@ dns_https_rr () {
                fileout "${jsonID}" "INFO" " no resource record found"
           fi
      fi
+     return 0
 }
 
 
@@ -24092,7 +24095,7 @@ determine_service() {
                               if "$HAS_XMPP"; then
                                    # small hack -- instead of changing calls all over the place
                                    STARTTLS="$STARTTLS -xmpphost $NODE"
-                              else
+                              llelse
                                    # If the XMPP name cannot be provided using -xmpphost,
                                    # then it needs to be provided to the -connect option
                                    NODEIP="$NODE"
@@ -24101,6 +24104,11 @@ determine_service() {
                          if [[ "$protocol" == xmpp-server ]] && ! "$HAS_XMPP_SERVER"; then
                               #FIXME: make use of HAS_XMPP_SERVER2
                               fatal "Your $OPENSSL does not support the \"-starttls xmpp-server\" option" $ERR_OSSLBIN
+                         fi
+                    elif [[ "$protocol" == ldap ]]; then
+                         # Check if openssl version supports postgres.
+                         if ! "$HAS_LDAP"; then
+                              fatal "Your $OPENSSL does not support the \"-starttls ldap\" option" $ERR_OSSLBIN
                          fi
                     elif [[ "$protocol" == postgres ]]; then
                          # Check if openssl version supports postgres.
