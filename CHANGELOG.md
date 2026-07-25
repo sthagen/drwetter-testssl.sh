@@ -13,6 +13,8 @@
 * Enable IPv6 automagically, i.e. if target via IPv6 is reachable just (also) scan it
 * Detect and show DNS HTTPS RR (RFC 9460)
 * Provide an FAQ
+* Security fix: HTML-escape URLs in the HTML report to prevent stored XSS from a server-controlled `Location:` header (#3090)
+* Detect short-lived certificates (validity period <= `DAYS_VALID_SHORTLIVED`, default 10 days) and no longer flag them red merely for their short lifespan; warn only when less than 24h is left (#3097)
 
 ### Features implemented / improvements in 3.2
 

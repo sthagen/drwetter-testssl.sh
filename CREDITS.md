@@ -71,6 +71,9 @@ Full contribution, see git log.
 * Christian Dresen
    - Dockerfile
 
+* Eric Gu
+  - HTML report XSS fix (escape server-controlled URLs, #3090)
+
 * enxio
    - support for TN3270/telnet STARTTLS
 

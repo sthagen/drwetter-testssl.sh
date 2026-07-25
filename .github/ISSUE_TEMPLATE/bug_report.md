@@ -17,8 +17,9 @@ It's much appreciated if you spot bugs and file them! Please keep in mind though
 
 **Before you open an issue please check which version you are running and whether it is the latest in stable / dev branch**
 
-- [ ] I am running version (``git log | head -1`` ) from the git repo 
-- [ ] I am running ``testssl.sh -v | grep from``
+- [ ] I am running version from the git repo :  <!-- use ``git log | head -1`` --> 
+- [ ] I am running: <!-- use: ``testssl.sh -v | grep from`` -->
+- [ ] Different version, check for updates here:  <!-- Please specify -->
 
 
 **Before you open an issue please consult the [FAQ](https://github.com/testssl/testssl.sh/blob/3.3dev/FAQ.md) and check whether this is a known problem by searching the  [issues](https://github.com/testssl/testssl.sh/issues)**
@@ -38,9 +39,14 @@ A clear and concise description of what you would expect to happen instead.
 
 
 **Your system (please complete the following information):**
- - OS: ``awk -F\" '/PRETTY_NAME/ { print $2 }' /etc/os-release``
- - Platform: ``uname -srm``
- - OpenSSL + bash: ``testssl.sh -b 2>/dev/null | grep Using``
+ - OS: <!-- ``awk -F\" '/PRETTY_NAME/ { print $2 }' /etc/os-release`` --> 
+ - Platform: <!--``uname -srm`` --> 
+ - OpenSSL + bash: <!-- ``testssl.sh -b 2>/dev/null | grep Using`` -->
+
+**AI section**
+- [ ] I found a bug using LLM version: <!-- e.g. GPT-A.B, Claude <NAME> A.B, Gemini A.B <NAME>, Qwen<B>-Coder, DeepSeek-<A>  etc. -->
+- [ ] It was just me
+
 
 **Additional context**
 

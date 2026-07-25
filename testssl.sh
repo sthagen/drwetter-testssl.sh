@@ -220,6 +220,7 @@ HPKP_MIN=${HPKP_MIN:-30}                # >=30 days should be ok for HPKP_MIN, p
      HPKP_MIN=$((HPKP_MIN * 86400))     # correct to seconds
 DAYS2WARN1=${DAYS2WARN1:-60}            # days to warn before cert expires, threshold 1
 DAYS2WARN2=${DAYS2WARN2:-30}            # days to warn before cert expires, threshold 2
+DAYS_VALID_SHORTLIVED=${DAYS_VALID_SHORTLIVED:-10}  # validity period (notAfter-notBefore) <= this many days => "short-lived", see CA/Browser Forum BR 1.6.1 and #3097
 UNBRACKTD_IPV6=${UNBRACKTD_IPV6:-false} # some versions of OpenSSL (like Gentoo) don't support [bracketed] IPv6 addresses
 NO_ENGINE=${NO_ENGINE:-false}           # if there are problems finding the (external) openssl engine set this to true
 declare -r CLIENT_MIN_FS=5              # number of ciphers needed to run a test for FS
@@ -760,8 +761,8 @@ tmln_fixme() { tmln_warning "Fixme: $1"; }
 pr_fixme()   { pr_warning "Fixme: $1"; }
 prln_fixme() { prln_warning "Fixme: $1"; }
 
-pr_url()     { tm_out "$1"; html_out "<a href=\"$1\" style=\"color:black;text-decoration:none;\">$1</a>"; }
-pr_boldurl() { tm_bold "$1"; html_out "<a href=\"$1\" style=\"font-weight:bold;color:black;text-decoration:none;\">$1</a>"; }
+pr_url()     { tm_out "$1"; html_out "<a href=\"$(html_reserved "$1")\" style=\"color:black;text-decoration:none;\">$(html_reserved "$1")</a>"; }
+pr_boldurl() { tm_bold "$1"; html_out "<a href=\"$(html_reserved "$1")\" style=\"font-weight:bold;color:black;text-decoration:none;\">$(html_reserved "$1")</a>"; }
 
 ### color switcher (see e.g. https://linuxtidbits.wordpress.com/2008/08/11/output-color-on-bash-scripts/
 ###                          https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/x405.html
@@ -9590,6 +9591,7 @@ certificate_info() {
      local indent=""
      local days2warn2=$DAYS2WARN2
      local days2warn1=$DAYS2WARN1
+     local cert_is_shortlived=false
      local provides_stapling=false
      local caa_node="" all_caa="" caa_property_name="" caa_property_value=""
      local response=""
@@ -10257,12 +10259,32 @@ certificate_info() {
           days2warn1=$((days2warn1 / 2))
      fi
 
+     # A short-lived certificate has a validity period (notAfter - notBefore) at or below
+     # DAYS_VALID_SHORTLIVED. These (e.g. Let's Encrypt's 6-day "shortlived" profile) are
+     # intentionally short, so the normal days2warn thresholds would always flag them red.
+     # For those we only warn when the cert is nearly expired (< 24h left), see #3097.
+     [[ $diffseconds -gt 0 ]] && [[ $diffseconds -le $((secsaday*DAYS_VALID_SHORTLIVED)) ]] && cert_is_shortlived=true
+
      debugme echo -n "(diffseconds: $diffseconds)"
      if ! [[ "$($OPENSSL x509 -checkend 1 2>>$ERRFILE <<< "$hostcert")" =~ \ not\  ]]; then
           pr_svrty_critical "expired"
           expfinding="expired"
           expok="CRITICAL"
           set_grade_cap "T" "Certificate expired"
+     elif "$cert_is_shortlived"; then
+          # An intentionally short-lived cert (e.g. Let's Encrypt's 6-day profile) shouldn't be
+          # flagged red just for its short lifespan. Warn only when it is about to expire (< 24h
+          # left) and only if its total lifetime is more than 24h -- otherwise the 24h rule would
+          # flag such a cert red for its whole life. The "short-lived cert" remark signals intent.
+          if [[ $diffseconds -gt $secsaday ]] && \
+             ! [[ "$($OPENSSL x509 -checkend $secsaday 2>>$ERRFILE <<< "$hostcert")" =~ \ not\  ]]; then
+               pr_svrty_high "short-lived cert, expires < 24h"
+               expfinding+="short-lived cert, expires < 24h"
+               expok="HIGH"
+          else
+               pr_svrty_good "short-lived cert ($days2expire days)"
+               expfinding+="short-lived cert ($days2expire days)"
+          fi
      else
           # low threshold first
           if [[ "$($OPENSSL x509 -checkend $((secsaday*days2warn2)) 2>>$ERRFILE <<< "$hostcert")" =~ \ not\  ]]; then
@@ -22101,6 +22123,7 @@ HPKP_MIN: $HPKP_MIN
 CLIENT_MIN_FS: $CLIENT_MIN_FS
 DAYS2WARN1: $DAYS2WARN1
 DAYS2WARN2: $DAYS2WARN2
+DAYS_VALID_SHORTLIVED: $DAYS_VALID_SHORTLIVED
 
 IPv6_OK: $IPv6_OK
 MAX_WAITSOCK: $MAX_WAITSOCK
@@ -23415,7 +23438,7 @@ check_proxy() {
                     PROXYIP="$PROXYNODE"
                else
                     # This was tested with vanilla OpenSSL versions
-                    if [[ ${OSSL_VER_MAJOR$}${OSSL_VER_MINOR} -ge 11 ]]; then
+                    if [[ $OSSL_VER_MAJOR -ge 3 ]] || [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" == 1.1.* ]]; then
                          PROXYIP="[$PROXYNODE]"
                     else
                          fatal_cmd_line "OpenSSL version >= 1.1.0 required for IPv6 proxy support" $ERR_OSSLBIN
@@ -23428,7 +23451,7 @@ check_proxy() {
                if [[ -z "$PROXYIP" ]]; then
                     PROXYIP="$(get_aaaa_record "$PROXYNODE" 2>/dev/null | grep -v alias | sed 's/^.*address //')"
                     if [[ -n "$PROXYIP" ]]; then
-                         if [[ ${OSSL_VER_MAJOR$}${OSSL_VER_MINOR} -lt 11 ]]; then
+                         if [[ $OSSL_VER_MAJOR -lt 3 ]] && [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" != 1.1.* ]]; then
                               fatal_cmd_line "OpenSSL version >= 1.1.0 required for IPv6 proxy support" $ERR_OSSLBIN
                          fi
                     fi
@@ -26014,8 +26037,8 @@ issue_cmdline_warnings() {
           fileout_insert_warning "cmdline_ssl-native" "WARN" "Usage of '--ssl-native' is not recommended as it will return incomplete and maybe even incorrect results"
      fi
      tmp=${URI#*//}      # remove https:// and (future) friends
-     if [[ ! $tmp =~ [a-zA-Z] ]] && [[ ! $tmp =~ $avoid_complaints ]]; then
-          # No letters indicate it's not a name
+     if [[ ! $tmp =~ [a-zA-Z] ]] && [[ ! $tmp =~ $avoid_complaints ]] && [[ -z "$FNAME" ]]; then
+          # No letters indicate it's not a name. No mass testing via via
           prln_warning " Warning: Target is not a server name: results may be completely wrong, at minimum trust may show false results."
           fileout_insert_warning "cmdline_ip-target" "WARN" "Target is not a server name: results may be completely wrong, at minimum trust may show false results."
      fi
@@ -26291,7 +26314,12 @@ lets_roll() {
           else
                run_mass_testing
           fi
-          exit $?
+          RET=$?
+          # START_TIME was set by "lets_roll init" above; compute the overall scan
+          # time here so fileout_json_footer() doesn't mistake it for an interrupted
+          # scan (SCAN_TIME==0) and report "Scan interrupted", see #1246
+          calc_scantime
+          exit $RET
      fi
      html_banner
 

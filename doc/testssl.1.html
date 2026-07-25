@@ -988,6 +988,15 @@
         <li>DAYS2WARN2 is the second threshold when you’ll be warning of
         a certificate expiration of a host, preset to 30 (days). For
         Let’s Encrypt this value will be divided internally by 2.</li>
+        <li>DAYS_VALID_SHORTLIVED is preset to 10 (days). Certificates
+        with a total validity period (notAfter - notBefore) of this many
+        days or fewer are treated as intentionally short-lived (see
+        “Short-lived Subscriber Certificate” in the CA/Browser Forum
+        Baseline Requirements, e.g. Let’s Encrypt’s 6-day profile). They
+        are not being warned of for their short lifespan. A warning is
+        issued only when less than 24 hours of validity are left, and
+        only for certificates whose total validity period is more than
+        24 hours.</li>
         <li>TESTSSL_INSTALL_DIR is the derived installation directory of
         testssl.sh. Relatively to that the <code>bin</code> and
         mandatory <code>etc</code> directory will be looked for.</li>
