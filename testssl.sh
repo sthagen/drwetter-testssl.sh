@@ -24118,7 +24118,7 @@ determine_service() {
                               if "$HAS_XMPP"; then
                                    # small hack -- instead of changing calls all over the place
                                    STARTTLS="$STARTTLS -xmpphost $NODE"
-                              llelse
+                              else
                                    # If the XMPP name cannot be provided using -xmpphost,
                                    # then it needs to be provided to the -connect option
                                    NODEIP="$NODE"
