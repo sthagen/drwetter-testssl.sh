@@ -4,6 +4,7 @@
 # --banner is equal to --version
 
 use strict;
+use warnings;
 use Test::More;
 
 my $tests = 0;

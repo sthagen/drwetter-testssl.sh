@@ -15,6 +15,7 @@
 * Provide an FAQ
 * Security fix: HTML-escape URLs in the HTML report to prevent stored XSS from a server-controlled `Location:` header (#3090)
 * Detect short-lived certificates (validity period <= `DAYS_VALID_SHORTLIVED`, default 10 days) and no longer flag them red merely for their short lifespan; warn only when less than 24h is left (#3097)
+* Check for SLH-DSA signatures (draft-reddy-tls-slhdsa)
 
 ### Features implemented / improvements in 3.2
 

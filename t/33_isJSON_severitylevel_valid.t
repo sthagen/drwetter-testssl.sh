@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 
 use strict;
+use warnings;
 use Test::More;
 use Data::Dumper;
 use JSON;
@@ -66,7 +67,7 @@ is($found,0,"We should not have any finding with INFO level"); $tests++;
 done_testing($tests);
 printf "\n\n";
 
-sub json($) {
+sub json {
     my $file = shift;
     $file = `cat $file`;
     unlink $file;

@@ -4,6 +4,7 @@
 # doesn't have any syntax errors
 
 use strict;
+use warnings;
 use Test::More;
 
 my $tests = 0;

@@ -5,6 +5,7 @@
 # This runs a basic test with the supplied openssl vs /usr/bin/openssl
 
 use strict;
+use warnings;
 use Test::More;
 use Data::Dumper;
 use Text::Diff;

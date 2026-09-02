@@ -3,6 +3,7 @@
 # Basics: is there a syntax error where already bash hiccups on?
 
 use strict;
+use warnings;
 use Test::More;
 use File::stat;
 
@@ -25,11 +26,11 @@ my $info    = stat($prg);
 my $retMode = $info->mode;
 
 #1
-is($retMode & 0400, 0400, "Checking \"./testssl.sh\" for read permission");
+is($retMode & oct("400"), oct("0400"), "Checking \"./testssl.sh\" for read permission");
 $tests++;
 
 #2
-is($retMode & 0100, 0100, "Checking \"./testssl.sh\" for execute permission");
+is($retMode & oct("0100"), oct("0100"), "Checking \"./testssl.sh\" for execute permission");
 $tests++;
 
 $fileout = `bash $prg 2>&1`;

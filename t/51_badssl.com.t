@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 
 use strict;
+use warnings;
 use Test::More;
 use Data::Dumper;
 use JSON;
@@ -154,7 +155,7 @@ is($found,1,"We should have a finding for this in the JSON output"); $tests++;
 
 done_testing($tests);
 
-sub json($) {
+sub json {
 	my $file = shift;
 	$file = `cat $file`;
 	unlink $file;

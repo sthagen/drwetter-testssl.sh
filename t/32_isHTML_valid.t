@@ -4,6 +4,7 @@
 # This could be amended by using HTML::Tidy or HTML::Valid
 
 use strict;
+use warnings;
 use Test::More;
 use Data::Dumper;
 use Text::Diff;
@@ -79,11 +80,11 @@ $debughtml = `cat $html_file`;
 unlink $html_file;
 
 # Remove date information from the Start and Done banners in the two HTML files, since they were created at different times
-$html =~ s/Start 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]/Start XXXX-XX-XX XX:XX:XX/;
-$debughtml =~ s/Start 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9]/Start XXXX-XX-XX XX:XX:XX/;
+$html =~ s/Start 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] \(UTC offset: [+-][0-9][0-9][0-9][0-9]\)/Start XXXX-XX-XX XX:XX:XX (UTC offset: +XXXX)/;
+$debughtml =~ s/Start 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] \(UTC offset: [+-][0-9][0-9][0-9][0-9]\)/Start XXXX-XX-XX XX:XX:XX (UTC offset: +XXXX)/;
 
-$html =~ s/Done 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] \[ *[0-9]*s\]/Done XXXX-XX-XX XX:XX:XX [   Xs]/;
-$debughtml =~ s/Done 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] \[ *[0-9]*s\]/Done XXXX-XX-XX XX:XX:XX [   Xs]/;
+$html =~ s/Done 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] \(UTC offset: [+-][0-9][0-9][0-9][0-9]\) \[ *[0-9]*s\]/Done XXXX-XX-XX XX:XX:XX (UTC offset: +XXXX) [   Xs]/;
+$debughtml =~ s/Done 2[0-9][0-9][0-9]-[0-3][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] \(UTC offset: [+-][0-9][0-9][0-9][0-9]\) \[ *[0-9]*s\]/Done XXXX-XX-XX XX:XX:XX (UTC offset: +XXXX) [   Xs]/;
 
 # Remove time difference from "HTTP clock skew" line
 $html =~ s/HTTP clock skew              \+?-?[0-9]* /HTTP clock skew              X /;

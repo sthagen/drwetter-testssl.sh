@@ -10,6 +10,7 @@
 # - Hosts which match the regex patterns should be avoided
 
 use strict;
+use warnings;
 use Test::More;
 use Data::Dumper;
 # use JSON;
@@ -150,7 +151,7 @@ if ( $os ne "darwin" ){
 done_testing($tests);
 # unlink "tmp.json";
 
-sub json($) {
+sub json {
 	my $file = shift;
 	$file = `cat $file`;
 	unlink $file;

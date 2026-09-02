@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 
 use strict;
+use warnings;
 use Test::More;
 
 printf "\n%s\n", "Make sure CA certificate stores are older than their SPKI hashes \"~/etc/ca_hashes.txt\" ...";

@@ -4,6 +4,7 @@
 #
 
 use strict;
+use warnings;
 use Test::More;
 use JSON;
 
@@ -94,7 +95,7 @@ if ( $os eq "linux" ){
 done_testing($tests);
 printf "\n\n";
 
-sub json($) {
+sub json {
     my $file = shift;
     $file = `cat $file`;
     unlink $file;

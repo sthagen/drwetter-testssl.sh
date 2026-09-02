@@ -7,6 +7,7 @@
 #    "finding"      : "Scan interrupted"
 
 use strict;
+use warnings;
 use Test::More;
 use Data::Dumper;
 # if needed: comment this and the lines below in:
@@ -64,7 +65,7 @@ done_testing($tests);
 printf "\n";
 
 
-sub json($) {
+sub json {
 	my $file = shift;
 	$file = `cat $file`;
 	unlink $file;
