@@ -770,47 +770,13 @@ prln_fixme() { prln_warning "Fixme: $1"; }
 pr_url()     { tm_out "$1"; html_out "<a href=\"$(html_reserved "$1")\" style=\"color:black;text-decoration:none;\">$(html_reserved "$1")</a>"; }
 pr_boldurl() { tm_bold "$1"; html_out "<a href=\"$(html_reserved "$1")\" style=\"font-weight:bold;color:black;text-decoration:none;\">$(html_reserved "$1")</a>"; }
 
-### color switcher (see e.g. https://linuxtidbits.wordpress.com/2008/08/11/output-color-on-bash-scripts/
-###                          https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/x405.html
-### no output support for HTML!
-### NOTE: These color functions (brown, yellow, off) are used in emphasize_stuff_in_headers(), but should
-### generally be avoided, Functions such as pr_svrty_low() and pr_svrty_medium() should be used instead, as
-### they handle both terminal and HTML output.
 set_color_functions() {
-     local ncurses_tput=true
-
      if [[ $SYSTEM == OpenBSD ]] && [[ "$TERM" =~ xterm-256 ]]; then
           export TERM=xterm
           # OpenBSD can't handle 256 colors (yet) in xterm which might lead to ugly errors
           # like "tput: not enough arguments (3) for capability `AF'". Not our fault but
           # before we get blamed we fix it here.
      fi
-
-     # Empty all vars if we have COLOR=0 equals no escape code -- these are globals:
-     brown=""
-     yellow=""
-     off=""
-
-     type -p tput &>/dev/null || return 0      # Hey wait, do we actually have tput / ncurses ?
-     tput cols &>/dev/null || return 0         # tput under BSDs and GNUs doesn't work either (TERM undefined?)
-     tput sgr0 &>/dev/null || ncurses_tput=false
-     if [[ "$COLOR" -ge 2 ]]; then
-          if $ncurses_tput; then
-               brown=$(tput setaf 3)
-               yellow=$(tput setaf 3; tput bold)
-          else                                    # this is a try for old BSD, see terminfo(5)
-               brown=$(tput AF 3)
-               yellow=$(tput AF 3; tput md)
-          fi
-     fi
-     if [[ "$COLOR" -ge 1 ]]; then
-          if $ncurses_tput; then
-               off=$(tput sgr0)
-          else                                    # this is a try for old BSD, see terminfo(5)
-               off=$(tput me)
-          fi
-     fi
-     # FreeBSD 10 understands ESC codes like 'echo -e "\e[3mfoobar\e[23m"', but also no tput for italics
 }
 
 ###### START universal helper function definitions ######
