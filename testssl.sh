@@ -1995,7 +1995,7 @@ check_pwnedkeys() {
      local cert="$1"
      local cert_key_algo="$2"
      local -i cert_keysize="$3"
-     local pubkey curve response
+     local pubkey curve fingerprint response
 
      "$PHONE_OUT" || return 0
 
@@ -2531,6 +2531,7 @@ s_client_options() {
 # sets global $SERVICE
 #
 service_detection() {
+     local plaintext
      local -i was_killed
      local jsonID
 
@@ -2657,7 +2658,7 @@ sanitze_http_header() {
 # problems not handled: chunked
 #
 run_http_header() {
-     local header
+     local header msg_thereafter
      local referer useragent
      local url redirect
      local jsonID="HTTP_status_code"
@@ -2829,7 +2830,7 @@ match_ipv4_httpheader() {
 run_http_date() {
      local difftime
      local spaces="                              "
-     jsonID="HTTP_clock_skew"
+     local jsonID="HTTP_clock_skew"
 
      if [[ $SERVICE != HTTP ]] || { [[ "$CLIENT_AUTH" == required ]] && [[ -z "$MTLS" ]]; }; then
           return 0
@@ -3981,8 +3982,8 @@ neat_list(){
 }
 
 run_cipher_match(){
-     local hexc n auth ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers s
-     local -a hexcode normalized_hexcode ciph sslvers kx enc export2 sigalg
+     local arg hexc n auth ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers s
+     local -a hexcode hexcode2 normalized_hexcode ciph sslvers kx enc export2 sigalg
      local -a ciphers_found ciphers_found2 ciph2 rfc_ciph rfc_ciph2 ossl_supported
      local -a -i index
      local -i nr_ciphers=0 nr_ossl_ciphers=0 nr_nonossl_ciphers=0
@@ -3990,7 +3991,7 @@ run_cipher_match(){
      local dhlen has_dh_bits="$HAS_DH_BITS"
      local cipher proto protos_to_try
      local available
-     local -i sclient_success
+     local -i i sclient_success
      local re='^[0-9A-Fa-f]+$'
      local using_sockets=true
 
@@ -4001,10 +4002,8 @@ run_cipher_match(){
      pr_headline " Testing ciphers with "
      if [[ $1 =~ $re ]]; then
           pr_headline "matching number pattern \"$1\" "
-          tjolines="$tjolines matching number pattern \"$1\"\n\n"
      else
           pr_headline "word pattern "\"$1\"" (ignore case) "
-          tjolines="$tjolines word pattern \"$1\" (ignore case)\n\n"
      fi
      outln
      if ! "$using_sockets"; then
@@ -4288,7 +4287,7 @@ run_allciphers() {
      local -a ciphers_found ciphers_found2 hexcode2 ciph2 rfc_ciph2
      local -i -a index
      local proto protos_to_try
-     local dhlen available ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers
+     local dhlen available cipher ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers
      local has_dh_bits="$HAS_DH_BITS"
      local using_sockets=true
 
@@ -4563,7 +4562,7 @@ ciphers_by_strength() {
      local -a hexcode2 ciph2 rfc_ciph2
      local -i i bundle end_of_bundle bundle_size num_bundles
      local -a ciphers_found ciphers_found2 sigalg ossl_supported index
-     local dhlen supported_sslv2_ciphers ciphers_to_test tls13_ciphers_to_test addcmd temp
+     local s dhlen supported_sslv2_ciphers ciphers_to_test tls13_ciphers_to_test addcmd temp
      local available proto_supported=false
      local id
      local has_dh_bits="$HAS_DH_BITS"
@@ -5265,6 +5264,7 @@ run_client_simulation() {
      local handshakebytes=()
      local lowest_protocol=()
      local highest_protocol=()
+     local alpn=()
      local service=()
      local minDhBits=()
      local maxDhBits=()
@@ -5273,13 +5273,15 @@ run_client_simulation() {
      local minEcdsaBits=()
      local curves=()
      local requiresSha2=()
+     local ja3=()
+     local ja4=()
      local current=()
      local i=0
      local name tls proto cipher temp what_dh bits curve supported_curves
      local has_dh_bits using_sockets=true
      local client_service
      local options
-     local -i ret=0
+     local -i ret=0 sclient_success nr_ossl_fail save_max_ossl_fail
      local jsonID="clientsimulation"
      local client_service=""
      local append_fileout=""
@@ -6840,7 +6842,7 @@ pr_kem_quality() {
 
 
 pr_kem_param_set_quality() {
-     kem="$1"
+     local kem="$1"
      local -i bits=0
 
      case "$kem" in
@@ -7124,6 +7126,7 @@ read_dhbits_from_file() {
 #
 sub_session_resumption() {
      local ret ret1 ret2
+     local new_sid new_sid2
      local tmpfile=$(mktemp $TEMPDIR/session_resumption.$NODEIP.XXXXXX)
      local sess_data=$(mktemp $TEMPDIR/sub_session_data_resumption.$NODEIP.XXXXXX)
      local -a rw_line
@@ -7279,17 +7282,17 @@ sub_early_data() {
 }
 
 run_server_preference() {
-     local cipher1="" cipher2="" tls13_cipher1="" tls13_cipher2="" default_proto=""
+     local cipher0="" cipher1="" cipher2="" tls13_cipher1="" tls13_cipher2="" default_proto=""
      local default_cipher="" ciph
      local limitedsense="" supported_sslv2_ciphers
      local proto_ossl proto_txt proto_hex cipherlist i
      local -i ret=0 j sclient_success
      local list_fwd="DHE-RSA-SEED-SHA:SEED-SHA:DES-CBC3-SHA:RC4-MD5:DES-CBC-SHA:RC4-SHA:AES128-SHA:AES128-SHA256:AES256-SHA:ECDHE-RSA-AES128-SHA:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA:ECDH-RSA-DES-CBC3-SHA:ECDH-RSA-AES128-SHA:ECDH-RSA-AES256-SHA:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:DHE-DSS-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:AES256-SHA256:ECDHE-RSA-DES-CBC3-SHA:ECDHE-RSA-AES128-SHA256:AES256-GCM-SHA384:AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-SHA256:ADH-AES256-GCM-SHA384:AECDH-AES128-SHA:ECDHE-RSA-RC4-SHA:ECDHE-ECDSA-AES128-SHA"
      local list_reverse="ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-RC4-SHA:AECDH-AES128-SHA:ADH-AES256-GCM-SHA384:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-GCM-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-DES-CBC3-SHA:AES256-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-DSS-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDH-RSA-AES256-SHA:ECDH-RSA-AES128-SHA:ECDH-RSA-DES-CBC3-SHA:DHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:ECDHE-RSA-AES128-SHA:AES256-SHA:AES128-SHA256:AES128-SHA:RC4-SHA:DES-CBC-SHA:RC4-MD5:DES-CBC3-SHA:SEED-SHA:DHE-RSA-SEED-SHA"
-     tls_list_fwd="c0,2c, c0,30, 00,9f, cc,a9, cc,a8, cc,aa, c0,2b, c0,2f, 00,9e, c0,24, c0,28, 00,6b, c0,23, c0,27, 00,67, c0,0a, 00,04, 00,05, 00,09, 00,0a, 00,9a, 00,96,
-                   c0,14, 00,39, c0,09, c0,13, 00,33, 00,9d, 00,9c, 00,C6, 00,C7, 13,01, 13,02, 13,03, 13,04, 13,05, 00,3d, 00,3c, 00,35, 00,2f, 00,ff"
-     tls_list_rev="00,2f, 00,35, 00,3c, 00,3d, 13,05, 13,04, 13,03, 13,02, 13,01, 00,C7, 00,C6, 00,9c, 00,9d, 00,33, c0,13, c0,09, 00,39, c0,14, 00,96, 00,9a, 00,0a, 00,09, 00,05, 00,04,
-                   c0,0a, 00,67, c0,27, c0,23, 00,6b, c0,28, c0,24, 00,9e, c0,2f, c0,2b, cc,aa, cc,a8, cc,a9, 00,9f, c0,30, c0,2c, 00,ff"
+     local tls_list_fwd="c0,2c, c0,30, 00,9f, cc,a9, cc,a8, cc,aa, c0,2b, c0,2f, 00,9e, c0,24, c0,28, 00,6b, c0,23, c0,27, 00,67, c0,0a, 00,04, 00,05, 00,09, 00,0a, 00,9a, 00,96,
+                         c0,14, 00,39, c0,09, c0,13, 00,33, 00,9d, 00,9c, 00,C6, 00,C7, 13,01, 13,02, 13,03, 13,04, 13,05, 00,3d, 00,3c, 00,35, 00,2f, 00,ff"
+     local tls_list_rev="00,2f, 00,35, 00,3c, 00,3d, 13,05, 13,04, 13,03, 13,02, 13,01, 00,C7, 00,C6, 00,9c, 00,9d, 00,33, c0,13, c0,09, 00,39, c0,14, 00,96, 00,9a, 00,0a, 00,09, 00,05, 00,04,
+                         c0,0a, 00,67, c0,27, c0,23, 00,6b, c0,28, c0,24, 00,9e, c0,2f, c0,2b, cc,aa, cc,a8, cc,a9, 00,9f, c0,30, c0,2c, 00,ff"
      local has_cipher_order=false has_tls13_cipher_order=false
      local addcmd="" addcmd2=""
      local using_sockets=true
@@ -7670,6 +7673,7 @@ cipher_pref_check() {
      local -a rfc_ciph hexcode ciphers_found ciphers_found2
      local -a -i index
      local ciphers_found_with_sockets=false prioritize_chacha=false
+     local id
 
      if ! "$using_sockets" && ! sclient_supported "-$proto"; then
           outln
@@ -8536,7 +8540,7 @@ get_server_certificate() {
      local protocols_to_try proto
      local s sigalg sigalgs=""
      local success ret
-     local npn_params="" line
+     local npn_params="" line addcmd
      local ciphers_to_test=""
      # Cipher suites that use a certificate with an RSA (signature) public key
      local -r a_rsa="cc,13, cc,15, c0,30, c0,28, c0,14, 00,9f, cc,a8, cc,aa, c0,a3, c0,9f, 00,6b, 00,39, c0,77, 00,c4, 00,88, c0,45, c0,4d, c0,53, c0,61, c0,7d, c0,8b, 16,b7, 16,b9, c0,2f, c0,27, c0,13, 00,9e, c0,a2, c0,9e, 00,67, 00,33, c0,76, 00,be, 00,9a, 00,45, c0,44, c0,4c, c0,52, c0,60, c0,7c, c0,8a, c0,11, c0,12, 00,16, 00,15, 00,14, c0,10"
@@ -8765,7 +8769,7 @@ get_cn_from_cert() {
 # Return 0 if the name provided in arg1 is a wildcard name
 is_wildcard()
 {
-     local certname="$1"
+     local basename certname="$1"
 
      # If the first label in the DNS name begins "xn--", then assume it is an
      # A-label and not a wildcard name (RFC 6125, Section 6.4.3).
@@ -8843,7 +8847,7 @@ compare_server_name_to_cert() {
      local cert="$1"
      local servername cns cn dns_sans ip_sans san dercert tag
      local srv_id="" xmppaddr=""
-     local -i i len len1 cn_match=0 wildcard_cert=0
+     local -i i j len len1 cn_match=0 wildcard_cert=0
      local -i subret=0             # no error condition, passing results
 
      HAS_DNS_SANS=false
@@ -11982,7 +11986,7 @@ run_npn() {
 
 
 run_alpn() {
-     local tmpstr alpn_extn len
+     local tmpstr proto alpn_extn len
      local -i ret=0
      local has_alpn_proto=false
      local alpn_finding=""
@@ -12678,6 +12682,7 @@ socksend_x() {
 # ARG1: blocksize for reading
 #
 sockread() {
+     local maxsleep
      [[ -z "$2" ]] && maxsleep=$MAX_WAITSOCK || maxsleep=$2
      SOCK_REPLY_FILE=$(mktemp $TEMPDIR/ddreply.XXXXXX) || return 7
      dd bs=$1 of=$SOCK_REPLY_FILE count=1 <&5 2>/dev/null &
@@ -16502,7 +16507,7 @@ prepare_tls_clienthello() {
      local new_socket=true
      local tls_word_reclayer="03, 01"      # the first TLS version number is the record layer and always 0301
                                            # -- except: SSLv3 and second ClientHello after HelloRetryRequest
-     local servername_hexstr len_servername len_servername_hex
+     local servername servername_hexstr len_servername len_servername_hex
      local hexdump_format_str part1 part2
      local all_extensions=""
      local -i i j len_ciph_suites_byte len_extension len_padding_extension len_all len_session_id
@@ -17465,7 +17470,7 @@ send_app_data() {
 #       sequence number will not be correct.
 receive_app_data() {
      local plaintext=""
-     local tls_version cipher client_key client_iv server_key server_iv
+     local tls_version cipher client_key client_iv server_key server_iv content_type
      local aad ciphertext="" res="" data
      local -i client_seq server_seq len msg_len
      local include_headers=true
@@ -17832,8 +17837,9 @@ run_ticketbleed() {
      local len_sid="$(( ${#sid} / 4))"
      local xlen_sid="$(dec02hex $len_sid)"
      local -i len_tckt_tls=0 nr_sid_detected=0
+     local client_hello tls_hello_ascii
      local xlen_tckt_tls="" xlen_handshake_record_layer="" xlen_handshake_ssl_layer=""
-     local -i len_handshake_record_layer=0
+     local -i len_handshake_ssl_layer len_handshake_record_layer=0
      local i
      local -a memory sid_detected
      local early_exit=true
@@ -18172,7 +18178,7 @@ run_opossum() {
 run_renego() {
      local legacycmd="" proto="$OPTIMAL_PROTO"
      local sec_renego
-     local -i ret=0
+     local -i ret=0 restore_errfile
      local cve=""
      local cwe="CWE-310"
      local hint=""
@@ -19515,7 +19521,7 @@ run_logjam() {
 
 # Decrypting RSA with Obsolete and Weakened eNcryption, more @ https://drownattack.com/
 run_drown() {
-     local -i nr_ciphers_detected ret=0
+     local -i lines nr_ciphers_detected ret=0
      local spaces="                                          "
      local cert_fingerprint_sha2=""
      local cve="CVE-2016-0800 CVE-2016-0703"
@@ -19601,8 +19607,8 @@ run_drown() {
 # Browser Exploit Against SSL/TLS: don't use CBC Ciphers in SSLv3 TLSv1.0
 run_beast(){
      local hexc dash cbc_cipher sslvers auth mac
-     local -a ciph hexcode normalized_hexcode kx enc export2
-     local proto proto_hex
+     local -a ciph hexcode normalized_hexcode rfc_ciph kx enc export2 ossl_supported ciphers_found sigalg
+     local proto proto_hex dhlen
      local -i i subret nr_ciphers=0 sclient_success=0
      local detected_cbc_ciphers="" ciphers_to_test
      local higher_proto_supported=""
@@ -20111,10 +20117,10 @@ run_winshock() {
 run_lucky13() {
      local spaces="                                           "
      local cbc_ciphers="ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:SRP-DSS-AES-256-CBC-SHA:SRP-RSA-AES-256-CBC-SHA:SRP-AES-256-CBC-SHA:RSA-PSK-AES256-CBC-SHA384:DHE-PSK-AES256-CBC-SHA384:DHE-PSK-AES256-CBC-SHA:ECDHE-PSK-CAMELLIA256-SHA384:RSA-PSK-CAMELLIA256-SHA384:DHE-PSK-CAMELLIA256-SHA384:PSK-AES256-CBC-SHA384:PSK-CAMELLIA256-SHA384:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA256:DH-RSA-AES256-SHA256:DH-DSS-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-DSS-AES256-SHA:DH-RSA-AES256-SHA:DH-DSS-AES256-SHA:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CAMELLIA256-SHA384:DHE-RSA-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA256:DH-RSA-CAMELLIA256-SHA256:DH-DSS-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-DSS-CAMELLIA256-SHA:DH-RSA-CAMELLIA256-SHA:DH-DSS-CAMELLIA256-SHA:AECDH-AES256-SHA:ADH-AES256-SHA256:ADH-AES256-SHA:ADH-CAMELLIA256-SHA256:ADH-CAMELLIA256-SHA:ECDH-RSA-AES256-SHA384:ECDH-ECDSA-AES256-SHA384:ECDH-RSA-AES256-SHA:ECDH-ECDSA-AES256-SHA:ECDH-RSA-CAMELLIA256-SHA384:ECDH-ECDSA-CAMELLIA256-SHA384:AES256-SHA256:AES256-SHA:CAMELLIA256-SHA256:ECDHE-PSK-AES256-CBC-SHA384:ECDHE-PSK-AES256-CBC-SHA:CAMELLIA256-SHA:RSA-PSK-AES256-CBC-SHA:PSK-AES256-CBC-SHA:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:SRP-DSS-AES-128-CBC-SHA:SRP-RSA-AES-128-CBC-SHA:SRP-AES-128-CBC-SHA:DHE-RSA-AES128-SHA256:DHE-DSS-AES128-SHA256:DH-RSA-AES128-SHA256:DH-DSS-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA:DH-RSA-AES128-SHA:DH-DSS-AES128-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA256:DH-RSA-CAMELLIA128-SHA256:DH-DSS-CAMELLIA128-SHA256:DHE-RSA-SEED-SHA:DHE-DSS-SEED-SHA:DH-RSA-SEED-SHA:DH-DSS-SEED-SHA:DHE-RSA-CAMELLIA128-SHA:DHE-DSS-CAMELLIA128-SHA:DH-RSA-CAMELLIA128-SHA:DH-DSS-CAMELLIA128-SHA:AECDH-AES128-SHA:ADH-AES128-SHA256:ADH-AES128-SHA:ADH-CAMELLIA128-SHA256:ADH-SEED-SHA:ADH-CAMELLIA128-SHA:ECDH-RSA-AES128-SHA256:ECDH-ECDSA-AES128-SHA256:ECDH-RSA-AES128-SHA:ECDH-ECDSA-AES128-SHA:ECDH-RSA-CAMELLIA128-SHA256:ECDH-ECDSA-CAMELLIA128-SHA256:AES128-SHA256:AES128-SHA:CAMELLIA128-SHA256:ECDHE-PSK-AES128-CBC-SHA256:ECDHE-PSK-AES128-CBC-SHA:RSA-PSK-AES128-CBC-SHA256:DHE-PSK-AES128-CBC-SHA256:DHE-PSK-AES128-CBC-SHA:SEED-SHA:CAMELLIA128-SHA:ECDHE-PSK-CAMELLIA128-SHA256:RSA-PSK-CAMELLIA128-SHA256:DHE-PSK-CAMELLIA128-SHA256:PSK-AES128-CBC-SHA256:PSK-CAMELLIA128-SHA256:IDEA-CBC-SHA:RSA-PSK-AES128-CBC-SHA:PSK-AES128-CBC-SHA:KRB5-IDEA-CBC-SHA:KRB5-IDEA-CBC-MD5:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:SRP-DSS-3DES-EDE-CBC-SHA:SRP-RSA-3DES-EDE-CBC-SHA:SRP-3DES-EDE-CBC-SHA:EDH-RSA-DES-CBC3-SHA:EDH-DSS-DES-CBC3-SHA:DH-RSA-DES-CBC3-SHA:DH-DSS-DES-CBC3-SHA:AECDH-DES-CBC3-SHA:ADH-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:ECDH-ECDSA-DES-CBC3-SHA:DES-CBC3-SHA:RSA-PSK-3DES-EDE-CBC-SHA:PSK-3DES-EDE-CBC-SHA:KRB5-DES-CBC3-SHA:KRB5-DES-CBC3-MD5:ECDHE-PSK-3DES-EDE-CBC-SHA:DHE-PSK-3DES-EDE-CBC-SHA:EXP1024-DHE-DSS-DES-CBC-SHA:EDH-RSA-DES-CBC-SHA:EDH-DSS-DES-CBC-SHA:DH-RSA-DES-CBC-SHA:DH-DSS-DES-CBC-SHA:ADH-DES-CBC-SHA:EXP1024-DES-CBC-SHA:DES-CBC-SHA:KRB5-DES-CBC-SHA:KRB5-DES-CBC-MD5:EXP-EDH-RSA-DES-CBC-SHA:EXP-EDH-DSS-DES-CBC-SHA:EXP-ADH-DES-CBC-SHA:EXP-DES-CBC-SHA:EXP-RC2-CBC-MD5:EXP-KRB5-RC2-CBC-SHA:EXP-KRB5-DES-CBC-SHA:EXP-KRB5-RC2-CBC-MD5:EXP-KRB5-DES-CBC-MD5:EXP-DH-DSS-DES-CBC-SHA:EXP-DH-RSA-DES-CBC-SHA"
-     cbc_ciphers_hex1="c0,28, c0,24, c0,14, c0,0a, c0,22, c0,21, c0,20, 00,b7, 00,b3, 00,91, c0,9b, c0,99, c0,97, 00,af, c0,95, 00,6b, 00,6a, 00,69, 00,68, 00,39, 00,38, 00,37, 00,36, c0,77, c0,73, 00,c4, 00,c3, 00,c2, 00,c1, 00,88, 00,87, 00,86, 00,85, c0,19, 00,6d, 00,3a, 00,c5, 00,89, c0,2a, c0,26, c0,0f, c0,05, c0,79, c0,75, 00,3d, 00,35, 00,c0, c0,38, c0,36, 00,84, 00,95, 00,8d, c0,3d, c0,3f, c0,41, c0,43, c0,45, c0,47, c0,49, c0,4b, c0,4d, c0,4f, c0,65, c0,67, c0,69, c0,71, c0,27, c0,23, c0,13, c0,09, c0,1f, c0,1e, c0,1d, 00,67, 00,40, 00,3f, 00,3e, 00,33, 00,32, 00,31, 00,30, c0,76, c0,72, 00,be, 00,bd, 00,bc, 00,bb, 00,9a, 00,99, 00,98, 00,97, 00,45, 00,44, 00,43, 00,42, c0,18, 00,6c, 00,34, 00,bf, 00,9b, 00,46, c0,29, c0,25, c0,0e, c0,04, c0,78, c0,74, 00,3c, 00,2f, 00,ba"
-     cbc_ciphers_hex2="c0,37, c0,35, 00,b6, 00,b2, 00,90, 00,96, 00,41, c0,9a, c0,98, c0,96, 00,ae, c0,94, 00,07, 00,94, 00,8c, 00,21, 00,25, c0,3c, c0,3e, c0,40, c0,42, c0,44, c0,46, c0,48, c0,4a, c0,4c, c0,4e, c0,64, c0,66, c0,68, c0,70, c0,12, c0,08, c0,1c, c0,1b, c0,1a, 00,16, 00,13, 00,10, 00,0d, c0,17, 00,1b, c0,0d, c0,03, 00,0a, 00,93, 00,8b, 00,1f, 00,23, c0,34, 00,8f, fe,ff, ff,e0, 00,63, 00,15, 00,12, 00,0f, 00,0c, 00,1a, 00,62, 00,09, 00,61, 00,1e, 00,22, fe,fe, ff,e1, 00,14, 00,11, 00,19, 00,08, 00,06, 00,27, 00,26, 00,2a, 00,29, 00,0b, 00,0e"
+     local cbc_ciphers_hex1="c0,28, c0,24, c0,14, c0,0a, c0,22, c0,21, c0,20, 00,b7, 00,b3, 00,91, c0,9b, c0,99, c0,97, 00,af, c0,95, 00,6b, 00,6a, 00,69, 00,68, 00,39, 00,38, 00,37, 00,36, c0,77, c0,73, 00,c4, 00,c3, 00,c2, 00,c1, 00,88, 00,87, 00,86, 00,85, c0,19, 00,6d, 00,3a, 00,c5, 00,89, c0,2a, c0,26, c0,0f, c0,05, c0,79, c0,75, 00,3d, 00,35, 00,c0, c0,38, c0,36, 00,84, 00,95, 00,8d, c0,3d, c0,3f, c0,41, c0,43, c0,45, c0,47, c0,49, c0,4b, c0,4d, c0,4f, c0,65, c0,67, c0,69, c0,71, c0,27, c0,23, c0,13, c0,09, c0,1f, c0,1e, c0,1d, 00,67, 00,40, 00,3f, 00,3e, 00,33, 00,32, 00,31, 00,30, c0,76, c0,72, 00,be, 00,bd, 00,bc, 00,bb, 00,9a, 00,99, 00,98, 00,97, 00,45, 00,44, 00,43, 00,42, c0,18, 00,6c, 00,34, 00,bf, 00,9b, 00,46, c0,29, c0,25, c0,0e, c0,04, c0,78, c0,74, 00,3c, 00,2f, 00,ba"
+     local cbc_ciphers_hex2="c0,37, c0,35, 00,b6, 00,b2, 00,90, 00,96, 00,41, c0,9a, c0,98, c0,96, 00,ae, c0,94, 00,07, 00,94, 00,8c, 00,21, 00,25, c0,3c, c0,3e, c0,40, c0,42, c0,44, c0,46, c0,48, c0,4a, c0,4c, c0,4e, c0,64, c0,66, c0,68, c0,70, c0,12, c0,08, c0,1c, c0,1b, c0,1a, 00,16, 00,13, 00,10, 00,0d, c0,17, 00,1b, c0,0d, c0,03, 00,0a, 00,93, 00,8b, 00,1f, 00,23, c0,34, 00,8f, fe,ff, ff,e0, 00,63, 00,15, 00,12, 00,0f, 00,0c, 00,1a, 00,62, 00,09, 00,61, 00,1e, 00,22, fe,fe, ff,e1, 00,14, 00,11, 00,19, 00,08, 00,06, 00,27, 00,26, 00,2a, 00,29, 00,0b, 00,0e"
      local has_dh_bits="$HAS_DH_BITS"
-     local -i nr_supported_ciphers=0 sclient_success
+     local -i nr_cbc_ciphers nr_supported_ciphers=0 sclient_success
      local using_sockets=true
      local cve="CVE-2013-0169"
      local cwe="CWE-310"
@@ -20187,11 +20193,11 @@ run_rc4() {
      local -i rc4_offered=0
      local -i nr_ciphers=0 nr_ossl_ciphers=0 nr_nonossl_ciphers=0 sclient_success=0
      local n auth mac hexc sslv2_ciphers_hex="" sslv2_ciphers_ossl="" s
-     local -a normalized_hexcode hexcode ciph sslvers kx enc export2 sigalg ossl_supported
+     local -a normalized_hexcode hexcode ciph rfc_ciph sslvers kx enc export2 sigalg ossl_supported
      local -i i
      local -a ciphers_found ciphers_found2 hexcode2 ciph2 rfc_ciph2
      local -i -a index
-     local dhlen available="" ciphers_to_test supported_sslv2_ciphers proto
+     local dhlen available="" cipher ciphers_to_test supported_sslv2_ciphers proto
      local has_dh_bits="$HAS_DH_BITS" rc4_detected=""
      local using_sockets=true
      local cve="CVE-2013-2566 CVE-2015-2808"
@@ -22040,7 +22046,7 @@ EOF
 
 
 prepare_arrays() {
-     local hexc mac ossl_ciph
+     local hexc n mac ossl_ciph
      local ossl_supported_tls="" ossl_supported_sslv2=""
      local -i i=0
 
@@ -23156,6 +23162,7 @@ shouldwedo_ipv6() {
 determine_ip_addresses() {
      local ip4=""
      local ip6=""
+     local addr
 
      # first, try to get IP addresses from /etc/hosts
      # Local_A[AAA] is for our UI
@@ -24775,6 +24782,7 @@ run_rating() {
      local -i c1_worst c1_best
      local -i c3_worst c3_best c3_worst_cb c3_best_cb
      local old_ifs=$IFS sorted_reasons sorted_warnings
+     local reason warning
      local -i reason_nr=0 warning_nr=0
 
      outln "\n";
@@ -25300,7 +25308,7 @@ parse_cmd_line() {
                     ;;
                -x|-x=*|--single[-_]cipher|--single[-_]cipher=*)
                     do_cipher_match=true
-                    single_cipher=$(parse_opt_equal_sign "$1" "$2")
+                    SINGLE_CIPHER=$(parse_opt_equal_sign "$1" "$2")
                     [[ $? -eq 0 ]] && shift
                     ;;
                -t|-t=*|--starttls|--starttls=*)
@@ -26054,7 +26062,7 @@ lets_roll() {
                # we will have an invalid JSON with no if statement
                ((section_number++))
                fileout_section_header $section_number false
-               run_cipher_match ${single_cipher}
+               run_cipher_match ${SINGLE_CIPHER}
                stopwatch run_cipher_match
           else
                fileout_section_header $section_number false && ((section_number++))
