@@ -512,14 +512,18 @@ date -j -f '%s' 1234567 >/dev/null 2>&1 && \
      HAS_FREEBSDDATE=true
 
 
-echo A | sed -E 's/A//' >/dev/null 2>&1 && \
-     declare -r HAS_SED_E=true || \
+if echo A | sed -E 's/A//' >/dev/null 2>&1; then
+     declare -r HAS_SED_E=true
+else
      declare -r HAS_SED_E=false
+fi
 
 ########### Terminal definitions
-tty -s && \
-     declare -r INTERACTIVE=true || \
+if tty -s; then
+     declare -r INTERACTIVE=true
+else
      declare -r INTERACTIVE=false
+fi
 
 if [[ -z $TERM_WIDTH ]]; then                               # No batch file and no otherwise predefined TERM_WIDTH
      if ! tput cols &>/dev/null || ! "$INTERACTIVE";then    # Prevent tput errors if running non interactive
@@ -620,81 +624,81 @@ out()   { printf -- "%b" "$1"; html_out "$(html_reserved "$1")"; }
 outln() { printf -- "%b" "$1\n"; html_out "$(html_reserved "$1")\n"; }
 
 # Color print functions, see also https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/x329.html
-tm_liteblue()   { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[0;32m$1" || tm_out "\033[0;34m$1"; } || tm_out "$1"; tm_off; }    # not yet used
-pr_liteblue()   { tm_liteblue "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+tm_liteblue()   { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[0;32m$1"; else tm_out "\033[0;34m$1"; fi; }; else tm_out "$1"; fi; tm_off; }    # not yet used
+pr_liteblue()   { tm_liteblue "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 tmln_liteblue() { tm_liteblue "$1"; tmln_out; }
 prln_liteblue() { pr_liteblue "$1"; outln; }
 
-tm_blue()       { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[1;32m$1" || tm_out "\033[1;34m$1"; } || tm_out "$1"; tm_off; }    # used for head lines of single tests
-pr_blue()       { tm_blue "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+tm_blue()       { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[1;32m$1"; else tm_out "\033[1;34m$1"; fi; }; else tm_out "$1"; fi; tm_off; }    # used for head lines of single tests
+pr_blue()       { tm_blue "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 tmln_blue()     { tm_blue "$1"; tmln_out; }
 prln_blue()     { pr_blue "$1"; outln; }
 
-tm_yellow()  { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;33m$1" || tm_out "$1"; tm_off; }
-pr_yellow()  { tm_yellow "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#8a7237;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_yellow()  { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;33m$1"; else tm_out "$1"; fi; tm_off; }
+pr_yellow()  { tm_yellow "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#8a7237;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 
-tm_brown()  { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;33m$1" || tm_out "$1"; tm_off; }
-pr_brown()  { tm_brown "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#8a7237;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_brown()  { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;33m$1"; else tm_out "$1"; fi; tm_off; }
+pr_brown()  { tm_brown "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#8a7237;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 
 # we should be able to use aliases here
-tm_warning()    { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;35m$1" || tm_underline "$1"; tm_off; }                   # some local problem: one test cannot be done
+tm_warning()    { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;35m$1"; else tm_underline "$1"; fi; tm_off; }                   # some local problem: one test cannot be done
 tmln_warning()  { tm_warning "$1"; tmln_out; }                                                                    # litemagenta
-pr_warning()    { tm_warning "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#cd00cd;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<u>$(html_reserved "$1")</u>" || html_out "$(html_reserved "$1")"; }; }
+pr_warning()    { tm_warning "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#cd00cd;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<u>$(html_reserved "$1")</u>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_warning()  { pr_warning "$1"; outln; }
 
-tm_magenta()    { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;35m$1" || tm_underline "$1"; tm_off; }                   # fatal error: quitting because of this!
+tm_magenta()    { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;35m$1"; else tm_underline "$1"; fi; tm_off; }                   # fatal error: quitting because of this!
 tmln_magenta()  { tm_magenta "$1"; tmln_out; }
 # different as warning above?
-pr_magenta()    { tm_magenta "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#be32d0;font-weight:bold;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<u>$(html_reserved "$1")</u>" || html_out "$(html_reserved "$1")"; }; }
+pr_magenta()    { tm_magenta "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#be32d0;font-weight:bold;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<u>$(html_reserved "$1")</u>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_magenta()  { pr_magenta "$1"; outln; }
 
-tm_litecyan()   { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;36m$1" || tm_out "$1"; tm_off; }                         # not yet used
+tm_litecyan()   { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;36m$1"; else tm_out "$1"; fi; tm_off; }                         # not yet used
 tmln_litecyan() { tm_litecyan "$1"; tmln_out; }
-pr_litecyan()   { tm_litecyan "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#168092;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_litecyan()   { tm_litecyan "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#168092;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_litecyan() { pr_litecyan "$1"; outln; }
 
-tm_cyan()       { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;36m$1" || tm_out "$1"; tm_off; }                         # additional hint
+tm_cyan()       { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;36m$1"; else tm_out "$1"; fi; tm_off; }                         # additional hint
 tmln_cyan()     { tm_cyan "$1"; tmln_out; }
-pr_cyan()       { tm_cyan "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#0d7ea2;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_cyan()       { tm_cyan "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#0d7ea2;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_cyan()     { pr_cyan "$1"; outln; }
 
-tm_litegrey()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[0;37m$1" || tm_out "$1"; tm_off; }                         # ... https://github.com/testssl/testssl.sh/pull/600#issuecomment-276129876
+tm_litegrey()   { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[0;37m$1"; else tm_out "$1"; fi; tm_off; }                         # ... https://github.com/testssl/testssl.sh/pull/600#issuecomment-276129876
 tmln_litegrey() { tm_litegrey "$1"; tmln_out; }                                                                   # not really usable on a black background, see ..
 prln_litegrey() { pr_litegrey "$1"; outln; }
-pr_litegrey()   { tm_litegrey "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:#71767a;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_litegrey()   { tm_litegrey "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:#71767a;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 
-tm_grey()       { [[ "$COLOR" -ne 0 ]] && tm_out "\033[1;30m$1" || tm_out "$1"; tm_off; }
-pr_grey()       { tm_grey "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:#757575;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_grey()       { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[1;30m$1"; else tm_out "$1"; fi; tm_off; }
+pr_grey()       { tm_grey "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:#757575;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_grey()     { tm_grey "$1"; tmln_out; }
 prln_grey()     { pr_grey "$1"; outln; }
 
-tm_svrty_good()   { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[0;34m$1" || tm_out "\033[0;32m$1"; } || tm_out "$1"; tm_off; }   # litegreen (liteblue), This is good
+tm_svrty_good()   { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[0;34m$1"; else tm_out "\033[0;32m$1"; fi; }; else tm_out "$1"; fi; tm_off; }   # litegreen (liteblue), This is good
 tmln_svrty_good() { tm_svrty_good "$1"; tmln_out; }
-pr_svrty_good()   { tm_svrty_good "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+pr_svrty_good()   { tm_svrty_good "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 prln_svrty_good() { pr_svrty_good "$1"; outln; }
 
-tm_svrty_best()   { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[1;34m$1" || tm_out "\033[1;32m$1"; } ||  tm_out "$1"; tm_off; }  # green (blue), This is the best
+tm_svrty_best()   { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[1;34m$1"; else tm_out "\033[1;32m$1"; fi; }; else tm_out "$1"; fi; tm_off; }  # green (blue), This is the best
 tmln_svrty_best() { tm_svrty_best "$1"; tmln_out; }
-pr_svrty_best()   { tm_svrty_best "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+pr_svrty_best()   { tm_svrty_best "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 prln_svrty_best() { pr_svrty_best "$1"; outln; }
 
-tm_svrty_low()     { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;33m$1" || tm_out "$1"; tm_off; }         # yellow brown | academic or minor problem
+tm_svrty_low()     { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;33m$1"; else tm_out "$1"; fi; tm_off; }         # yellow brown | academic or minor problem
 tmln_svrty_low()   { tm_svrty_low "$1"; tmln_out; }
-pr_svrty_low()     { tm_svrty_low "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#a86437;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_svrty_low()     { tm_svrty_low "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#a86437;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_svrty_low()   { pr_svrty_low "$1"; outln; }
 
-tm_svrty_medium()  { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;33m$1" || tm_out "$1"; tm_off; }         # brown | it is not a bad problem but you shouldn't do this
-pr_svrty_medium()  { tm_svrty_medium "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#c05600;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_svrty_medium()  { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;33m$1"; else tm_out "$1"; fi; tm_off; }         # brown | it is not a bad problem but you shouldn't do this
+pr_svrty_medium()  { tm_svrty_medium "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#c05600;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_svrty_medium(){ tm_svrty_medium "$1"; tmln_out; }
 prln_svrty_medium(){ pr_svrty_medium "$1"; outln; }
 
-tm_svrty_high()    { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;31m$1" || tm_bold "$1"; tm_off; }               # litered
-pr_svrty_high()    { tm_svrty_high "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#e52207;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }; }
+tm_svrty_high()    { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;31m$1"; else tm_bold "$1"; fi; tm_off; }               # litered
+pr_svrty_high()    { tm_svrty_high "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#e52207;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_svrty_high()  { tm_svrty_high "$1"; tmln_out; }
 prln_svrty_high()  { pr_svrty_high "$1"; outln; }
 
-tm_svrty_critical()   { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;31m$1" || tm_bold "$1"; tm_off; }           # red
-pr_svrty_critical()   { tm_svrty_critical "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#e52207;font-weight:bold;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }; }
+tm_svrty_critical()   { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;31m$1"; else tm_bold "$1"; fi; tm_off; }           # red
+pr_svrty_critical()   { tm_svrty_critical "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#e52207;font-weight:bold;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_svrty_critical() { tm_svrty_critical "$1"; tmln_out; }
 prln_svrty_critical() { pr_svrty_critical "$1"; outln; }
 
@@ -706,9 +710,9 @@ prln_deemphasize()    { pr_deemphasize "$1"; outln; }
 # color=1 functions
 tm_off()        { [[ "$COLOR" -ne 0 ]] && tm_out "\033[m"; }
 
-tm_bold()       { [[ "$COLOR" -ne 0 ]] && tm_out "\033[1m$1" || tm_out "$1"; tm_off; }
+tm_bold()       { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[1m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_bold()     { tm_bold "$1"; tmln_out; }
-pr_bold()       { tm_bold "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_bold()       { tm_bold "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_bold()     { pr_bold "$1" ; outln; }
 
 NO_ITALICS=false
@@ -721,33 +725,33 @@ elif [[ $SYSTEM == FreeBSD ]]; then
           NO_ITALICS=true
      fi
 fi
-tm_italic()     { { [[ "$COLOR" -ne 0 ]] && ! "$NO_ITALICS"; } && tm_out "\033[3m$1" || tm_out "$1"; tm_off; }
+tm_italic()     { if [[ "$COLOR" -ne 0 ]] && ! "$NO_ITALICS"; then tm_out "\033[3m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_italic()   { tm_italic "$1" ; tmln_out; }
-pr_italic()     { tm_italic "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<i>$(html_reserved "$1")</i>" || html_out "$(html_reserved "$1")"; }
+pr_italic()     { tm_italic "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<i>$(html_reserved "$1")</i>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_italic()   { pr_italic "$1"; outln; }
 
-tm_strikethru()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[9m$1" || tm_out "$1"; tm_off; }                          # ugly!
+tm_strikethru()   { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[9m$1"; else tm_out "$1"; fi; tm_off; }                          # ugly!
 tmln_strikethru() { tm_strikethru "$1"; tmln_out; }
-pr_strikethru()   { tm_strikethru "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<strike>$(html_reserved "$1")</strike>" || html_out "$(html_reserved "$1")"; }
+pr_strikethru()   { tm_strikethru "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<strike>$(html_reserved "$1")</strike>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_strikethru() { pr_strikethru "$1" ; outln; }
 
-tm_underline()    { [[ "$COLOR" -ne 0 ]] && tm_out "\033[4m$1" || tm_out "$1"; tm_off; }
+tm_underline()    { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[4m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_underline()  { tm_underline "$1"; tmln_out; }
-pr_underline()    { tm_underline "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<u>$(html_reserved "$1")</u>" || html_out "$(html_reserved "$1")"; }
+pr_underline()    { tm_underline "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<u>$(html_reserved "$1")</u>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_underline()  { pr_underline "$1"; outln; }
 
-tm_reverse()      { [[ "$COLOR" -ne 0 ]] && tm_out "\033[7m$1" || tm_out "$1"; tm_off; }
-tm_reverse_bold() { [[ "$COLOR" -ne 0 ]] && tm_out "\033[7m\033[1m$1" || tm_out "$1"; tm_off; }
-pr_reverse()      { tm_reverse "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:white;background-color:black;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
-pr_reverse_bold() { tm_reverse_bold "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:white;background-color:black;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_reverse()      { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[7m$1"; else tm_out "$1"; fi; tm_off; }
+tm_reverse_bold() { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[7m\033[1m$1"; else tm_out "$1"; fi; tm_off; }
+pr_reverse()      { tm_reverse "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:white;background-color:black;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
+pr_reverse_bold() { tm_reverse_bold "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:white;background-color:black;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 
 #pr_headline() { pr_blue "$1"; }
 #https://misc.flogisoft.com/bash/tip_colors_and_formatting
 
 #pr_headline() { [[ "$COLOR" -ge 2 ]] && out "\033[1;30m\033[47m$1" || out "$1"; tm_off; }
-tm_headline()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[1m\033[4m$1" || tm_out "$1"; tm_off; }
+tm_headline()   { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[1m\033[4m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_headline() { tm_headline "$1"; tmln_out; }
-pr_headline()   { tm_headline "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"text-decoration:underline;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_headline()   { tm_headline "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"text-decoration:underline;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 pr_headlineln() { pr_headline "$1" ; outln; }
 
 tm_squoted() { tm_out "'$1'"; }
@@ -1673,9 +1677,11 @@ out_row_aligned() {
      local first=true
 
      while read line; do
-          "$first" && \
-               first=false || \
+          if "$first"; then
+               first=false
+          else
                out "$2"
+          fi
           outln "$line"
      done <<< "$1"
 }
@@ -1766,8 +1772,11 @@ tmpfile_handle() {
      [[ -z "$savefile" ]] && savefile=$TMPFILE
 #FIXME: make sure/find out if we do not need $TEMPDIR/$NODEIP.$1" if debug=0. We would save fs access here
      mv $savefile "$TEMPDIR/$NODEIP.$1" 2>/dev/null
-     [[ $ERRFILE =~ dev.null ]] && return 0 || \
+     if [[ $ERRFILE =~ dev.null ]]; then
+          return 0
+     else
           mv $ERRFILE "$TEMPDIR/$NODEIP.${1//.txt/}.errorlog" 2>/dev/null
+     fi
      return 0
 }
 
@@ -3707,9 +3716,11 @@ prettyprint_local() {
      else
           pr_headline " Displaying all local ciphers ";
           # pattern provided; which one?
-          [[ $1 =~ $re ]] && \
-               pr_headline "matching number pattern \"$1\" " || \
+          if [[ $1 =~ $re ]]; then
+               pr_headline "matching number pattern \"$1\" "
+          else
                pr_headline "matching word pattern "\"$1\"" (ignore case) "
+          fi
      fi
      outln "\n"
      neat_header
@@ -7223,9 +7234,11 @@ sub_session_resumption() {
                "$byID" && echo "byID" || echo "by ticket"
           fi
      fi
-     "$byID" && \
-          tmpfile_handle ${FUNCNAME[0]}.byID.log $tmpfile || \
+     if "$byID"; then
+          tmpfile_handle ${FUNCNAME[0]}.byID.log $tmpfile
+     else
           tmpfile_handle ${FUNCNAME[0]}.byticket.log $tmpfile
+     fi
      return $ret
 }
 
@@ -19227,7 +19240,7 @@ run_freak() {
                     for (( i=0; i < TLS_NR_CIPHERS; i++ )); do
                          [[ "$hexc" == ${TLS_CIPHER_HEXCODE[i]} ]] && break
                     done
-                    [[ $i -eq $TLS_NR_CIPHERS ]] && tm_out "$hexc " || tm_out "${TLS_CIPHER_OSSL_NAME[i]} "
+                    if [[ $i -eq $TLS_NR_CIPHERS ]]; then tm_out "$hexc "; else tm_out "${TLS_CIPHER_OSSL_NAME[i]} "; fi
                done
                tmln_out
           else
@@ -19398,7 +19411,7 @@ run_logjam() {
                     for (( i=0; i < TLS_NR_CIPHERS; i++ )); do
                          [[ "$hexc" == ${TLS_CIPHER_HEXCODE[i]} ]] && break
                     done
-                    [[ $i -eq $TLS_NR_CIPHERS ]] && tm_out "$hexc " || tm_out "${TLS_CIPHER_OSSL_NAME[i]} "
+                    if [[ $i -eq $TLS_NR_CIPHERS ]]; then tm_out "$hexc "; else tm_out "${TLS_CIPHER_OSSL_NAME[i]} "; fi
                done
                tmln_out
           else
@@ -19858,9 +19871,11 @@ run_beast(){
                     fileout "${jsonID}_CBC_$(toupper $proto)" "MEDIUM" "$detected_cbc_ciphers" "$cve" "$cwe" "$hint"
                     ! "$first" && out "$spaces"
                     out "$(toupper $proto): "
-                    [[ -n "$higher_proto_supported" ]] && \
-                         pr_svrty_low "$(out_row_aligned_max_width "$detected_cbc_ciphers" "                                                 " $TERM_WIDTH)" || \
+                    if [[ -n "$higher_proto_supported" ]]; then
+                         pr_svrty_low "$(out_row_aligned_max_width "$detected_cbc_ciphers" "                                                 " $TERM_WIDTH)"
+                    else
                          pr_svrty_medium "$(out_row_aligned_max_width "$detected_cbc_ciphers" "                                                 " $TERM_WIDTH)"
+                    fi
                     outln
                     detected_cbc_ciphers=""  # empty for next round
                     first=false
