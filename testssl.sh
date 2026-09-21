@@ -4067,7 +4067,7 @@ run_cipher_match(){
                     fi
                done
           else
-               while read hexc n ciph[nr_ciphers] sslvers[nr_ciphers] kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+               while read hexc n "ciph[nr_ciphers]" "sslvers[nr_ciphers]" "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                     hexc="$(normalize_ciphercode $hexc)"
                     # is argument a number?
                     if [[ $arg =~ $re ]]; then
@@ -4339,7 +4339,7 @@ run_allciphers() {
           done
           nr_ciphers=$TLS_NR_CIPHERS
      else
-          while read -r hexc n ciph[nr_ciphers] sslvers[nr_ciphers] kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read -r hexc n "ciph[nr_ciphers]" "sslvers[nr_ciphers]" "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                ciphers_found[nr_ciphers]=false
                if [[ ${#hexc} -eq 9 ]]; then
                     if [[ "${hexc:2:2}" == 00 ]]; then
@@ -4649,7 +4649,7 @@ ciphers_by_strength() {
           else
                ossl_ciphers_proto="-tls1"
           fi
-          while read hexc n ciph[nr_ciphers] sslvers kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read hexc n "ciph[nr_ciphers]" sslvers "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                if [[ "$proto" == -tls1_3 ]]; then
                     [[ ":$TLS13_OSSL_CIPHERS:" =~ :${ciph[nr_ciphers]}: ]] || continue
                elif [[ "$proto" == -tls1_2 ]]; then
@@ -11207,7 +11207,7 @@ run_fs() {
                fi
           done
      else
-          while read -r hexc dash ciph[nr_supported_ciphers] sslvers kx[nr_supported_ciphers] auth enc[nr_supported_ciphers] mac exprt; do
+          while read -r hexc dash "ciph[nr_supported_ciphers]" sslvers "kx[nr_supported_ciphers]" auth "enc[nr_supported_ciphers]" mac exprt; do
                ciphers_found[nr_supported_ciphers]=false
                if [[ "${hexc:2:2}" == 00 ]]; then
                     normalized_hexcode[nr_supported_ciphers]="x${hexc:7:2}"
@@ -14362,7 +14362,7 @@ gcm() {
                done
 
                buf="$(gcm_mult $hl $hh ${gcm_ctx_buf[0]} ${gcm_ctx_buf[1]} ${gcm_ctx_buf[2]} ${gcm_ctx_buf[3]} ${gcm_ctx_buf[4]} ${gcm_ctx_buf[5]} ${gcm_ctx_buf[6]} ${gcm_ctx_buf[7]} ${gcm_ctx_buf[8]} ${gcm_ctx_buf[9]} ${gcm_ctx_buf[10]} ${gcm_ctx_buf[11]} ${gcm_ctx_buf[12]} ${gcm_ctx_buf[13]} ${gcm_ctx_buf[14]} ${gcm_ctx_buf[15]})"
-               read -r gcm_ctx_buf[0] gcm_ctx_buf[1] gcm_ctx_buf[2] gcm_ctx_buf[3] gcm_ctx_buf[4] gcm_ctx_buf[5] gcm_ctx_buf[6] gcm_ctx_buf[7] gcm_ctx_buf[8] gcm_ctx_buf[9] gcm_ctx_buf[10] gcm_ctx_buf[11] gcm_ctx_buf[12] gcm_ctx_buf[13] gcm_ctx_buf[14] gcm_ctx_buf[15] <<< "$buf"
+               read -r "gcm_ctx_buf[0]" "gcm_ctx_buf[1]" "gcm_ctx_buf[2]" "gcm_ctx_buf[3]" "gcm_ctx_buf[4]" "gcm_ctx_buf[5]" "gcm_ctx_buf[6]" "gcm_ctx_buf[7]" "gcm_ctx_buf[8]" "gcm_ctx_buf[9]" "gcm_ctx_buf[10]" "gcm_ctx_buf[11]" "gcm_ctx_buf[12]" "gcm_ctx_buf[13]" "gcm_ctx_buf[14]" "gcm_ctx_buf[15]" <<< "$buf"
           done
      fi
 
@@ -14396,7 +14396,7 @@ gcm() {
 
           if "$compute_tag"; then
                tmp="$(gcm_mult $hl $hh ${gcm_ctx_buf[0]} ${gcm_ctx_buf[1]} ${gcm_ctx_buf[2]} ${gcm_ctx_buf[3]} ${gcm_ctx_buf[4]} ${gcm_ctx_buf[5]} ${gcm_ctx_buf[6]} ${gcm_ctx_buf[7]} ${gcm_ctx_buf[8]} ${gcm_ctx_buf[9]} ${gcm_ctx_buf[10]} ${gcm_ctx_buf[11]} ${gcm_ctx_buf[12]} ${gcm_ctx_buf[13]} ${gcm_ctx_buf[14]} ${gcm_ctx_buf[15]})"
-               read -r gcm_ctx_buf[0] gcm_ctx_buf[1] gcm_ctx_buf[2] gcm_ctx_buf[3] gcm_ctx_buf[4] gcm_ctx_buf[5] gcm_ctx_buf[6] gcm_ctx_buf[7] gcm_ctx_buf[8] gcm_ctx_buf[9] gcm_ctx_buf[10] gcm_ctx_buf[11] gcm_ctx_buf[12] gcm_ctx_buf[13] gcm_ctx_buf[14] gcm_ctx_buf[15] <<< "$tmp"
+               read -r "gcm_ctx_buf[0]" "gcm_ctx_buf[1]" "gcm_ctx_buf[2]" "gcm_ctx_buf[3]" "gcm_ctx_buf[4]" "gcm_ctx_buf[5]" "gcm_ctx_buf[6]" "gcm_ctx_buf[7]" "gcm_ctx_buf[8]" "gcm_ctx_buf[9]" "gcm_ctx_buf[10]" "gcm_ctx_buf[11]" "gcm_ctx_buf[12]" "gcm_ctx_buf[13]" "gcm_ctx_buf[14]" "gcm_ctx_buf[15]" <<< "$tmp"
           fi
 
           input="${input:$((2*use_len))}"
@@ -14419,7 +14419,7 @@ gcm() {
                done
 
                buf="$(gcm_mult $hl $hh ${gcm_ctx_buf[0]} ${gcm_ctx_buf[1]} ${gcm_ctx_buf[2]} ${gcm_ctx_buf[3]} ${gcm_ctx_buf[4]} ${gcm_ctx_buf[5]} ${gcm_ctx_buf[6]} ${gcm_ctx_buf[7]} ${gcm_ctx_buf[8]} ${gcm_ctx_buf[9]} ${gcm_ctx_buf[10]} ${gcm_ctx_buf[11]} ${gcm_ctx_buf[12]} ${gcm_ctx_buf[13]} ${gcm_ctx_buf[14]} ${gcm_ctx_buf[15]})"
-               read -r gcm_ctx_buf[0] gcm_ctx_buf[1] gcm_ctx_buf[2] gcm_ctx_buf[3] gcm_ctx_buf[4] gcm_ctx_buf[5] gcm_ctx_buf[6] gcm_ctx_buf[7] gcm_ctx_buf[8] gcm_ctx_buf[9] gcm_ctx_buf[10] gcm_ctx_buf[11] gcm_ctx_buf[12] gcm_ctx_buf[13] gcm_ctx_buf[14] gcm_ctx_buf[15] <<< "$buf"
+               read -r "gcm_ctx_buf[0]" "gcm_ctx_buf[1]" "gcm_ctx_buf[2]" "gcm_ctx_buf[3]" "gcm_ctx_buf[4]" "gcm_ctx_buf[5]" "gcm_ctx_buf[6]" "gcm_ctx_buf[7]" "gcm_ctx_buf[8]" "gcm_ctx_buf[9]" "gcm_ctx_buf[10]" "gcm_ctx_buf[11]" "gcm_ctx_buf[12]" "gcm_ctx_buf[13]" "gcm_ctx_buf[14]" "gcm_ctx_buf[15]" <<< "$buf"
                for (( i=0; i < 16; i++ )); do
                     tag[i]=$((tag[i] ^ 0x${gcm_ctx_buf[i]}))
                done
@@ -19690,7 +19690,7 @@ run_beast(){
           done
      else
           # no sockets, openssl
-          while read hexc dash ciph[nr_ciphers] sslvers kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read hexc dash "ciph[nr_ciphers]" sslvers "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                if [[ ":${cbc_cipher_list}:" =~ :${ciph[nr_ciphers]}: ]]; then
                     ossl_supported[nr_ciphers]=true
                     if [[ "${hexc:2:2}" == "00" ]]; then
@@ -20270,7 +20270,7 @@ run_rc4() {
                fi
           done
      else
-          while read hexc n ciph[nr_ciphers] sslvers[nr_ciphers] kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read hexc n "ciph[nr_ciphers]" "sslvers[nr_ciphers]" "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                if [[ "${ciph[nr_ciphers]}" =~ RC4 ]]; then
                     ciphers_found[nr_ciphers]=false
                     if [[ ${#hexc} -eq 9 ]]; then
@@ -22069,7 +22069,7 @@ prepare_arrays() {
           "$HAS_SSL2" && ossl_supported_sslv2="$($OPENSSL ciphers -ssl2 -V 'ALL:COMPLEMENTOFALL:@STRENGTH' 2>$ERRFILE)"
           ossl_supported_tls="$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL:@STRENGTH' 'ALL' "-no_ssl2 -V")"
           TLS13_OSSL_CIPHERS=""
-          while read hexc n TLS_CIPHER_OSSL_NAME[i] TLS_CIPHER_RFC_NAME[i] TLS_CIPHER_SSLVERS[i] TLS_CIPHER_KX[i] TLS_CIPHER_AUTH[i] TLS_CIPHER_ENC[i] mac TLS_CIPHER_EXPORT[i]; do
+          while read hexc n "TLS_CIPHER_OSSL_NAME[i]" "TLS_CIPHER_RFC_NAME[i]" "TLS_CIPHER_SSLVERS[i]" "TLS_CIPHER_KX[i]" "TLS_CIPHER_AUTH[i]" "TLS_CIPHER_ENC[i]" mac "TLS_CIPHER_EXPORT[i]"; do
                TLS_CIPHER_HEXCODE[i]="$hexc"
                TLS_CIPHER_OSSL_SUPPORTED[i]=false
                if [[ ${#hexc} -eq 9 ]]; then
