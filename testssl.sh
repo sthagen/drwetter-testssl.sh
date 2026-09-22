@@ -512,14 +512,18 @@ date -j -f '%s' 1234567 >/dev/null 2>&1 && \
      HAS_FREEBSDDATE=true
 
 
-echo A | sed -E 's/A//' >/dev/null 2>&1 && \
-     declare -r HAS_SED_E=true || \
+if echo A | sed -E 's/A//' >/dev/null 2>&1; then
+     declare -r HAS_SED_E=true
+else
      declare -r HAS_SED_E=false
+fi
 
 ########### Terminal definitions
-tty -s && \
-     declare -r INTERACTIVE=true || \
+if tty -s; then
+     declare -r INTERACTIVE=true
+else
      declare -r INTERACTIVE=false
+fi
 
 if [[ -z $TERM_WIDTH ]]; then                               # No batch file and no otherwise predefined TERM_WIDTH
      if ! tput cols &>/dev/null || ! "$INTERACTIVE";then    # Prevent tput errors if running non interactive
@@ -620,75 +624,81 @@ out()   { printf -- "%b" "$1"; html_out "$(html_reserved "$1")"; }
 outln() { printf -- "%b" "$1\n"; html_out "$(html_reserved "$1")\n"; }
 
 # Color print functions, see also https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/x329.html
-tm_liteblue()   { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[0;32m$1" || tm_out "\033[0;34m$1"; } || tm_out "$1"; tm_off; }    # not yet used
-pr_liteblue()   { tm_liteblue "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+tm_liteblue()   { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[0;32m$1"; else tm_out "\033[0;34m$1"; fi; }; else tm_out "$1"; fi; tm_off; }    # not yet used
+pr_liteblue()   { tm_liteblue "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 tmln_liteblue() { tm_liteblue "$1"; tmln_out; }
 prln_liteblue() { pr_liteblue "$1"; outln; }
 
-tm_blue()       { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[1;32m$1" || tm_out "\033[1;34m$1"; } || tm_out "$1"; tm_off; }    # used for head lines of single tests
-pr_blue()       { tm_blue "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+tm_blue()       { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[1;32m$1"; else tm_out "\033[1;34m$1"; fi; }; else tm_out "$1"; fi; tm_off; }    # used for head lines of single tests
+pr_blue()       { tm_blue "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 tmln_blue()     { tm_blue "$1"; tmln_out; }
 prln_blue()     { pr_blue "$1"; outln; }
 
+tm_yellow()  { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;33m$1"; else tm_out "$1"; fi; tm_off; }
+pr_yellow()  { tm_yellow "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#8a7237;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
+
+tm_brown()  { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;33m$1"; else tm_out "$1"; fi; tm_off; }
+pr_brown()  { tm_brown "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#8a7237;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
+
 # we should be able to use aliases here
-tm_warning()    { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;35m$1" || tm_underline "$1"; tm_off; }                   # some local problem: one test cannot be done
+tm_warning()    { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;35m$1"; else tm_underline "$1"; fi; tm_off; }                   # some local problem: one test cannot be done
 tmln_warning()  { tm_warning "$1"; tmln_out; }                                                                    # litemagenta
-pr_warning()    { tm_warning "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#cd00cd;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<u>$(html_reserved "$1")</u>" || html_out "$(html_reserved "$1")"; }; }
+pr_warning()    { tm_warning "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#cd00cd;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<u>$(html_reserved "$1")</u>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_warning()  { pr_warning "$1"; outln; }
 
-tm_magenta()    { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;35m$1" || tm_underline "$1"; tm_off; }                   # fatal error: quitting because of this!
+tm_magenta()    { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;35m$1"; else tm_underline "$1"; fi; tm_off; }                   # fatal error: quitting because of this!
 tmln_magenta()  { tm_magenta "$1"; tmln_out; }
 # different as warning above?
-pr_magenta()    { tm_magenta "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#be32d0;font-weight:bold;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<u>$(html_reserved "$1")</u>" || html_out "$(html_reserved "$1")"; }; }
+pr_magenta()    { tm_magenta "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#be32d0;font-weight:bold;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<u>$(html_reserved "$1")</u>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_magenta()  { pr_magenta "$1"; outln; }
 
-tm_litecyan()   { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;36m$1" || tm_out "$1"; tm_off; }                         # not yet used
+tm_litecyan()   { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;36m$1"; else tm_out "$1"; fi; tm_off; }                         # not yet used
 tmln_litecyan() { tm_litecyan "$1"; tmln_out; }
-pr_litecyan()   { tm_litecyan "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#168092;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_litecyan()   { tm_litecyan "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#168092;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_litecyan() { pr_litecyan "$1"; outln; }
 
-tm_cyan()       { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;36m$1" || tm_out "$1"; tm_off; }                         # additional hint
+tm_cyan()       { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;36m$1"; else tm_out "$1"; fi; tm_off; }                         # additional hint
 tmln_cyan()     { tm_cyan "$1"; tmln_out; }
-pr_cyan()       { tm_cyan "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#0d7ea2;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_cyan()       { tm_cyan "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#0d7ea2;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_cyan()     { pr_cyan "$1"; outln; }
 
-tm_litegrey()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[0;37m$1" || tm_out "$1"; tm_off; }                         # ... https://github.com/testssl/testssl.sh/pull/600#issuecomment-276129876
+tm_litegrey()   { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[0;37m$1"; else tm_out "$1"; fi; tm_off; }                         # ... https://github.com/testssl/testssl.sh/pull/600#issuecomment-276129876
 tmln_litegrey() { tm_litegrey "$1"; tmln_out; }                                                                   # not really usable on a black background, see ..
 prln_litegrey() { pr_litegrey "$1"; outln; }
-pr_litegrey()   { tm_litegrey "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:#71767a;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_litegrey()   { tm_litegrey "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:#71767a;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 
-tm_grey()       { [[ "$COLOR" -ne 0 ]] && tm_out "\033[1;30m$1" || tm_out "$1"; tm_off; }
-pr_grey()       { tm_grey "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:#757575;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_grey()       { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[1;30m$1"; else tm_out "$1"; fi; tm_off; }
+pr_grey()       { tm_grey "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:#757575;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_grey()     { tm_grey "$1"; tmln_out; }
 prln_grey()     { pr_grey "$1"; outln; }
 
-tm_svrty_good()   { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[0;34m$1" || tm_out "\033[0;32m$1"; } || tm_out "$1"; tm_off; }   # litegreen (liteblue), This is good
+tm_svrty_good()   { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[0;34m$1"; else tm_out "\033[0;32m$1"; fi; }; else tm_out "$1"; fi; tm_off; }   # litegreen (liteblue), This is good
 tmln_svrty_good() { tm_svrty_good "$1"; tmln_out; }
-pr_svrty_good()   { tm_svrty_good "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+pr_svrty_good()   { tm_svrty_good "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#008817;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 prln_svrty_good() { pr_svrty_good "$1"; outln; }
 
-tm_svrty_best()   { [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && tm_out "\033[1;34m$1" || tm_out "\033[1;32m$1"; } ||  tm_out "$1"; tm_off; }  # green (blue), This is the best
+tm_svrty_best()   { if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then tm_out "\033[1;34m$1"; else tm_out "\033[1;32m$1"; fi; }; else tm_out "$1"; fi; tm_off; }  # green (blue), This is the best
 tmln_svrty_best() { tm_svrty_best "$1"; tmln_out; }
-pr_svrty_best()   { tm_svrty_best "$1"; [[ "$COLOR" -ge 2 ]] && { "$COLORBLIND" && html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>"; } || html_out "$(html_reserved "$1")"; }
+pr_svrty_best()   { tm_svrty_best "$1"; if [[ "$COLOR" -ge 2 ]]; then { if "$COLORBLIND"; then html_out "<span style=\"color:#5c5cff;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "<span style=\"color:#008817;font-weight:bold;\">$(html_reserved "$1")</span>"; fi; }; else html_out "$(html_reserved "$1")"; fi; }
 prln_svrty_best() { pr_svrty_best "$1"; outln; }
 
-tm_svrty_low()     { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;33m$1" || tm_out "$1"; tm_off; }         # yellow brown | academic or minor problem
+tm_svrty_low()     { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;33m$1"; else tm_out "$1"; fi; tm_off; }         # yellow brown | academic or minor problem
 tmln_svrty_low()   { tm_svrty_low "$1"; tmln_out; }
-pr_svrty_low()     { tm_svrty_low "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#a86437;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_svrty_low()     { tm_svrty_low "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#a86437;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_svrty_low()   { pr_svrty_low "$1"; outln; }
 
-tm_svrty_medium()  { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;33m$1" || tm_out "$1"; tm_off; }         # brown | it is not a bad problem but you shouldn't do this
-pr_svrty_medium()  { tm_svrty_medium "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#c05600;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_svrty_medium()  { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;33m$1"; else tm_out "$1"; fi; tm_off; }         # brown | it is not a bad problem but you shouldn't do this
+pr_svrty_medium()  { tm_svrty_medium "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#c05600;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_svrty_medium(){ tm_svrty_medium "$1"; tmln_out; }
 prln_svrty_medium(){ pr_svrty_medium "$1"; outln; }
 
-tm_svrty_high()    { [[ "$COLOR" -ge 2 ]] && tm_out "\033[0;31m$1" || tm_bold "$1"; tm_off; }               # litered
-pr_svrty_high()    { tm_svrty_high "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#e52207;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }; }
+tm_svrty_high()    { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[0;31m$1"; else tm_bold "$1"; fi; tm_off; }               # litered
+pr_svrty_high()    { tm_svrty_high "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#e52207;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_svrty_high()  { tm_svrty_high "$1"; tmln_out; }
 prln_svrty_high()  { pr_svrty_high "$1"; outln; }
 
-tm_svrty_critical()   { [[ "$COLOR" -ge 2 ]] && tm_out "\033[1;31m$1" || tm_bold "$1"; tm_off; }           # red
-pr_svrty_critical()   { tm_svrty_critical "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#e52207;font-weight:bold;\">$(html_reserved "$1")</span>" || { [[ "$COLOR" -eq 1 ]] && html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }; }
+tm_svrty_critical()   { if [[ "$COLOR" -ge 2 ]]; then tm_out "\033[1;31m$1"; else tm_bold "$1"; fi; tm_off; }           # red
+pr_svrty_critical()   { tm_svrty_critical "$1"; if [[ "$COLOR" -ge 2 ]]; then html_out "<span style=\"color:#e52207;font-weight:bold;\">$(html_reserved "$1")</span>"; elif [[ "$COLOR" -eq 1 ]]; then html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 tmln_svrty_critical() { tm_svrty_critical "$1"; tmln_out; }
 prln_svrty_critical() { pr_svrty_critical "$1"; outln; }
 
@@ -700,9 +710,9 @@ prln_deemphasize()    { pr_deemphasize "$1"; outln; }
 # color=1 functions
 tm_off()        { [[ "$COLOR" -ne 0 ]] && tm_out "\033[m"; }
 
-tm_bold()       { [[ "$COLOR" -ne 0 ]] && tm_out "\033[1m$1" || tm_out "$1"; tm_off; }
+tm_bold()       { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[1m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_bold()     { tm_bold "$1"; tmln_out; }
-pr_bold()       { tm_bold "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_bold()       { tm_bold "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_bold()     { pr_bold "$1" ; outln; }
 
 NO_ITALICS=false
@@ -715,33 +725,33 @@ elif [[ $SYSTEM == FreeBSD ]]; then
           NO_ITALICS=true
      fi
 fi
-tm_italic()     { { [[ "$COLOR" -ne 0 ]] && ! "$NO_ITALICS"; } && tm_out "\033[3m$1" || tm_out "$1"; tm_off; }
+tm_italic()     { if [[ "$COLOR" -ne 0 ]] && ! "$NO_ITALICS"; then tm_out "\033[3m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_italic()   { tm_italic "$1" ; tmln_out; }
-pr_italic()     { tm_italic "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<i>$(html_reserved "$1")</i>" || html_out "$(html_reserved "$1")"; }
+pr_italic()     { tm_italic "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<i>$(html_reserved "$1")</i>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_italic()   { pr_italic "$1"; outln; }
 
-tm_strikethru()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[9m$1" || tm_out "$1"; tm_off; }                          # ugly!
+tm_strikethru()   { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[9m$1"; else tm_out "$1"; fi; tm_off; }                          # ugly!
 tmln_strikethru() { tm_strikethru "$1"; tmln_out; }
-pr_strikethru()   { tm_strikethru "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<strike>$(html_reserved "$1")</strike>" || html_out "$(html_reserved "$1")"; }
+pr_strikethru()   { tm_strikethru "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<strike>$(html_reserved "$1")</strike>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_strikethru() { pr_strikethru "$1" ; outln; }
 
-tm_underline()    { [[ "$COLOR" -ne 0 ]] && tm_out "\033[4m$1" || tm_out "$1"; tm_off; }
+tm_underline()    { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[4m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_underline()  { tm_underline "$1"; tmln_out; }
-pr_underline()    { tm_underline "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<u>$(html_reserved "$1")</u>" || html_out "$(html_reserved "$1")"; }
+pr_underline()    { tm_underline "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<u>$(html_reserved "$1")</u>"; else html_out "$(html_reserved "$1")"; fi; }
 prln_underline()  { pr_underline "$1"; outln; }
 
-tm_reverse()      { [[ "$COLOR" -ne 0 ]] && tm_out "\033[7m$1" || tm_out "$1"; tm_off; }
-tm_reverse_bold() { [[ "$COLOR" -ne 0 ]] && tm_out "\033[7m\033[1m$1" || tm_out "$1"; tm_off; }
-pr_reverse()      { tm_reverse "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:white;background-color:black;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
-pr_reverse_bold() { tm_reverse_bold "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:white;background-color:black;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+tm_reverse()      { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[7m$1"; else tm_out "$1"; fi; tm_off; }
+tm_reverse_bold() { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[7m\033[1m$1"; else tm_out "$1"; fi; tm_off; }
+pr_reverse()      { tm_reverse "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:white;background-color:black;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
+pr_reverse_bold() { tm_reverse_bold "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"color:white;background-color:black;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 
 #pr_headline() { pr_blue "$1"; }
 #https://misc.flogisoft.com/bash/tip_colors_and_formatting
 
 #pr_headline() { [[ "$COLOR" -ge 2 ]] && out "\033[1;30m\033[47m$1" || out "$1"; tm_off; }
-tm_headline()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[1m\033[4m$1" || tm_out "$1"; tm_off; }
+tm_headline()   { if [[ "$COLOR" -ne 0 ]]; then tm_out "\033[1m\033[4m$1"; else tm_out "$1"; fi; tm_off; }
 tmln_headline() { tm_headline "$1"; tmln_out; }
-pr_headline()   { tm_headline "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"text-decoration:underline;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
+pr_headline()   { tm_headline "$1"; if [[ "$COLOR" -ne 0 ]]; then html_out "<span style=\"text-decoration:underline;font-weight:bold;\">$(html_reserved "$1")</span>"; else html_out "$(html_reserved "$1")"; fi; }
 pr_headlineln() { pr_headline "$1" ; outln; }
 
 tm_squoted() { tm_out "'$1'"; }
@@ -764,74 +774,13 @@ prln_fixme() { prln_warning "Fixme: $1"; }
 pr_url()     { tm_out "$1"; html_out "<a href=\"$(html_reserved "$1")\" style=\"color:black;text-decoration:none;\">$(html_reserved "$1")</a>"; }
 pr_boldurl() { tm_bold "$1"; html_out "<a href=\"$(html_reserved "$1")\" style=\"font-weight:bold;color:black;text-decoration:none;\">$(html_reserved "$1")</a>"; }
 
-### color switcher (see e.g. https://linuxtidbits.wordpress.com/2008/08/11/output-color-on-bash-scripts/
-###                          https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/x405.html
-### no output support for HTML!
 set_color_functions() {
-     local ncurses_tput=true
-
      if [[ $SYSTEM == OpenBSD ]] && [[ "$TERM" =~ xterm-256 ]]; then
           export TERM=xterm
           # OpenBSD can't handle 256 colors (yet) in xterm which might lead to ugly errors
           # like "tput: not enough arguments (3) for capability `AF'". Not our fault but
           # before we get blamed we fix it here.
      fi
-
-     # Empty all vars if we have COLOR=0 equals no escape code -- these are globals:
-     red=""
-     green=""
-     brown=""
-     blue=""
-     magenta=""
-     cyan=""
-     grey=""
-     yellow=""
-     off=""
-     bold=""
-     underline=""
-     italic=""
-
-     type -p tput &>/dev/null || return 0      # Hey wait, do we actually have tput / ncurses ?
-     tput cols &>/dev/null || return 0         # tput under BSDs and GNUs doesn't work either (TERM undefined?)
-     tput sgr0 &>/dev/null || ncurses_tput=false
-     if [[ "$COLOR" -ge 2 ]]; then
-          if $ncurses_tput; then
-               red=$(tput setaf 1)
-               green=$(tput setaf 2)
-               brown=$(tput setaf 3)
-               blue=$(tput setaf 4)
-               magenta=$(tput setaf 5)
-               cyan=$(tput setaf 6)
-               grey=$(tput setaf 7)
-               yellow=$(tput setaf 3; tput bold)
-          else                                    # this is a try for old BSD, see terminfo(5)
-               red=$(tput AF 1)
-               green=$(tput AF 2)
-               brown=$(tput AF 3)
-               blue=$(tput AF 4)
-               magenta=$(tput AF 5)
-               cyan=$(tput AF 6)
-               grey=$(tput AF 7)
-               yellow=$(tput AF 3; tput md)
-          fi
-     fi
-     if [[ "$COLOR" -ge 1 ]]; then
-          if $ncurses_tput; then
-               bold=$(tput bold)
-               underline=$(tput sgr 0 1 2>/dev/null)
-               italic=$(tput sitm)                # This doesn't work on FreeBSDi (9,10) and OpenBSD ...
-               italic_end=$(tput ritm)            # ... and this, too
-               off=$(tput sgr0)
-          else                                    # this is a try for old BSD, see terminfo(5)
-               bold=$(tput md)
-               underline=$(tput us)
-               italic=$(tput ZH 2>/dev/null)       # This doesn't work on FreeBSDi (9,10) and OpenBSD
-               italic_end=$(tput ZR 2>/dev/null)   # ... probably entry missing in /etc/termcap
-               reverse=$(tput mr)
-               off=$(tput me)
-          fi
-     fi
-     # FreeBSD 10 understands ESC codes like 'echo -e "\e[3mfoobar\e[23m"', but also no tput for italics
 }
 
 ###### START universal helper function definitions ######
@@ -1728,9 +1677,11 @@ out_row_aligned() {
      local first=true
 
      while read line; do
-          "$first" && \
-               first=false || \
+          if "$first"; then
+               first=false
+          else
                out "$2"
+          fi
           outln "$line"
      done <<< "$1"
 }
@@ -1821,8 +1772,11 @@ tmpfile_handle() {
      [[ -z "$savefile" ]] && savefile=$TMPFILE
 #FIXME: make sure/find out if we do not need $TEMPDIR/$NODEIP.$1" if debug=0. We would save fs access here
      mv $savefile "$TEMPDIR/$NODEIP.$1" 2>/dev/null
-     [[ $ERRFILE =~ dev.null ]] && return 0 || \
+     if [[ $ERRFILE =~ dev.null ]]; then
+          return 0
+     else
           mv $ERRFILE "$TEMPDIR/$NODEIP.${1//.txt/}.errorlog" 2>/dev/null
+     fi
      return 0
 }
 
@@ -2050,7 +2004,7 @@ check_pwnedkeys() {
      local cert="$1"
      local cert_key_algo="$2"
      local -i cert_keysize="$3"
-     local pubkey curve response
+     local pubkey curve fingerprint response
 
      "$PHONE_OUT" || return 0
 
@@ -2211,7 +2165,7 @@ check_revocation_ocsp() {
                     [[ $DEBUG -ge 3 ]] && echo "Switching to $openssl_bin "
                     ossl_ver="$($openssl_bin version -v 2>/dev/null)"
                     ossl_name="${ossl_ver%% *}"
-                    ossl_ver="${ossl_ver#$ossl_name }"
+                    ossl_ver="${ossl_ver#"$ossl_name" }"
                     ossl_ver="${ossl_ver%% *}"
                     ossl_ver_major="${ossl_ver%%\.*}"
                fi
@@ -2235,7 +2189,7 @@ check_revocation_ocsp() {
 
      if [[ $success -eq 0 ]] && grep -Fq "Response verify OK" "$tmpfile"; then
           response="$(grep -F "$HOSTCERT: " "$tmpfile")"
-          response="${response#$HOSTCERT: }"
+          response="${response#"$HOSTCERT": }"
           response="${response%\.}"
           if [[ "$response" =~ good ]]; then
                out ", "
@@ -2586,6 +2540,7 @@ s_client_options() {
 # sets global $SERVICE
 #
 service_detection() {
+     local plaintext
      local -i was_killed
      local jsonID
 
@@ -2712,7 +2667,7 @@ sanitze_http_header() {
 # problems not handled: chunked
 #
 run_http_header() {
-     local header
+     local header msg_thereafter
      local referer useragent
      local url redirect
      local jsonID="HTTP_status_code"
@@ -2884,7 +2839,7 @@ match_ipv4_httpheader() {
 run_http_date() {
      local difftime
      local spaces="                              "
-     jsonID="HTTP_clock_skew"
+     local jsonID="HTTP_clock_skew"
 
      if [[ $SERVICE != HTTP ]] || { [[ "$CLIENT_AUTH" == required ]] && [[ -z "$MTLS" ]]; }; then
           return 0
@@ -3414,117 +3369,28 @@ run_hpkp() {
      return 0
 }
 
-emphasize_stuff_in_headers(){
-     local html_brown="<span style=\\\"color:#8a7237;\\\">"
-     local html_yellow="<span style=\\\"color:#8a7237;font-weight:bold;\\\">"
-     local html_off="<\\/span>"
+emphasize_stuff_in_headers() (
+     local stuff="$1" match
 
-# see https://www.grymoire.com/Unix/Sed.html#uh-3
-#    outln "$1" | sed "s/[0-9]*/$brown&${off}/g"
-     tmln_out "$1" | sed -e "s/\([0-9]\)/${brown}\1${off}/g" \
-          -e "s/Unix/${yellow}Unix${off}/g" \
-          -e "s/Debian/${yellow}Debian${off}/g" \
-          -e "s/Win32/${yellow}Win32${off}/g" \
-          -e "s/Win64/${yellow}Win64${off}/g" \
-          -e "s/Ubuntu/${yellow}Ubuntu${off}/g" \
-          -e "s/ubuntu/${yellow}ubuntu${off}/g" \
-          -e "s/buster/${yellow}buster${off}/g" \
-          -e "s/stretch/${yellow}stretch${off}/g" \
-          -e "s/jessie/${yellow}jessie${off}/g" \
-          -e "s/squeeze/${yellow}squeeze${off}/g" \
-          -e "s/wheezy/${yellow}wheezy${off}/g" \
-          -e "s/lenny/${yellow}lenny${off}/g" \
-          -e "s/SUSE/${yellow}SUSE${off}/g" \
-          -e "s/Red Hat Enterprise Linux/${yellow}Red Hat Enterprise Linux${off}/g" \
-          -e "s/Red Hat/${yellow}Red Hat${off}/g" \
-          -e "s/CentOS/${yellow}CentOS${off}/g" \
-          -e "s/Via/${yellow}Via${off}/g" \
-          -e "s/X-Forwarded/${yellow}X-Forwarded${off}/g" \
-          -e "s/X-TYPO3-Parsetime/${yellow}X-TYPO3-Parsetime${off}/g" \
-          -e "s/Liferay-Portal/${yellow}Liferay-Portal${off}/g" \
-          -e "s/X-Cache-Lookup/${yellow}X-Cache-Lookup${off}/g" \
-          -e "s/X-Cache/${yellow}X-Cache${off}/g" \
-          -e "s/X-Squid/${yellow}X-Squid${off}/g" \
-          -e "s/X-Server/${yellow}X-Server${off}/g" \
-          -e "s/X-Varnish/${yellow}X-Varnish${off}/g" \
-          -e "s/X-OWA-Version/${yellow}X-OWA-Version${off}/g" \
-          -e "s/MicrosoftSharePointTeamServices/${yellow}MicrosoftSharePointTeamServices${off}/g" \
-          -e "s/X-Application-Context/${yellow}X-Application-Context${off}/g" \
-          -e "s/X-Version/${yellow}X-Version${off}/g" \
-          -e "s/X-Powered-By/${yellow}X-Powered-By${off}/g" \
-          -e "s/X-UA-Compatible/${yellow}X-UA-Compatible${off}/g" \
-          -e "s/Link/${yellow}Link${off}/g" \
-          -e "s/X-DNS-Prefetch-Control/${yellow}X-DNS-Prefetch-Control${off}/g" \
-          -e "s/X-Rack-Cache/${yellow}X-Rack-Cache${off}/g" \
-          -e "s/X-Runtime/${yellow}X-Runtime${off}/g" \
-          -e "s/X-Pingback/${yellow}X-Pingback${off}/g" \
-          -e "s/X-Permitted-Cross-Domain-Policies/${yellow}X-Permitted-Cross-Domain-Policies${off}/g" \
-          -e "s/X-AspNet-Version/${yellow}X-AspNet-Version${off}/g" \
-          -e "s/X-AspNetMvc-Version/${yellow}X-AspNetMvc-Version${off}/g" \
-          -e "s/x-note/${yellow}x-note${off}/g" \
-          -e "s/x-global-transaction-id/${yellow}x-global-transaction-id${off}/g" \
-          -e "s/X-Global-Transaction-ID/${yellow}X-Global-Transaction-ID${off}/g" \
-          -e "s/Alt-Svc/${yellow}Alt-Svc${off}/g" \
-          -e "s/system-wsgw-management-loopback/${yellow}system-wsgw-management-loopback${off}/g"
-
-     if "$do_html"; then
-          if [[ $COLOR -ge 2 ]]; then
-               html_out "$(tm_out "$1" | sed -e 's/\&/\&amp;/g' \
-                    -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/\"/\&quot;/g' -e "s/\'/\&apos;/g" \
-                    -e "s/\([0-9]\)/${html_brown}\1${html_off}/g" \
-                    -e "s/Unix/${html_yellow}Unix${html_off}/g" \
-                    -e "s/Debian/${html_yellow}Debian${html_off}/g" \
-                    -e "s/Win32/${html_yellow}Win32${html_off}/g" \
-                    -e "s/Win64/${html_yellow}Win64${html_off}/g" \
-                    -e "s/Ubuntu/${html_yellow}Ubuntu${html_off}/g" \
-                    -e "s/ubuntu/${html_yellow}ubuntu${html_off}/g" \
-                    -e "s/buster/${html_yellow}buster${html_off}/g" \
-                    -e "s/stretch/${html_yellow}stretch${html_off}/g" \
-                    -e "s/jessie/${html_yellow}jessie${html_off}/g" \
-                    -e "s/squeeze/${html_yellow}squeeze${html_off}/g" \
-                    -e "s/wheezy/${html_yellow}wheezy${html_off}/g" \
-                    -e "s/lenny/${html_yellow}lenny${html_off}/g" \
-                    -e "s/SUSE/${html_yellow}SUSE${html_off}/g" \
-                    -e "s/Red Hat Enterprise Linux/${html_yellow}Red Hat Enterprise Linux${html_off}/g" \
-                    -e "s/Red Hat/${html_yellow}Red Hat${html_off}/g" \
-                    -e "s/CentOS/${html_yellow}CentOS${html_off}/g" \
-                    -e "s/Via/${html_yellow}Via${html_off}/g" \
-                    -e "s/X-Forwarded/${html_yellow}X-Forwarded${html_off}/g" \
-                    -e "s/X-TYPO3-Parsetime/${yellow}X-TYPO3-Parsetime${html_off}/g" \
-                    -e "s/Liferay-Portal/${html_yellow}Liferay-Portal${html_off}/g" \
-                    -e "s/X-Cache-Lookup/${html_yellow}X-Cache-Lookup${html_off}/g" \
-                    -e "s/X-Cache/${html_yellow}X-Cache${html_off}/g" \
-                    -e "s/X-Squid/${html_yellow}X-Squid${html_off}/g" \
-                    -e "s/X-Server/${html_yellow}X-Server${html_off}/g" \
-                    -e "s/X-Varnish/${html_yellow}X-Varnish${html_off}/g" \
-                    -e "s/X-OWA-Version/${html_yellow}X-OWA-Version${html_off}/g" \
-                    -e "s/MicrosoftSharePointTeamServices/${html_yellow}MicrosoftSharePointTeamServices${html_off}/g" \
-                    -e "s/X-Application-Context/${html_yellow}X-Application-Context${html_off}/g" \
-                    -e "s/X-Version/${html_yellow}X-Version${html_off}/g" \
-                    -e "s/X-Powered-By/${html_yellow}X-Powered-By${html_off}/g" \
-                    -e "s/X-UA-Compatible/${html_yellow}X-UA-Compatible${html_off}/g" \
-                    -e "s/Link/${html_yellow}Link${html_off}/g" \
-                    -e "s/X-Runtime/${html_yellow}X-Runtime${html_off}/g" \
-                    -e "s/X-Rack-Cache/${html_yellow}X-Rack-Cache${html_off}/g" \
-                    -e "s/X-DNS-Prefetch-Control/${html_yellow}X-DNS-Prefetch-Control${html_off}/g" \
-                    -e "s/X-Pingback/${html_yellow}X-Pingback${html_off}/g" \
-                    -e "s/X-Permitted-Cross-Domain-Policies/${html_yellow}X-Permitted-Cross-Domain-Policies${html_off}/g" \
-                    -e "s/X-AspNet-Version/${html_yellow}X-AspNet-Version${html_off}/g" \
-                    -e "s/X-AspNetMvc-Version/${html_yellow}X-AspNetMvc-Version${html_off}/g" \
-                    -e "s/x-note/${html_yellow}x-note${html_off}/g" \
-                    -e "s/X-Global-Transaction-ID/${html_yellow}X-Global-Transaction-ID${html_off}/g" \
-                    -e "s/x-global-transaction-id/${html_yellow}x-global-transaction-id${html_off}/g" \
-                    -e "s/Alt-Svc/${html_yellow}Alt-Svc${html_off}/g" \
-                    -e "s/system-wsgw-management-loopback/${html_yellow}system-wsgw-management-loopback${html_off}/g" \
-               )"
-#FIXME: this is double code. The pattern to emphasize headers should be better in one single function
-# And: It matches case sensitive headers only which won't detect all banners. (sed ignorecase is not a/v for OpenBSD sed)
+     # Note: parens in function definition here force this into a separate
+     # shell, preventing nocasematch from affecting the code outside this function
+     shopt -s nocasematch
+          
+     while [[ -n "$stuff" ]]; do
+          if [[ "$stuff" =~ ^Unix|^Debian|^Win32|^Win64|^Ubuntu|^buster|^stretch|^jessie|^squeeze|^wheezy|^lenny|^SUSE|^Red\ Hat\ Enterprise\ Linux|^Red\ Hat|^CentOS|^Via|^X-Forwarded|^X-TYPO3-Parsetime|^Liferay-Portal|^X-Cache-Lookup|^X-Cache|^X-Squid|^X-Server|^X-Varnish|^X-OWA-Version|^MicrosoftSharePointTeamServices|^X-Application-Context|^X-Version|^X-Powered-By|^X-UA-Compatible|^Link|^X-DNS-Prefetch-Control|^X-Rack-Cache|^X-Runtime|^X-Pingback|^X-Permitted-Cross-Domain-Policies|^X-AspNet-Version|^X-AspNetMvc-Version|^x-note/|^x-global-transaction-id|^X-Global-Transaction-ID|^Alt-Svc|^system-wsgw-management-loopback ]]; then
+               match="$BASH_REMATCH"
+               pr_yellow "$match"
+               stuff="${stuff/#$match}"
+          elif [[ "${stuff:0:1}" =~ [0-9] ]]; then
+               pr_brown "${stuff:0:1}"
+               stuff="${stuff:1}"
           else
-               html_out "$(html_reserved "$1")"
+               out "${stuff:0:1}"
+               stuff="${stuff:1}"
           fi
-          html_out "\n"
-     fi
-}
+     done
+     outln
+)
 
 run_server_banner() {
      local serverbanner
@@ -3809,7 +3675,7 @@ run_security_headers() {
                # Include $header when determining where to insert line breaks, but print $header
                # separately.
                header_output="$(out_row_aligned_max_width "${header:2}: $HEADERVALUE" "$spaces  " $TERM_WIDTH)"
-               outln "${header_output#${header:2}}"
+               outln "${header_output#"${header:2}"}"
                fileout "$header" "$svrty" "$HEADERVALUE"
           fi
      done
@@ -3850,9 +3716,11 @@ prettyprint_local() {
      else
           pr_headline " Displaying all local ciphers ";
           # pattern provided; which one?
-          [[ $1 =~ $re ]] && \
-               pr_headline "matching number pattern \"$1\" " || \
+          if [[ $1 =~ $re ]]; then
+               pr_headline "matching number pattern \"$1\" "
+          else
                pr_headline "matching word pattern "\"$1\"" (ignore case) "
+          fi
      fi
      outln "\n"
      neat_header
@@ -4125,8 +3993,8 @@ neat_list(){
 }
 
 run_cipher_match(){
-     local hexc n auth ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers s
-     local -a hexcode normalized_hexcode ciph sslvers kx enc export2 sigalg
+     local arg hexc n auth ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers s
+     local -a hexcode hexcode2 normalized_hexcode ciph sslvers kx enc export2 sigalg
      local -a ciphers_found ciphers_found2 ciph2 rfc_ciph rfc_ciph2 ossl_supported
      local -a -i index
      local -i nr_ciphers=0 nr_ossl_ciphers=0 nr_nonossl_ciphers=0
@@ -4134,7 +4002,7 @@ run_cipher_match(){
      local dhlen has_dh_bits="$HAS_DH_BITS"
      local cipher proto protos_to_try
      local available
-     local -i sclient_success
+     local -i i sclient_success
      local re='^[0-9A-Fa-f]+$'
      local using_sockets=true
 
@@ -4145,10 +4013,8 @@ run_cipher_match(){
      pr_headline " Testing ciphers with "
      if [[ $1 =~ $re ]]; then
           pr_headline "matching number pattern \"$1\" "
-          tjolines="$tjolines matching number pattern \"$1\"\n\n"
      else
           pr_headline "word pattern "\"$1\"" (ignore case) "
-          tjolines="$tjolines word pattern \"$1\" (ignore case)\n\n"
      fi
      outln
      if ! "$using_sockets"; then
@@ -4201,7 +4067,7 @@ run_cipher_match(){
                     fi
                done
           else
-               while read hexc n ciph[nr_ciphers] sslvers[nr_ciphers] kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+               while read hexc n "ciph[nr_ciphers]" "sslvers[nr_ciphers]" "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                     hexc="$(normalize_ciphercode $hexc)"
                     # is argument a number?
                     if [[ $arg =~ $re ]]; then
@@ -4432,7 +4298,7 @@ run_allciphers() {
      local -a ciphers_found ciphers_found2 hexcode2 ciph2 rfc_ciph2
      local -i -a index
      local proto protos_to_try
-     local dhlen available ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers
+     local dhlen available cipher ciphers_to_test tls13_ciphers_to_test supported_sslv2_ciphers
      local has_dh_bits="$HAS_DH_BITS"
      local using_sockets=true
 
@@ -4473,7 +4339,7 @@ run_allciphers() {
           done
           nr_ciphers=$TLS_NR_CIPHERS
      else
-          while read -r hexc n ciph[nr_ciphers] sslvers[nr_ciphers] kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read -r hexc n "ciph[nr_ciphers]" "sslvers[nr_ciphers]" "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                ciphers_found[nr_ciphers]=false
                if [[ ${#hexc} -eq 9 ]]; then
                     if [[ "${hexc:2:2}" == 00 ]]; then
@@ -4707,7 +4573,7 @@ ciphers_by_strength() {
      local -a hexcode2 ciph2 rfc_ciph2
      local -i i bundle end_of_bundle bundle_size num_bundles
      local -a ciphers_found ciphers_found2 sigalg ossl_supported index
-     local dhlen supported_sslv2_ciphers ciphers_to_test tls13_ciphers_to_test addcmd temp
+     local s dhlen supported_sslv2_ciphers ciphers_to_test tls13_ciphers_to_test addcmd temp
      local available proto_supported=false
      local id
      local has_dh_bits="$HAS_DH_BITS"
@@ -4783,7 +4649,7 @@ ciphers_by_strength() {
           else
                ossl_ciphers_proto="-tls1"
           fi
-          while read hexc n ciph[nr_ciphers] sslvers kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read hexc n "ciph[nr_ciphers]" sslvers "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                if [[ "$proto" == -tls1_3 ]]; then
                     [[ ":$TLS13_OSSL_CIPHERS:" =~ :${ciph[nr_ciphers]}: ]] || continue
                elif [[ "$proto" == -tls1_2 ]]; then
@@ -5163,17 +5029,17 @@ modify_clienthello() {
      len_clienthello=$(hex2dec "${tls_handshake_ascii:12:6}")
      tls_clientversion="${tls_handshake_ascii:18:4}"
      tls_random="${tls_handshake_ascii:22:64}"
-     len=2*$(hex2dec "${tls_handshake_ascii:86:2}")+2
+     len=$((2*$(hex2dec "${tls_handshake_ascii:86:2}")+2))
      tls_sid="${tls_handshake_ascii:86:$len}"
-     offset=86+$len
+     offset=$((86+len))
 
-     len=2*$(hex2dec "${tls_handshake_ascii:$offset:4}")+4
+     len=$((2*$(hex2dec "${tls_handshake_ascii:$offset:4}")+4))
      tls_cipher_suites="${tls_handshake_ascii:$offset:$len}"
-     offset=$offset+$len
+     offset=$((offset+len))
 
-     len=2*$(hex2dec "${tls_handshake_ascii:$offset:2}")+2
+     len=$((2*$(hex2dec "${tls_handshake_ascii:$offset:2}")+2))
      tls_compression_methods="${tls_handshake_ascii:$offset:$len}"
-     offset=$offset+$len
+     offset=$((offset+len))
 
      if [[ $offset -ge $tls_handshake_ascii_len ]]; then
           # No extensions
@@ -5181,12 +5047,12 @@ modify_clienthello() {
           return 0
      fi
 
-     len_extensions=2*$(hex2dec "${tls_handshake_ascii:$offset:4}")
+     len_extensions=$((2*$(hex2dec "${tls_handshake_ascii:$offset:4}")))
      offset+=4
      for (( 1; offset < tls_handshake_ascii_len; 1 )); do
           extension_type="${tls_handshake_ascii:$offset:4}"
           offset+=4
-          len_extension=2*$(hex2dec "${tls_handshake_ascii:$offset:4}")
+          len_extension=$((2*$(hex2dec "${tls_handshake_ascii:$offset:4}")))
 
           if [[ "$extension_type" == 0000 ]] && [[ -z "$new_key_share" ]]; then
                # If this is an initial ClientHello, then either remove
@@ -5204,13 +5070,13 @@ modify_clienthello() {
                     len_sni_ext=$(printf "%02x\n" $((len_servername+5)))
                     tls_extensions+="000000${len_sni_ext}00${len_sni_listlen}0000${len_servername_hex}${servername_hexstr}"
                fi
-               offset+=$len_extension+4
+               offset+=$((len_extension+4))
           elif [[ "$extension_type" != 00$KEY_SHARE_EXTN_NR ]] || [[ -z "$new_key_share" ]]; then
                # If this is in response to a HelloRetryRequest, then do
                # not copy over the old key_share extension, but
                # all other extensions should be copied into the new ClientHello.
-               offset=$offset-4
-               len=$len_extension+8
+               offset=$((offset-4))
+               len=$((len_extension+8))
                tls_extensions+="${tls_handshake_ascii:$offset:$len}"
                offset+=$len
           else
@@ -5218,7 +5084,7 @@ modify_clienthello() {
                # is being created in response to a HelloRetryRequest. Replace
                # the existing key_share extension with the new one.
                tls_extensions+="$new_key_share"
-               offset+=$len_extension+4
+               offset+=$((len_extension+4))
           fi
      done
      tls_extensions+="$cookie"
@@ -5273,18 +5139,18 @@ client_simulation_sockets() {
      # see also https://github.com/testssl/testssl.sh/pull/797
      if [[ "${1:0:4}" == 1603 ]]; then
           # Extract list of cipher suites from SSLv3 or later ClientHello
-          sid_len=4*$(hex2dec "${data:174:2}")
-          offset1=178+$sid_len
-          offset2=182+$sid_len
-          len=4*$(hex2dec "${data:offset1:2}${data:offset2:2}")-2
-          offset1=186+$sid_len
+          sid_len=$((4*$(hex2dec "${data:174:2}")))
+          offset1=$((178+sid_len))
+          offset2=$((182+sid_len))
+          len=$((4*$(hex2dec "${data:offset1:2}${data:offset2:2}")-2))
+          offset1=$((186+sid_len))
           code2network "$(tolower "${data:offset1:len}")"    # convert CIPHER_SUITES to a "standardized" format
      else
           # Extract list of cipher suites from SSLv2 ClientHello
-          len=2*$(hex2dec "${clienthello:12:2}")
+          len=$((2*$(hex2dec "${clienthello:12:2}")))
           for (( i=22; i < 22+len; i+=6 )); do
-               offset1=$i+2
-               offset2=$i+4
+               offset1=$((i+2))
+               offset2=$((i+4))
                [[ "${clienthello:i:2}" == 00 ]] && cipher_list_2send+=", ${clienthello:offset1:2},${clienthello:offset2:2}"
           done
           code2network "$(tolower "${cipher_list_2send:2}")" # convert CIPHER_SUITES to a "standardized" format
@@ -5409,6 +5275,7 @@ run_client_simulation() {
      local handshakebytes=()
      local lowest_protocol=()
      local highest_protocol=()
+     local alpn=()
      local service=()
      local minDhBits=()
      local maxDhBits=()
@@ -5417,13 +5284,15 @@ run_client_simulation() {
      local minEcdsaBits=()
      local curves=()
      local requiresSha2=()
+     local ja3=()
+     local ja4=()
      local current=()
      local i=0
      local name tls proto cipher temp what_dh bits curve supported_curves
      local has_dh_bits using_sockets=true
      local client_service
      local options
-     local -i ret=0
+     local -i ret=0 sclient_success nr_ossl_fail save_max_ossl_fail
      local jsonID="clientsimulation"
      local client_service=""
      local append_fileout=""
@@ -6984,7 +6853,7 @@ pr_kem_quality() {
 
 
 pr_kem_param_set_quality() {
-     kem="$1"
+     local kem="$1"
      local -i bits=0
 
      case "$kem" in
@@ -7268,6 +7137,7 @@ read_dhbits_from_file() {
 #
 sub_session_resumption() {
      local ret ret1 ret2
+     local new_sid new_sid2
      local tmpfile=$(mktemp $TEMPDIR/session_resumption.$NODEIP.XXXXXX)
      local sess_data=$(mktemp $TEMPDIR/sub_session_data_resumption.$NODEIP.XXXXXX)
      local -a rw_line
@@ -7364,9 +7234,11 @@ sub_session_resumption() {
                "$byID" && echo "byID" || echo "by ticket"
           fi
      fi
-     "$byID" && \
-          tmpfile_handle ${FUNCNAME[0]}.byID.log $tmpfile || \
+     if "$byID"; then
+          tmpfile_handle ${FUNCNAME[0]}.byID.log $tmpfile
+     else
           tmpfile_handle ${FUNCNAME[0]}.byticket.log $tmpfile
+     fi
      return $ret
 }
 
@@ -7423,17 +7295,17 @@ sub_early_data() {
 }
 
 run_server_preference() {
-     local cipher1="" cipher2="" tls13_cipher1="" tls13_cipher2="" default_proto=""
+     local cipher0="" cipher1="" cipher2="" tls13_cipher1="" tls13_cipher2="" default_proto=""
      local default_cipher="" ciph
      local limitedsense="" supported_sslv2_ciphers
      local proto_ossl proto_txt proto_hex cipherlist i
      local -i ret=0 j sclient_success
      local list_fwd="DHE-RSA-SEED-SHA:SEED-SHA:DES-CBC3-SHA:RC4-MD5:DES-CBC-SHA:RC4-SHA:AES128-SHA:AES128-SHA256:AES256-SHA:ECDHE-RSA-AES128-SHA:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA:ECDH-RSA-DES-CBC3-SHA:ECDH-RSA-AES128-SHA:ECDH-RSA-AES256-SHA:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:DHE-DSS-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:AES256-SHA256:ECDHE-RSA-DES-CBC3-SHA:ECDHE-RSA-AES128-SHA256:AES256-GCM-SHA384:AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-SHA256:ADH-AES256-GCM-SHA384:AECDH-AES128-SHA:ECDHE-RSA-RC4-SHA:ECDHE-ECDSA-AES128-SHA"
      local list_reverse="ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-RC4-SHA:AECDH-AES128-SHA:ADH-AES256-GCM-SHA384:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-GCM-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-DES-CBC3-SHA:AES256-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-DSS-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDH-RSA-AES256-SHA:ECDH-RSA-AES128-SHA:ECDH-RSA-DES-CBC3-SHA:DHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:ECDHE-RSA-AES128-SHA:AES256-SHA:AES128-SHA256:AES128-SHA:RC4-SHA:DES-CBC-SHA:RC4-MD5:DES-CBC3-SHA:SEED-SHA:DHE-RSA-SEED-SHA"
-     tls_list_fwd="c0,2c, c0,30, 00,9f, cc,a9, cc,a8, cc,aa, c0,2b, c0,2f, 00,9e, c0,24, c0,28, 00,6b, c0,23, c0,27, 00,67, c0,0a, 00,04, 00,05, 00,09, 00,0a, 00,9a, 00,96,
-                   c0,14, 00,39, c0,09, c0,13, 00,33, 00,9d, 00,9c, 00,C6, 00,C7, 13,01, 13,02, 13,03, 13,04, 13,05, 00,3d, 00,3c, 00,35, 00,2f, 00,ff"
-     tls_list_rev="00,2f, 00,35, 00,3c, 00,3d, 13,05, 13,04, 13,03, 13,02, 13,01, 00,C7, 00,C6, 00,9c, 00,9d, 00,33, c0,13, c0,09, 00,39, c0,14, 00,96, 00,9a, 00,0a, 00,09, 00,05, 00,04,
-                   c0,0a, 00,67, c0,27, c0,23, 00,6b, c0,28, c0,24, 00,9e, c0,2f, c0,2b, cc,aa, cc,a8, cc,a9, 00,9f, c0,30, c0,2c, 00,ff"
+     local tls_list_fwd="c0,2c, c0,30, 00,9f, cc,a9, cc,a8, cc,aa, c0,2b, c0,2f, 00,9e, c0,24, c0,28, 00,6b, c0,23, c0,27, 00,67, c0,0a, 00,04, 00,05, 00,09, 00,0a, 00,9a, 00,96,
+                         c0,14, 00,39, c0,09, c0,13, 00,33, 00,9d, 00,9c, 00,C6, 00,C7, 13,01, 13,02, 13,03, 13,04, 13,05, 00,3d, 00,3c, 00,35, 00,2f, 00,ff"
+     local tls_list_rev="00,2f, 00,35, 00,3c, 00,3d, 13,05, 13,04, 13,03, 13,02, 13,01, 00,C7, 00,C6, 00,9c, 00,9d, 00,33, c0,13, c0,09, 00,39, c0,14, 00,96, 00,9a, 00,0a, 00,09, 00,05, 00,04,
+                         c0,0a, 00,67, c0,27, c0,23, 00,6b, c0,28, c0,24, 00,9e, c0,2f, c0,2b, cc,aa, cc,a8, cc,a9, 00,9f, c0,30, c0,2c, 00,ff"
      local has_cipher_order=false has_tls13_cipher_order=false
      local addcmd="" addcmd2=""
      local using_sockets=true
@@ -7814,6 +7686,7 @@ cipher_pref_check() {
      local -a rfc_ciph hexcode ciphers_found ciphers_found2
      local -a -i index
      local ciphers_found_with_sockets=false prioritize_chacha=false
+     local id
 
      if ! "$using_sockets" && ! sclient_supported "-$proto"; then
           outln
@@ -8068,7 +7941,7 @@ cipher_pref_check() {
      done
      if [[ -n "$first_cipher" ]]; then
           # Search for first ChaCha20 cipher that comes after $first_cipher in $order.
-          for first_chacha_cipher in ${order#*$first_cipher}; do
+          for first_chacha_cipher in ${order#*"$first_cipher"}; do
                [[ "$first_chacha_cipher" =~ CHACHA20 ]] && break
           done
      fi
@@ -8417,7 +8290,7 @@ extract_new_tls_extensions() {
      if [[ -n "$tls_extensions" ]]; then
           # check to see if any new TLS extensions were returned and add any new ones to TLS_EXTENSIONS
           while read -d "\"" -r line; do
-               if [[ $line != "" ]] && [[ ! "${TLS_EXTENSIONS[*]}" =~ "$line" ]]; then
+               if [[ $line != "" ]] && [[ ! "${TLS_EXTENSIONS[*]}" =~ $line ]]; then
                     i=${#TLS_EXTENSIONS[*]}
                     while [[ $i -gt 0 ]] && [[ ${TLS_EXTENSIONS[i-1]#*/#} -gt ${line#*/#} ]]; do
                          TLS_EXTENSIONS[i]="${TLS_EXTENSIONS[i-1]}"
@@ -8654,8 +8527,8 @@ extract_stapled_ocsp() {
           ocsp="${response##*TLS server extension \"status request\" (id=5), len=}"
           ocsp="${ocsp%%<<<*}"
           tmp="${ocsp%%[!0-9]*}"
-          ocsp="${ocsp#$tmp}"
-          ocsp_len=2*$tmp
+          ocsp="${ocsp#"$tmp"}"
+          ocsp_len=$((2*tmp))
           ocsp="$(awk ' { print $3 $4 $5 $6 $7 $8 $9 $10 $11 $12 $13 $14 $15 $16 $17 } ' <<< "$ocsp" | sed 's/-//')"
           ocsp="$(strip_spaces "$(newline_to_spaces "$ocsp")")"
           ocsp="${ocsp:0:ocsp_len}"
@@ -8668,7 +8541,7 @@ extract_stapled_ocsp() {
      if [[ "${ocsp:0:2}" == "01" ]]; then
           STAPLED_OCSP_RESPONSE="${ocsp:8}"
      elif [[ "${ocsp:0:2}" == "02" ]]; then
-          ocsp_len=2*$(hex2dec "${tls_certificate_status_ascii:8:6}")
+          ocsp_len=$((2*$(hex2dec "${tls_certificate_status_ascii:8:6}")))
           STAPLED_OCSP_RESPONSE="${ocsp:14:ocsp_len}"
      fi
      return 0
@@ -8680,7 +8553,7 @@ get_server_certificate() {
      local protocols_to_try proto
      local s sigalg sigalgs=""
      local success ret
-     local npn_params="" line
+     local npn_params="" line addcmd
      local ciphers_to_test=""
      # Cipher suites that use a certificate with an RSA (signature) public key
      local -r a_rsa="cc,13, cc,15, c0,30, c0,28, c0,14, 00,9f, cc,a8, cc,aa, c0,a3, c0,9f, 00,6b, 00,39, c0,77, 00,c4, 00,88, c0,45, c0,4d, c0,53, c0,61, c0,7d, c0,8b, 16,b7, 16,b9, c0,2f, c0,27, c0,13, 00,9e, c0,a2, c0,9e, 00,67, 00,33, c0,76, 00,be, 00,9a, 00,45, c0,44, c0,4c, c0,52, c0,60, c0,7c, c0,8a, c0,11, c0,12, 00,16, 00,15, 00,14, c0,10"
@@ -8903,13 +8776,13 @@ get_cn_from_cert() {
      # see x509(1ssl):
      subject="$($OPENSSL x509 -in $1 -noout -subject -nameopt multiline,-align,sname,-esc_msb,utf8,-space_eq 2>>$ERRFILE)"
      echo "$(awk -F'=' '/CN=/ { print $2 }' <<< "$subject" | tr '\n' ' ')"
-     return $?
+     return 0
 }
 
 # Return 0 if the name provided in arg1 is a wildcard name
 is_wildcard()
 {
-     local certname="$1"
+     local basename certname="$1"
 
      # If the first label in the DNS name begins "xn--", then assume it is an
      # A-label and not a wildcard name (RFC 6125, Section 6.4.3).
@@ -8987,7 +8860,7 @@ compare_server_name_to_cert() {
      local cert="$1"
      local servername cns cn dns_sans ip_sans san dercert tag
      local srv_id="" xmppaddr=""
-     local -i i len len1 cn_match=0 wildcard_cert=0
+     local -i i j len len1 cn_match=0 wildcard_cert=0
      local -i subret=0             # no error condition, passing results
 
      HAS_DNS_SANS=false
@@ -9036,7 +8909,7 @@ compare_server_name_to_cert() {
           # Skip over the encoding of the length of the OCTET STRING.
           if [[ "${dercert:0:1}" == "8" ]]; then
                i="${dercert:1:1}"
-               i=2*$i+2
+               i=$((2*i+2))
                dercert="${dercert:i}"
           else
                dercert="${dercert:2}"
@@ -9047,13 +8920,13 @@ compare_server_name_to_cert() {
                # over the encoding of the length.
                if [[ "${dercert:2:1}" == "8" ]]; then
                     case "${dercert:3:1}" in
-                         1) len=2*0x${dercert:4:2}; dercert="${dercert:6}" ;;
-                         2) len=2*0x${dercert:4:4}; dercert="${dercert:8}" ;;
-                         3) len=2*0x${dercert:4:6}; dercert="${dercert:10}" ;;
+                         1) len=$((2*0x${dercert:4:2})); dercert="${dercert:6}" ;;
+                         2) len=$((2*0x${dercert:4:4})); dercert="${dercert:8}" ;;
+                         3) len=$((2*0x${dercert:4:6})); dercert="${dercert:10}" ;;
                          *) len=0 ;;
                     esac
                else
-                    len=2*0x${dercert:2:2}
+                    len=$((2*0x${dercert:2:2}))
                     dercert="${dercert:4}"
                fi
                if [[ $len -ne 0 ]] && [[ $len -lt ${#dercert} ]]; then
@@ -9064,13 +8937,13 @@ compare_server_name_to_cert() {
                          if [[ "${dercert:i:1}" == "8" ]]; then
                               i+=1
                               case "${dercert:i:1}" in
-                                   1) i+=1; len_name=2*0x${dercert:i:2}; i+=2 ;;
-                                   2) i+=1; len_name=2*0x${dercert:i:4}; i+=4 ;;
-                                   3) i+=1; len_name=2*0x${dercert:i:6}; i+=4 ;;
+                                   1) i+=1; len_name=$((2*0x${dercert:i:2})); i+=2 ;;
+                                   2) i+=1; len_name=$((2*0x${dercert:i:4})); i+=4 ;;
+                                   3) i+=1; len_name=$((2*0x${dercert:i:6})); i+=4 ;;
                                    *) len=0 ;;
                               esac
                          else
-                              len_name=2*0x${dercert:i:2}
+                              len_name=$((2*0x${dercert:i:2}))
                               i+=2
                          fi
                          if [[ "$tag" == "A0" ]]; then
@@ -9078,12 +8951,12 @@ compare_server_name_to_cert() {
                               if [[ $len_name -gt 18 ]] && [[ "${dercert:i:20}" == "06082B06010505070805" || \
                                    "${dercert:i:20}" == "06082B06010505070807" ]]; then
                                    # According to the OID, this is either an SRV-ID or XmppAddr.
-                                   j=$i+20
+                                   j=$((i+20))
                                    if [[ "${dercert:j:2}" == "A0" ]]; then
                                         j+=2
                                         if [[ "${dercert:j:1}" == "8" ]]; then
                                              j+=1
-                                             j+=2*0x${dercert:j:1}+1
+                                             j+=$((2*0x${dercert:j:1}+1))
                                         else
                                              j+=2
                                         fi
@@ -9095,13 +8968,13 @@ compare_server_name_to_cert() {
                                              if [[ "${dercert:j:1}" == "8" ]]; then
                                                   j+=1
                                                   case "${dercert:j:1}" in
-                                                       1) j+=1; len1=2*0x${dercert:j:2}; j+=2 ;;
-                                                       2) j+=1; len1=2*0x${dercert:j:4}; j+=4 ;;
-                                                       3) j+=1; len1=2*0x${dercert:j:6}; j+=6 ;;
+                                                       1) j+=1; len1=$((2*0x${dercert:j:2})); j+=2 ;;
+                                                       2) j+=1; len1=$((2*0x${dercert:j:4})); j+=4 ;;
+                                                       3) j+=1; len1=$((2*0x${dercert:j:6})); j+=6 ;;
                                                        4) len1=0 ;;
                                                   esac
                                              else
-                                                  len1=2*0x${dercert:j:2}
+                                                  len1=$((2*0x${dercert:j:2}))
                                                   j+=2
                                              fi
                                              if [[ $len1 -ne 0 ]]; then
@@ -9210,7 +9083,7 @@ etsi_ets_visibility_info() {
                # Skip over the encoding of the length of the OCTET STRING.
                if [[ "${dercert:0:1}" == 8 ]]; then
                     i="${dercert:1:1}"
-                    i=2*$i+2
+                    i=$((2*i+2))
                     dercert="${dercert:i}"
                else
                     dercert="${dercert:2}"
@@ -9221,13 +9094,13 @@ etsi_ets_visibility_info() {
                     # over the encoding of the length.
                     if [[ "${dercert:2:1}" == 8 ]]; then
                          case "${dercert:3:1}" in
-                              1) len=2*0x${dercert:4:2}; dercert="${dercert:6}" ;;
-                              2) len=2*0x${dercert:4:4}; dercert="${dercert:8}" ;;
-                              3) len=2*0x${dercert:4:6}; dercert="${dercert:10}" ;;
+                              1) len=$((2*0x${dercert:4:2})); dercert="${dercert:6}" ;;
+                              2) len=$((2*0x${dercert:4:4})); dercert="${dercert:8}" ;;
+                              3) len=$((2*0x${dercert:4:6})); dercert="${dercert:10}" ;;
                               *) len=0 ;;
                          esac
                     else
-                         len=2*0x${dercert:2:2}
+                         len=$((2*0x${dercert:2:2}))
                          dercert="${dercert:4}"
                     fi
                     if [[ $len -ne 0 ]] && [[ $len -lt ${#dercert} ]]; then
@@ -9238,13 +9111,13 @@ etsi_ets_visibility_info() {
                               if [[ "${dercert:i:1}" == 8 ]]; then
                                    i+=1
                                    case "${dercert:i:1}" in
-                                        1) i+=1; len_name=2*0x${dercert:i:2}; i+=2 ;;
-                                        2) i+=1; len_name=2*0x${dercert:i:4}; i+=4 ;;
-                                        3) i+=1; len_name=2*0x${dercert:i:6}; i+=4 ;;
+                                        1) i+=1; len_name=$((2*0x${dercert:i:2})); i+=2 ;;
+                                        2) i+=1; len_name=$((2*0x${dercert:i:4})); i+=4 ;;
+                                        3) i+=1; len_name=$((2*0x${dercert:i:6})); i+=4 ;;
                                         *) len=0 ;;
                                    esac
                               else
-                                   len_name=2*0x${dercert:i:2}
+                                   len_name=$((2*0x${dercert:i:2}))
                                    i+=2
                               fi
                               [[ "$tag" == A0 ]] || continue
@@ -9258,7 +9131,7 @@ etsi_ets_visibility_info() {
                               j+=2
                               if [[ "${dercert:j:1}" == 8 ]]; then
                                    j+=1
-                                   j+=2*0x${dercert:j:1}+1
+                                   j+=$((2*0x${dercert:j:1}+1))
                               else
                                    j+=2
                               fi
@@ -9271,13 +9144,13 @@ etsi_ets_visibility_info() {
                               if [[ "${dercert:j:1}" == 8 ]]; then
                                    j+=1
                                    case "${dercert:j:1}" in
-                                        1) j+=1; len1=2*0x${dercert:j:2}; j+=2 ;;
-                                        2) j+=1; len1=2*0x${dercert:j:4}; j+=4 ;;
-                                        3) j+=1; len1=2*0x${dercert:j:6}; j+=6 ;;
+                                        1) j+=1; len1=$((2*0x${dercert:j:2})); j+=2 ;;
+                                        2) j+=1; len1=$((2*0x${dercert:j:4})); j+=4 ;;
+                                        3) j+=1; len1=$((2*0x${dercert:j:6})); j+=6 ;;
                                         4) len1=0 ;;
                                    esac
                               else
-                                   len1=2*0x${dercert:j:2}
+                                   len1=$((2*0x${dercert:j:2}))
                                    j+=2
                               fi
                               [[ $len1 -ne 0 ]] || continue
@@ -9292,13 +9165,13 @@ etsi_ets_visibility_info() {
                               if [[ "${dercert:j:1}" == "8" ]]; then
                                    j+=1
                                    case "${dercert:j:1}" in
-                                        1) j+=1; len1=2*0x${dercert:j:2}; j+=2 ;;
-                                        2) j+=1; len1=2*0x${dercert:j:4}; j+=4 ;;
-                                        3) j+=1; len1=2*0x${dercert:j:6}; j+=6 ;;
+                                        1) j+=1; len1=$((2*0x${dercert:j:2})); j+=2 ;;
+                                        2) j+=1; len1=$((2*0x${dercert:j:4})); j+=4 ;;
+                                        3) j+=1; len1=$((2*0x${dercert:j:6})); j+=6 ;;
                                         4) len1=0 ;;
                                    esac
                               else
-                                   len1=2*0x${dercert:j:2}
+                                   len1=$((2*0x${dercert:j:2}))
                                    j+=2
                               fi
                               access_description[nr_visnames]=""$(hex2binary "${dercert:j:len1}")""
@@ -9343,7 +9216,7 @@ must_staple() {
           # probably okay, since it seems likely that any TLS Feature extension
           # that includes status_request_v2 will also include status_request.
           supported=true
-     elif [[ "$hostcert_txt" =~ '1.3.6.1.5.5.7.1.24:' ]]; then
+     elif [[ "$hostcert_txt" =~ 1\.3\.6\.1\.5\.5\.7\.1\.24: ]]; then
           cert="$($OPENSSL x509 -in "$HOSTCERT" -outform DER 2>>$ERRFILE | hexdump -v -e '16/1 "%02X"')"
           extn="${cert##*06082B06010505070118}"
           # Check for critical bit, and skip over it if present.
@@ -9351,7 +9224,7 @@ must_staple() {
           # Next is tag and length of extnValue OCTET STRING. Assume it is less than 128 bytes.
           extn="${extn:4}"
           # The TLS Feature is a SEQUENCE of INTEGER. Get the length of the SEQUENCE
-          extn_len=2*$(hex2dec "${extn:2:2}")
+          extn_len=$((2*$(hex2dec "${extn:2:2}")))
           # If the extension include the status_request (5), then it supports must staple.
           if [[ "${extn:4:extn_len}" =~ 020105 ]]; then
                supported=true
@@ -9408,11 +9281,11 @@ certificate_transparency() {
      # server's certificate. If they aren't, check whether the server provided
      # a stapled OCSP response with SCTs. If no SCTs were found in the certificate
      # or OCSP response, check for an SCT TLS extension.
-     if [[ "$cert_txt" =~ CT\ Precertificate\ SCTs ]] || [[ "$cert_txt" =~ '1.3.6.1.4.1.11129.2.4.2' ]]; then
+     if [[ "$cert_txt" =~ CT\ Precertificate\ SCTs ]] || [[ "$cert_txt" =~ 1\.3\.6\.1\.4\.1\.11129\.2\.4\.2 ]]; then
           CERTIFICATE_TRANSPARENCY_SOURCE="certificate extension"
           return 0
      fi
-     if [[ "$ocsp_response" =~ CT\ Certificate\ SCTs ]] || [[ "$ocsp_response" =~ '1.3.6.1.4.1.11129.2.4.5' ]]; then
+     if [[ "$ocsp_response" =~ CT\ Certificate\ SCTs ]] || [[ "$ocsp_response" =~ 1\.3\.6\.1\.4\.1\.11129\.2\.4\.5 ]]; then
           CERTIFICATE_TRANSPARENCY_SOURCE="OCSP extension"
           return 0
      fi
@@ -9528,14 +9401,14 @@ determine_dates_certificate() {
           d=$(( ${yearend:8:2} - ${yearstart:8:2} ))
           # We take the year, month, days here as old OpenBSD's date is too difficult for real conversion
           # see comment in parse_date(). In diffseconds then we have the estimated absolute validity period
-          diffseconds=$(( d + ((m*30)) + ((y*365)) ))
+          diffseconds=$(( d + (m*30) + (y*365) ))
           diffseconds=$((diffseconds * secsaday))
           # Now we estimate the days left plus length of month/year:
           yearnow="$(date -juz GMT "+%Y-%m-%d %H:%M")"
           y=$(( ${yearend:0:4} - ${yearnow:0:4} ))
           m=$(( ${yearend:5:1} - ${yearnow:5:1} + ${yearend:6:1} - ${yearnow:6:1} ))
           d=$(( ${yearend:8:2} - ${yearnow:8:2} ))
-          days2expire=$(( d + ((m*30)) + ((y*365)) ))
+          days2expire=$(( d + (m*30) + (y*365) ))
      else
           startdate="$(parse_date "$startdate" +"%F %H:%M" "%b %d %T %Y %Z")"
           enddate="$(parse_date "$enddate" +"%F %H:%M" "%b %d %T %Y %Z")"
@@ -10625,7 +10498,7 @@ certificate_info() {
           [[ "$intermediates" =~ \-\-\-\-\-BEGIN\ CERTIFICATE\-\-\-\-\- ]] || break
           intermediates="${intermediates#*-----BEGIN CERTIFICATE-----}"
           cert="${intermediates%%-----END CERTIFICATE-----*}"
-          intermediates="${intermediates#${cert}-----END CERTIFICATE-----}"
+          intermediates="${intermediates#"${cert}"-----END CERTIFICATE-----}"
           cert="-----BEGIN CERTIFICATE-----${cert}-----END CERTIFICATE-----"
 
           fileout "intermediate_cert <#${i}>${json_postfix}" "INFO" "$(pem_to_one_line "$cert")"
@@ -11334,7 +11207,7 @@ run_fs() {
                fi
           done
      else
-          while read -r hexc dash ciph[nr_supported_ciphers] sslvers kx[nr_supported_ciphers] auth enc[nr_supported_ciphers] mac exprt; do
+          while read -r hexc dash "ciph[nr_supported_ciphers]" sslvers "kx[nr_supported_ciphers]" auth "enc[nr_supported_ciphers]" mac exprt; do
                ciphers_found[nr_supported_ciphers]=false
                if [[ "${hexc:2:2}" == 00 ]]; then
                     normalized_hexcode[nr_supported_ciphers]="x${hexc:7:2}"
@@ -11375,7 +11248,7 @@ run_fs() {
           if [[ "$(count_words "$OSSL_SUPPORTED_CURVES")" -gt 28 ]]; then
                # Place the first 28 supported curves in curves_list1 and the remainder in curves_list2.
                curves_list2="${curves_list1#* * * * * * * * * * * * * * * * * * * * * * * * * * * * }"
-               curves_list1="${curves_list1%$curves_list2}"
+               curves_list1="${curves_list1%"$curves_list2"}"
                curves_list1="$(strip_trailing_space "$curves_list1")"
                curves_list2="${curves_list2// /:}"
           fi
@@ -12087,7 +11960,7 @@ run_npn() {
      if "$HAS_NPN"; then
           # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
           # TLS13_ONLY is tested here again, just to be sure, see npn_pre
-          if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
+          if "$HAS_TLS13" && ! "$TLS13_ONLY"; then
                 proto="-no_tls1_3"
           fi
           $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
@@ -12126,7 +11999,7 @@ run_npn() {
 
 
 run_alpn() {
-     local tmpstr alpn_extn len
+     local tmpstr proto alpn_extn len
      local -i ret=0
      local has_alpn_proto=false
      local alpn_finding=""
@@ -12822,6 +12695,7 @@ socksend_x() {
 # ARG1: blocksize for reading
 #
 sockread() {
+     local maxsleep
      [[ -z "$2" ]] && maxsleep=$MAX_WAITSOCK || maxsleep=$2
      SOCK_REPLY_FILE=$(mktemp $TEMPDIR/ddreply.XXXXXX) || return 7
      dd bs=$1 of=$SOCK_REPLY_FILE count=1 <&5 2>/dev/null &
@@ -12891,21 +12765,21 @@ get_pub_key_size() {
                     129) len="0x${pubkey:i:2}" ;;
                     130) len="0x${pubkey:i:2}"
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          ;;
                     131) len="0x${pubkey:i:2}"
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          ;;
                     132) len="0x${pubkey:i:2}"
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          ;;
                esac
                i+=$((2+2*len))
@@ -12932,21 +12806,21 @@ get_pub_key_size() {
                     129) len="0x${pubkey:i:2}" ;;
                     130) len="0x${pubkey:i:2}"
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          ;;
                     131) len="0x${pubkey:i:2}"
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          ;;
                     132) len="0x${pubkey:i:2}"
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          i+=2
-                         len=256*$len+"0x${pubkey:i:2}"
+                         len=$((256*len+0x${pubkey:i:2}))
                          ;;
                esac
           fi
@@ -12967,8 +12841,8 @@ get_dh_ephemeralkey() {
      "$HAS_PKEY" || return 1
 
      tls_serverkeyexchange_ascii_len=${#tls_serverkeyexchange_ascii}
-     dh_p_len=2*$(hex2dec "${tls_serverkeyexchange_ascii:0:4}")
-     offset=4+$dh_p_len
+     dh_p_len=$((2*$(hex2dec "${tls_serverkeyexchange_ascii:0:4}")))
+     offset=$((4+dh_p_len))
      if [[ $tls_serverkeyexchange_ascii_len -lt $offset ]]; then
           debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
           return 1
@@ -12977,7 +12851,7 @@ get_dh_ephemeralkey() {
      # Subtract any leading 0 bytes
      for (( i=4; i < offset; i+=2 )); do
           [[ "${tls_serverkeyexchange_ascii:i:2}" != "00" ]] && break
-          dh_p_len=$dh_p_len-2
+          dh_p_len=$((dh_p_len-2))
      done
      if [[ $i -ge $offset ]]; then
           debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
@@ -12985,9 +12859,9 @@ get_dh_ephemeralkey() {
      fi
      dh_p="${tls_serverkeyexchange_ascii:i:dh_p_len}"
 
-     dh_g_len=2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")
-     i=4+$offset
-     offset+=4+$dh_g_len
+     dh_g_len=$((2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")))
+     i=$((4+offset))
+     offset+=$((4+dh_g_len))
      if [[ $tls_serverkeyexchange_ascii_len -lt $offset ]]; then
           debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
           return 1
@@ -12995,7 +12869,7 @@ get_dh_ephemeralkey() {
      # Subtract any leading 0 bytes
      for (( 1; i < offset; i+=2 )); do
           [[ "${tls_serverkeyexchange_ascii:i:2}" != "00" ]] && break
-          dh_g_len=$dh_g_len-2
+          dh_g_len=$((dh_g_len-2))
      done
      if [[ $i -ge $offset ]]; then
           debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
@@ -13003,9 +12877,9 @@ get_dh_ephemeralkey() {
      fi
      dh_g="${tls_serverkeyexchange_ascii:i:dh_g_len}"
 
-     dh_y_len=2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")
-     i=4+$offset
-     offset+=4+$dh_y_len
+     dh_y_len=$((2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")))
+     i=$((4+offset))
+     offset+=$((4+dh_y_len))
      if [[ $tls_serverkeyexchange_ascii_len -lt $offset ]]; then
           debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
           return 1
@@ -13013,7 +12887,7 @@ get_dh_ephemeralkey() {
      # Subtract any leading 0 bytes
      for (( 1; i < offset; i+=2 )); do
           [[ "${tls_serverkeyexchange_ascii:i:2}" != "00" ]] && break
-          dh_y_len=$dh_y_len-2
+          dh_y_len=$((dh_y_len-2))
      done
      if [[ $i -ge $offset ]]; then
           debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
@@ -13025,7 +12899,7 @@ get_dh_ephemeralkey() {
      # which just means that the encoded length of the public key must be less than
      # 65,536 bytes. If the length is anywhere close to that, it is almost certainly an
      # encoding error.
-     if [[ $dh_p_len+$dh_g_len+$dh_y_len -ge 131000 ]]; then
+     if [[ $((dh_p_len+dh_g_len+dh_y_len)) -ge 131000 ]]; then
           debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
           return 1
      fi
@@ -13061,7 +12935,7 @@ get_dh_ephemeralkey() {
      dh_y="02${len1}$dh_y"
 
      # Make a SEQUENCE of p and g
-     dh_param_len=${#dh_p}+${#dh_g}
+     dh_param_len=$((${#dh_p}+${#dh_g}))
      if [[ $dh_param_len -lt 256 ]]; then
           len1="$(printf "%02x" $((dh_param_len/2)))"
      elif [[ $dh_param_len -lt 512 ]]; then
@@ -13072,7 +12946,7 @@ get_dh_ephemeralkey() {
      dh_param="30${len1}${dh_p}${dh_g}"
 
      # Make a SEQUENCE of the parameters SEQUENCE and the OID
-     dh_param_len=22+${#dh_param}
+     dh_param_len=$((22+${#dh_param}))
      if [[ $dh_param_len -lt 256 ]]; then
           len1="$(printf "%02x" $((dh_param_len/2)))"
      elif [[ $dh_param_len -lt 512 ]]; then
@@ -13083,7 +12957,7 @@ get_dh_ephemeralkey() {
      dh_param="30${len1}06092A864886F70D010301${dh_param}"
 
      # Encapsulate public key, y, in a BIT STRING
-     dh_y_len=${#dh_y}+2
+     dh_y_len=$((${#dh_y}+2))
      if [[ $dh_y_len -lt 256 ]]; then
           len1="$(printf "%02x" $((dh_y_len/2)))"
      elif [[ $dh_y_len -lt 512 ]]; then
@@ -13094,7 +12968,7 @@ get_dh_ephemeralkey() {
      dh_y="03${len1}00$dh_y"
 
      # Create the public key SEQUENCE
-     i=${#dh_param}+${#dh_y}
+     i=$((${#dh_param}+${#dh_y}))
      if [[ $i -lt 256 ]]; then
           len1="$(printf "%02x" $((i/2)))"
      elif [[ $i -lt 512 ]]; then
@@ -13205,7 +13079,7 @@ parse_sslv2_serverhello() {
      rm -f $HOSTCERT
      > $TEMPDIR/intermediatecerts.pem
      if [[ $ret -eq 3 ]]; then
-          certificate_len=2*$(hex2dec "$v2_hello_cert_length")
+          certificate_len=$((2*$(hex2dec "$v2_hello_cert_length")))
 
           if [[ "$v2_cert_type" == "01" ]] && [[ "$v2_hello_cert_length" != "00" ]]; then
                hex2binary "${v2_hello_ascii:26:certificate_len}" | \
@@ -14469,8 +14343,8 @@ gcm() {
                vh=${gcm_ctx_hh[i]}
                vl=${gcm_ctx_hl[i]}
                for (( j=1; j < i; j++ )); do
-                    gcm_ctx_hh[$((i+j))]=$((vh ^ gcm_ctx_hh[j]))
-                    gcm_ctx_hl[$((i+j))]=$((vl ^ gcm_ctx_hl[j]))
+                    gcm_ctx_hh[i+j]=$((vh ^ gcm_ctx_hh[j]))
+                    gcm_ctx_hl[i+j]=$((vl ^ gcm_ctx_hl[j]))
                done
           done
 
@@ -14488,7 +14362,7 @@ gcm() {
                done
 
                buf="$(gcm_mult $hl $hh ${gcm_ctx_buf[0]} ${gcm_ctx_buf[1]} ${gcm_ctx_buf[2]} ${gcm_ctx_buf[3]} ${gcm_ctx_buf[4]} ${gcm_ctx_buf[5]} ${gcm_ctx_buf[6]} ${gcm_ctx_buf[7]} ${gcm_ctx_buf[8]} ${gcm_ctx_buf[9]} ${gcm_ctx_buf[10]} ${gcm_ctx_buf[11]} ${gcm_ctx_buf[12]} ${gcm_ctx_buf[13]} ${gcm_ctx_buf[14]} ${gcm_ctx_buf[15]})"
-               read -r gcm_ctx_buf[0] gcm_ctx_buf[1] gcm_ctx_buf[2] gcm_ctx_buf[3] gcm_ctx_buf[4] gcm_ctx_buf[5] gcm_ctx_buf[6] gcm_ctx_buf[7] gcm_ctx_buf[8] gcm_ctx_buf[9] gcm_ctx_buf[10] gcm_ctx_buf[11] gcm_ctx_buf[12] gcm_ctx_buf[13] gcm_ctx_buf[14] gcm_ctx_buf[15] <<< "$buf"
+               read -r "gcm_ctx_buf[0]" "gcm_ctx_buf[1]" "gcm_ctx_buf[2]" "gcm_ctx_buf[3]" "gcm_ctx_buf[4]" "gcm_ctx_buf[5]" "gcm_ctx_buf[6]" "gcm_ctx_buf[7]" "gcm_ctx_buf[8]" "gcm_ctx_buf[9]" "gcm_ctx_buf[10]" "gcm_ctx_buf[11]" "gcm_ctx_buf[12]" "gcm_ctx_buf[13]" "gcm_ctx_buf[14]" "gcm_ctx_buf[15]" <<< "$buf"
           done
      fi
 
@@ -14522,7 +14396,7 @@ gcm() {
 
           if "$compute_tag"; then
                tmp="$(gcm_mult $hl $hh ${gcm_ctx_buf[0]} ${gcm_ctx_buf[1]} ${gcm_ctx_buf[2]} ${gcm_ctx_buf[3]} ${gcm_ctx_buf[4]} ${gcm_ctx_buf[5]} ${gcm_ctx_buf[6]} ${gcm_ctx_buf[7]} ${gcm_ctx_buf[8]} ${gcm_ctx_buf[9]} ${gcm_ctx_buf[10]} ${gcm_ctx_buf[11]} ${gcm_ctx_buf[12]} ${gcm_ctx_buf[13]} ${gcm_ctx_buf[14]} ${gcm_ctx_buf[15]})"
-               read -r gcm_ctx_buf[0] gcm_ctx_buf[1] gcm_ctx_buf[2] gcm_ctx_buf[3] gcm_ctx_buf[4] gcm_ctx_buf[5] gcm_ctx_buf[6] gcm_ctx_buf[7] gcm_ctx_buf[8] gcm_ctx_buf[9] gcm_ctx_buf[10] gcm_ctx_buf[11] gcm_ctx_buf[12] gcm_ctx_buf[13] gcm_ctx_buf[14] gcm_ctx_buf[15] <<< "$tmp"
+               read -r "gcm_ctx_buf[0]" "gcm_ctx_buf[1]" "gcm_ctx_buf[2]" "gcm_ctx_buf[3]" "gcm_ctx_buf[4]" "gcm_ctx_buf[5]" "gcm_ctx_buf[6]" "gcm_ctx_buf[7]" "gcm_ctx_buf[8]" "gcm_ctx_buf[9]" "gcm_ctx_buf[10]" "gcm_ctx_buf[11]" "gcm_ctx_buf[12]" "gcm_ctx_buf[13]" "gcm_ctx_buf[14]" "gcm_ctx_buf[15]" <<< "$tmp"
           fi
 
           input="${input:$((2*use_len))}"
@@ -14545,7 +14419,7 @@ gcm() {
                done
 
                buf="$(gcm_mult $hl $hh ${gcm_ctx_buf[0]} ${gcm_ctx_buf[1]} ${gcm_ctx_buf[2]} ${gcm_ctx_buf[3]} ${gcm_ctx_buf[4]} ${gcm_ctx_buf[5]} ${gcm_ctx_buf[6]} ${gcm_ctx_buf[7]} ${gcm_ctx_buf[8]} ${gcm_ctx_buf[9]} ${gcm_ctx_buf[10]} ${gcm_ctx_buf[11]} ${gcm_ctx_buf[12]} ${gcm_ctx_buf[13]} ${gcm_ctx_buf[14]} ${gcm_ctx_buf[15]})"
-               read -r gcm_ctx_buf[0] gcm_ctx_buf[1] gcm_ctx_buf[2] gcm_ctx_buf[3] gcm_ctx_buf[4] gcm_ctx_buf[5] gcm_ctx_buf[6] gcm_ctx_buf[7] gcm_ctx_buf[8] gcm_ctx_buf[9] gcm_ctx_buf[10] gcm_ctx_buf[11] gcm_ctx_buf[12] gcm_ctx_buf[13] gcm_ctx_buf[14] gcm_ctx_buf[15] <<< "$buf"
+               read -r "gcm_ctx_buf[0]" "gcm_ctx_buf[1]" "gcm_ctx_buf[2]" "gcm_ctx_buf[3]" "gcm_ctx_buf[4]" "gcm_ctx_buf[5]" "gcm_ctx_buf[6]" "gcm_ctx_buf[7]" "gcm_ctx_buf[8]" "gcm_ctx_buf[9]" "gcm_ctx_buf[10]" "gcm_ctx_buf[11]" "gcm_ctx_buf[12]" "gcm_ctx_buf[13]" "gcm_ctx_buf[14]" "gcm_ctx_buf[15]" <<< "$buf"
                for (( i=0; i < 16; i++ )); do
                     tag[i]=$((tag[i] ^ 0x${gcm_ctx_buf[i]}))
                done
@@ -14609,7 +14483,7 @@ gcm-decrypt() {
      tmp="$(gcm "$cipher" "$key" "$nonce" "$ciphertext" "$aad" "decrypt" "$compute_tag")"
      [[ $? -ne 0 ]] && return 7
      computed_tag="${tmp##* }"
-     plaintext="${tmp% $computed_tag}"
+     plaintext="${tmp% "$computed_tag"}"
 
      if ! "$compute_tag" || [[ "$computed_tag" == $expected_tag ]]; then
           if [[ -n "$plaintext" ]]; then
@@ -14841,7 +14715,7 @@ check_tls_serverhellodone() {
 
      tls_hello_ascii_len=${#tls_hello_ascii}
      for (( i=0; i<tls_hello_ascii_len; i+=msg_len )); do
-          remaining=$tls_hello_ascii_len-$i
+          remaining=$((tls_hello_ascii_len-i))
           [[ $remaining -lt 10 ]] && return 1
 
           tls_content_type="${tls_hello_ascii:i:2}"
@@ -14855,9 +14729,9 @@ check_tls_serverhellodone() {
           [[ "${tls_protocol:0:2}" != 03 ]] && return 2
           i+=4
           additional_data="$tls_content_type$tls_protocol${tls_hello_ascii:i:4}"
-          msg_len=2*$(hex2dec "${tls_hello_ascii:i:4}")
+          msg_len=$((2*$(hex2dec "${tls_hello_ascii:i:4}")))
           i+=4
-          remaining=$tls_hello_ascii_len-$i
+          remaining=$((tls_hello_ascii_len-i))
           [[ $msg_len -gt $remaining ]] && return 1
 
           if [[ "$tls_content_type" == 16 ]]; then
@@ -14874,23 +14748,23 @@ check_tls_serverhellodone() {
                     # if the version field specifies TLSv1.2, then check to see if there is a
                     # supported_versions extension.
                     if [[ "$DETECTED_TLS_VERSION" == 0303 ]]; then
-                         tls_serverhello_ascii_len=2*$(hex2dec "${tls_handshake_ascii:2:6}")
-                         sid_len=2*$(hex2dec "${tls_handshake_ascii:76:2}")
+                         tls_serverhello_ascii_len=$((2*$(hex2dec "${tls_handshake_ascii:2:6}")))
+                         sid_len=$((2*$(hex2dec "${tls_handshake_ascii:76:2}")))
                          if [[ $tls_serverhello_ascii_len -gt 76+$sid_len ]]; then
                               # ServerHello contains extensions, so check for supported_versions extension
-                              offset=84+$sid_len
-                              tls_extensions_len=2*$(hex2dec "${tls_handshake_ascii:offset:4}")
-                              [[ $tls_extensions_len -ne $tls_serverhello_ascii_len-$sid_len-80 ]] && return 2
+                              offset=$((84+sid_len))
+                              tls_extensions_len=$((2*$(hex2dec "${tls_handshake_ascii:offset:4}")))
+                              [[ $tls_extensions_len -ne $((tls_serverhello_ascii_len-sid_len-80)) ]] && return 2
                               for (( j=0; j<tls_extensions_len; j+=8+extension_len )); do
-                                   [[ $tls_extensions_len-$j -lt 8 ]] && return 2
-                                   offset=88+$sid_len+$j
+                                   [[ $((tls_extensions_len-j)) -lt 8 ]] && return 2
+                                   offset=$((88+sid_len+j))
                                    extension_type="${tls_handshake_ascii:offset:4}"
-                                   offset=92+$sid_len+$j
-                                   extension_len=2*$(hex2dec "${tls_handshake_ascii:offset:4}")
-                                   [[ $extension_len -gt $tls_extensions_len-$j-8 ]] && return 2
+                                   offset=$((92+sid_len+j))
+                                   extension_len=$((2*$(hex2dec "${tls_handshake_ascii:offset:4}")))
+                                   [[ $extension_len -gt $((tls_extensions_len-j-8)) ]] && return 2
                                    if [[ "$extension_type" == 002B ]]; then # supported_versions
                                         [[ $extension_len -ne 4 ]] && return 2
-                                        offset=96+$sid_len+$j
+                                        offset=$((96+sid_len+j))
                                         DETECTED_TLS_VERSION="${tls_handshake_ascii:offset:4}"
                                    fi
                               done
@@ -14902,7 +14776,7 @@ check_tls_serverhellodone() {
                          DETECTED_TLS_VERSION=0304
                     fi
                     if [[ 0x$DETECTED_TLS_VERSION -ge 0x0304 ]] && [[ "$process_full" == ephemeralkey ]]; then
-                         tls_serverhello_ascii_len=2*$(hex2dec "${tls_handshake_ascii:2:6}")
+                         tls_serverhello_ascii_len=$((2*$(hex2dec "${tls_handshake_ascii:2:6}")))
                          if [[ $tls_handshake_ascii_len -ge $tls_serverhello_ascii_len+8 ]]; then
                               tm_out ""
                               return 0 # The entire ServerHello message has been received (and the rest isn't needed)
@@ -14922,9 +14796,9 @@ check_tls_serverhellodone() {
                seq_num+=1
 
                # Remove zeros from end of plaintext, if any
-               plaintext_len=${#plaintext}-2
+               plaintext_len=$((${#plaintext}-2))
                while [[ "${plaintext:plaintext_len:2}" == 00 ]]; do
-                    plaintext_len=$plaintext_len-2
+                    plaintext_len=$((plaintext_len-2))
                done
                tls_content_type="${plaintext:plaintext_len:2}"
                decrypted_response+="${tls_content_type}0301$(printf "%04X" $((plaintext_len/2)))${plaintext:0:plaintext_len}"
@@ -14945,7 +14819,7 @@ check_tls_serverhellodone() {
      # If there is a fatal alert, then we are done.
      tls_alert_ascii_len=${#tls_alert_ascii}
      for (( i=0; i<tls_alert_ascii_len; i+=4 )); do
-          remaining=$tls_alert_ascii_len-$i
+          remaining=$((tls_alert_ascii_len-i))
           [[ $remaining -lt 4 ]] && return 1
           tls_err_level=${tls_alert_ascii:i:2}    # 1: warning, 2: fatal
           [[ $tls_err_level == 02 ]] && DETECTED_TLS_VERSION="" && tm_out "" && return 0
@@ -14954,13 +14828,13 @@ check_tls_serverhellodone() {
      # If there is a serverHelloDone or Finished, then we are done.
      tls_handshake_ascii_len=${#tls_handshake_ascii}
      for (( i=0; i<tls_handshake_ascii_len; i+=msg_len )); do
-          remaining=$tls_handshake_ascii_len-$i
+          remaining=$((tls_handshake_ascii_len-i))
           [[ $remaining -lt 8 ]] && return 1
           tls_msg_type="${tls_handshake_ascii:i:2}"
           i+=2
-          msg_len=2*$(hex2dec "${tls_handshake_ascii:i:6}")
+          msg_len=$((2*$(hex2dec "${tls_handshake_ascii:i:6}")))
           i+=6
-          remaining=$tls_handshake_ascii_len-$i
+          remaining=$((tls_handshake_ascii_len-i))
           [[ $msg_len -gt $remaining ]] && return 1
 
           # The ServerHello has already been added to $msg_transcript,
@@ -15116,7 +14990,7 @@ parse_tls_serverhello() {
           i+=2
           tls_protocol="${tls_hello_ascii:i:4}"
           i+=4
-          msg_len=2*$(hex2dec "${tls_hello_ascii:i:4}")
+          msg_len=$((2*$(hex2dec "${tls_hello_ascii:i:4}")))
           i+=4
 
           if [[ $DEBUG -ge 3 ]]; then
@@ -15157,7 +15031,7 @@ parse_tls_serverhello() {
           fi
           DETECTED_TLS_VERSION=$tls_protocol
 
-          if [[ $msg_len -gt $tls_hello_ascii_len-$i ]]; then
+          if [[ $msg_len -gt $((tls_hello_ascii_len-i)) ]]; then
                if [[ "$process_full" =~ all ]]; then
                     debugme tmln_warning "Malformed message."
                     [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
@@ -15165,7 +15039,7 @@ parse_tls_serverhello() {
                else
                     # This could just be a result of the server's response being split
                     # across two or more packets. Just grab the part that is available.
-                    msg_len=$tls_hello_ascii_len-$i
+                    msg_len=$((tls_hello_ascii_len-i))
                fi
           fi
 
@@ -15188,7 +15062,7 @@ parse_tls_serverhello() {
           debugme echo "TLS alert messages:"
           for (( i=0; i+3 < tls_alert_ascii_len; i+=4 )); do
                tls_err_level=${tls_alert_ascii:i:2}    # 1: warning, 2: fatal
-               j=$i+2
+               j=$((i+2))
                tls_err_descr_no=${tls_alert_ascii:j:2}
                if [[ $DEBUG -ge 1 ]]; then
                     debugme tm_out  "     tls_err_descr_no:       0x${tls_err_descr_no} / = $(hex2dec ${tls_err_descr_no})"
@@ -15226,7 +15100,7 @@ parse_tls_serverhello() {
           echo "TLS handshake messages:"
      fi
      for (( i=0; i<tls_handshake_ascii_len; i+=msg_len )); do
-          if [[ $tls_handshake_ascii_len-$i -lt 8 ]]; then
+          if [[ $((tls_handshake_ascii_len-i)) -lt 8 ]]; then
                if [[ "$process_full" =~ all ]]; then
                     # The entire server response should have been retrieved.
                     debugme tmln_warning "Malformed message."
@@ -15240,7 +15114,7 @@ parse_tls_serverhello() {
           fi
           tls_msg_type="${tls_handshake_ascii:i:2}"
           i+=2
-          msg_len=2*$(hex2dec "${tls_handshake_ascii:i:6}")
+          msg_len=$((2*$(hex2dec "${tls_handshake_ascii:i:6}")))
           i+=6
           if [[ $DEBUG -ge 3 ]]; then
                tm_out  "     handshake type:         0x${tls_msg_type}"
@@ -15271,7 +15145,7 @@ parse_tls_serverhello() {
                echo "     msg_len:                $((msg_len/2))"
                tmln_out
           fi
-          if [[ $msg_len -gt $tls_handshake_ascii_len-$i ]]; then
+          if [[ $msg_len -gt $((tls_handshake_ascii_len-i)) ]]; then
                if [[ "$process_full" =~ all ]]; then
                     debugme tmln_warning "Malformed message."
                     [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
@@ -15280,7 +15154,7 @@ parse_tls_serverhello() {
                     # This could just be a result of the server's response being
                     # split across two or more packets. Just grab the part that
                     # is available.
-                    msg_len=$tls_handshake_ascii_len-$i
+                    msg_len=$((tls_handshake_ascii_len-i))
                fi
           fi
 
@@ -15356,7 +15230,7 @@ parse_tls_serverhello() {
                tls_extensions+="TLS server extension \"compress_certificate\" (id=27), len=0\n"
                if [[ "$process_full" =~ all ]] && "$HAS_ZLIB" && [[ "${tls_handshake_ascii:i:4}" == 0001 ]]; then
                     offset=$((i+4))
-                    tls_certificate_ascii_len=2*0x${tls_handshake_ascii:offset:6}
+                    tls_certificate_ascii_len=$((2*0x${tls_handshake_ascii:offset:6}))
                     offset=$((i+16))
                     len1=$((msg_len-16))
                     tls_certificate_ascii="$(hex2binary "${tls_handshake_ascii:offset:len1}" | $OPENSSL zlib -d 2>/dev/null | hexdump -v -e '16/1 "%02X"')"
@@ -15415,9 +15289,9 @@ parse_tls_serverhello() {
           tls_hello_time="${tls_serverhello_ascii:4:8}"
           [[ "$TLS_DIFFTIME_SET" || "$DEBUG" ]] && TLS_TIME=$(hex2dec "$tls_hello_time")
           tls_sid_len_hex="${tls_serverhello_ascii:68:2}"
-          tls_sid_len=2*$(hex2dec "$tls_sid_len_hex")
+          tls_sid_len=$((2*$(hex2dec "$tls_sid_len_hex")))
           offset=$((tls_sid_len+70))
-          if [[ $tls_serverhello_ascii_len -lt 76+$tls_sid_len ]]; then
+          if [[ $tls_serverhello_ascii_len -lt $((76+tls_sid_len)) ]]; then
                debugme echo "Malformed response"
                [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
                return 1
@@ -15444,8 +15318,8 @@ parse_tls_serverhello() {
                [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
                return 1
           fi
-          tls_extensions_len=$(hex2dec "${tls_serverhello_ascii:extns_offset:4}")*2
-          if [[ $tls_extensions_len -ne $tls_serverhello_ascii_len-$extns_offset-4 ]]; then
+          tls_extensions_len=$(($(hex2dec "${tls_serverhello_ascii:extns_offset:4}")*2))
+          if [[ $tls_extensions_len -ne $((tls_serverhello_ascii_len-extns_offset-4)) ]]; then
                debugme tmln_warning "Malformed message."
                [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
                return 1
@@ -15459,7 +15333,7 @@ parse_tls_serverhello() {
                offset=$((extns_offset+i+4))
                extension_type="${tls_serverhello_ascii:offset:4}"
                offset=$((extns_offset+i+8))
-               extension_len=2*$(hex2dec "${tls_serverhello_ascii:offset:4}")
+               extension_len=$((2*$(hex2dec "${tls_serverhello_ascii:offset:4}")))
                if [[  $extension_len -gt $tls_extensions_len-$i-8 ]]; then
                     debugme echo "Malformed response"
                     [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
@@ -15495,7 +15369,7 @@ parse_tls_serverhello() {
                                fi
                                echo -n "Supported groups: " >> $TMPFILE
                                offset=$((extns_offset+12+i))
-                               len1=2*$(hex2dec "${tls_serverhello_ascii:offset:4}")
+                               len1=$((2*$(hex2dec "${tls_serverhello_ascii:offset:4}")))
                                if [[ $extension_len -lt $len1+4 ]] || [[ $len1 -lt 4 ]]; then
                                     debugme tmln_warning "Malformed supported groups extension."
                                     return 1
@@ -15547,14 +15421,14 @@ parse_tls_serverhello() {
                                fi
                                echo -n "ALPN protocol:  " >> $TMPFILE
                                offset=$((extns_offset+12+i))
-                               j=2*$(hex2dec "${tls_serverhello_ascii:offset:4}")
+                               j=$((2*$(hex2dec "${tls_serverhello_ascii:offset:4}")))
                                if [[ $extension_len -ne $j+4 ]] || [[ $j -lt 2 ]]; then
                                     debugme echo "Malformed application layer protocol negotiation extension."
                                     [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
                                     return 1
                                fi
                                offset=$((offset+4))
-                               j=2*$(hex2dec "${tls_serverhello_ascii:offset:2}")
+                               j=$((2*$(hex2dec "${tls_serverhello_ascii:offset:2}")))
                                if [[ $extension_len -ne $j+6 ]]; then
                                     debugme echo "Malformed application layer protocol negotiation extension."
                                     [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
@@ -15600,7 +15474,7 @@ parse_tls_serverhello() {
                                offset=$((extns_offset+12+i))
                                named_curve=$(hex2dec "${tls_serverhello_ascii:offset:4}")
                                offset=$((extns_offset+16+i))
-                               msg_len=2*"$(hex2dec "${tls_serverhello_ascii:offset:4}")"
+                               msg_len=$((2*$(hex2dec "${tls_serverhello_ascii:offset:4}")))
                                if [[ $msg_len -ne $extension_len-8 ]]; then
                                     debugme tmln_warning "Malformed key share extension."
                                     [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
@@ -15653,7 +15527,7 @@ parse_tls_serverhello() {
 
                                     # First is the length of the public-key SEQUENCE, and it is always encoded in four bytes (3082xxxx)
                                     # Next is the length of the parameters SEQUENCE, and it is also always encoded in four bytes (3082xxxx)
-                                    dh_param_len=8+2*"$(hex2dec "${dh_param:12:4}")"
+                                    dh_param_len=$((8+2*$(hex2dec "${dh_param:12:4}")))
                                     dh_param="${dh_param:8:dh_param_len}"
                                     if [[ "0x${tls_serverhello_ascii:offset:2}" -ge 0x80 ]]; then
                                          key_bitstring="00${tls_serverhello_ascii:offset:msg_len}"
@@ -15801,8 +15675,8 @@ parse_tls_serverhello() {
                                          [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
                                          return 1
                                     fi
-                                    protocol_len=2*$(hex2dec "${tls_serverhello_ascii:offset:2}")
-                                    if [[ $extension_len -lt $j+$protocol_len+2 ]]; then
+                                    protocol_len=$((2*$(hex2dec "${tls_serverhello_ascii:offset:2}")))
+                                    if [[ $extension_len -lt $((j+protocol_len+2)) ]]; then
                                          debugme echo "Malformed next protocol extension."
                                          [[ $DEBUG -ge 1 ]] && tmpfile_handle ${FUNCNAME[0]}.txt
                                          return 1
@@ -15830,9 +15704,9 @@ parse_tls_serverhello() {
                     # the aren't added a second time.
                     added_encrypted_extensions=true
                     if [[ -n "$tls_encryptedextensions_ascii" ]]; then
-                         tls_serverhello_ascii_len+=$tls_encryptedextensions_ascii_len-4
-                         tls_extensions_len+=$tls_encryptedextensions_ascii_len-4
-                         tls_encryptedextensions_ascii_len=$tls_encryptedextensions_ascii_len/2-2
+                         tls_serverhello_ascii_len+=$((tls_encryptedextensions_ascii_len-4))
+                         tls_extensions_len+=$((tls_encryptedextensions_ascii_len-4))
+                         tls_encryptedextensions_ascii_len=$((tls_encryptedextensions_ascii_len/2-2))
                          offset=$((extns_offset+4))
                          tls_serverhello_ascii="${tls_serverhello_ascii:0:extns_offset}$(printf "%04X" $((0x${tls_serverhello_ascii:extns_offset:4}+tls_encryptedextensions_ascii_len)))${tls_serverhello_ascii:offset}${tls_encryptedextensions_ascii:4}"
                     fi
@@ -15852,28 +15726,28 @@ parse_tls_serverhello() {
                                    tmpfile_handle ${FUNCNAME[0]}.txt
                                    return 1
                               fi
-                              certificate_list_len=2*$(hex2dec "${tls_certificate_ascii:2:6}")
-                              if [[ $certificate_list_len -ne $tls_certificate_ascii_len-8 ]]; then
+                              certificate_list_len=$((2*$(hex2dec "${tls_certificate_ascii:2:6}")))
+                              if [[ $certificate_list_len -ne $((tls_certificate_ascii_len-8)) ]]; then
                                    debugme tmln_warning "Malformed Certificate Handshake message in ServerHello."
                                    tmpfile_handle ${FUNCNAME[0]}.txt
                                    return 1
                               fi
                               for (( j=8; j < tls_certificate_ascii_len; j+=extn_len )); do
-                                   if [[ $tls_certificate_ascii_len-$j -lt 6 ]]; then
+                                   if [[ $((tls_certificate_ascii_len-j)) -lt 6 ]]; then
                                         debugme tmln_warning "Malformed Certificate Handshake message in ServerHello."
                                         tmpfile_handle ${FUNCNAME[0]}.txt
                                         return 1
                                    fi
-                                   certificate_len=2*$(hex2dec "${tls_certificate_ascii:j:6}")
-                                   if [[ $certificate_len -gt $tls_certificate_ascii_len-$j-6 ]]; then
+                                   certificate_len=$((2*$(hex2dec "${tls_certificate_ascii:j:6}")))
+                                   if [[ $certificate_len -gt $((tls_certificate_ascii_len-j-6)) ]]; then
                                         debugme tmln_warning "Malformed Certificate Handshake message in ServerHello."
                                         tmpfile_handle ${FUNCNAME[0]}.txt
                                         return 1
                                    fi
-                                   len1=$certificate_len+6
+                                   len1=$((certificate_len+6))
                                    tls_revised_certificate_msg+="${tls_certificate_ascii:j:len1}"
                                    j+=$len1
-                                   extn_len=2*$(hex2dec "${tls_certificate_ascii:j:4}")
+                                   extn_len=$((2*$(hex2dec "${tls_certificate_ascii:j:4}")))
                                    j+=4
                                    # TODO: Should only the extensions associated with the EE certificate be added to $tls_serverhello_ascii?
                                    tls_serverhello_ascii_len+=$extn_len
@@ -16014,16 +15888,16 @@ parse_tls_serverhello() {
      # $DETECTED_TLS_VERSION appeared in the list offered in the ClientHello.
      if [[ "${TLS_CLIENT_HELLO:0:2}" == 01 ]]; then
           # get position of cipher lists (just after session id)
-          offset=78+2*$(hex2dec "${TLS_CLIENT_HELLO:76:2}")
+          offset=$((78+2*$(hex2dec "${TLS_CLIENT_HELLO:76:2}")))
           # get position of compression methods
-          offset+=4+2*$(hex2dec "${TLS_CLIENT_HELLO:offset:4}")
+          offset+=$((4+2*$(hex2dec "${TLS_CLIENT_HELLO:offset:4}")))
           # get position of extensions
-          extns_offset=$offset+6+2*$(hex2dec "${TLS_CLIENT_HELLO:offset:2}")
+          extns_offset=$((offset+6+2*$(hex2dec "${TLS_CLIENT_HELLO:offset:2}")))
           len1=${#TLS_CLIENT_HELLO}
           for (( i=extns_offset; i < len1; i+=8+extension_len )); do
                extension_type="${TLS_CLIENT_HELLO:i:4}"
-               offset=4+$i
-               extension_len=2*$(hex2dec "${TLS_CLIENT_HELLO:offset:4}")
+               offset=$((4+i))
+               extension_len=$((2*$(hex2dec "${TLS_CLIENT_HELLO:offset:4}")))
                if [[ "$extension_type" == 002b ]]; then
                     offset+=6
                     tls_protocol2="$(tolower "$tls_protocol2")"
@@ -16055,7 +15929,7 @@ parse_tls_serverhello() {
                tmpfile_handle ${FUNCNAME[0]}.txt
                return 1
           fi
-          certificate_list_len=2*$(hex2dec "${tls_certificate_ascii:0:6}")
+          certificate_list_len=$((2*$(hex2dec "${tls_certificate_ascii:0:6}")))
           if [[ $certificate_list_len -ne $tls_certificate_ascii_len-6 ]]; then
                debugme echo "Malformed Certificate Handshake message in ServerHello."
                tmpfile_handle ${FUNCNAME[0]}.txt
@@ -16063,7 +15937,7 @@ parse_tls_serverhello() {
           fi
 
           # Place server's certificate in $HOSTCERT
-          certificate_len=2*$(hex2dec "${tls_certificate_ascii:6:6}")
+          certificate_len=$((2*$(hex2dec "${tls_certificate_ascii:6:6}")))
           if [[ $certificate_len -gt $tls_certificate_ascii_len-12 ]]; then
                debugme echo "Malformed Certificate Handshake message in ServerHello."
                tmpfile_handle ${FUNCNAME[0]}.txt
@@ -16096,9 +15970,9 @@ parse_tls_serverhello() {
                     tmpfile_handle ${FUNCNAME[0]}.txt
                     return 1
                fi
-               certificate_len=2*$(hex2dec "${tls_certificate_ascii:i:6}")
+               certificate_len=$((2*$(hex2dec "${tls_certificate_ascii:i:6}")))
                i+=6
-               if [[ $certificate_len -gt $tls_certificate_ascii_len-$i ]]; then
+               if [[ $certificate_len -gt $((tls_certificate_ascii_len-i)) ]]; then
                     debugme echo "Malformed certificate in Certificate Handshake message in ServerHello."
                     tmpfile_handle ${FUNCNAME[0]}.txt
                     return 1
@@ -16141,8 +16015,8 @@ parse_tls_serverhello() {
           return 1
      elif [[ $tls_certificate_status_ascii_len -ne 0 ]] && [[ "${tls_certificate_status_ascii:0:2}" == "01" ]]; then
           # This is a certificate status message of type "ocsp"
-          ocsp_response_len=2*$(hex2dec "${tls_certificate_status_ascii:2:6}")
-          if [[ $ocsp_response_len -ne $tls_certificate_status_ascii_len-8 ]]; then
+          ocsp_response_len=$((2*$(hex2dec "${tls_certificate_status_ascii:2:6}")))
+          if [[ $ocsp_response_len -ne $((tls_certificate_status_ascii_len-8)) ]]; then
                debugme echo "Malformed certificate status Handshake message in ServerHello."
                tmpfile_handle ${FUNCNAME[0]}.txt
                return 1
@@ -16151,14 +16025,14 @@ parse_tls_serverhello() {
      elif [[ $tls_certificate_status_ascii_len -ne 0 ]] && [[ "${tls_certificate_status_ascii:0:2}" == "02" ]]; then
           # This is a list of OCSP responses, but only the first one is needed
           # since the first one corresponds to the server's certificate.
-          ocsp_response_list_len=2*$(hex2dec "${tls_certificate_status_ascii:2:6}")
+          ocsp_response_list_len=$((2*$(hex2dec "${tls_certificate_status_ascii:2:6}")))
           if [[ $ocsp_response_list_len -ne $tls_certificate_status_ascii_len-8 ]] || [[ $ocsp_response_list_len -lt 6 ]]; then
                debugme echo "Malformed certificate status Handshake message in ServerHello."
                tmpfile_handle ${FUNCNAME[0]}.txt
                return 1
           fi
-          ocsp_response_len=2*$(hex2dec "${tls_certificate_status_ascii:8:6}")
-          if [[ $ocsp_response_len -gt $ocsp_response_list_len-6 ]]; then
+          ocsp_response_len=$((2*$(hex2dec "${tls_certificate_status_ascii:8:6}")))
+          if [[ $ocsp_response_len -gt $((ocsp_response_list_len-6)) ]]; then
                debugme echo "Malformed certificate status Handshake message in ServerHello."
                tmpfile_handle ${FUNCNAME[0]}.txt
                return 1
@@ -16232,7 +16106,7 @@ parse_tls_serverhello() {
                     if [[ "$DETECTED_TLS_VERSION" == 0303 ]]; then
                          # Skip over the public key to get to the SignatureAndHashAlgorithm
                          # This is TLS 1.2-only, as this field does not appear in earlier versions.
-                         len1=2*$(hex2dec "${tls_serverkeyexchange_ascii:6:2}")
+                         len1=$((2*$(hex2dec "${tls_serverkeyexchange_ascii:6:2}")))
                          offset=$((len1+8))
                          if [[ $tls_serverkeyexchange_ascii_len -ge $((offset+4)) ]]; then
                               # The SignatureAndHashAlgorithm won't be present in an anonymous
@@ -16259,8 +16133,8 @@ parse_tls_serverhello() {
                     tmpfile_handle ${FUNCNAME[0]}.txt
                     return 1
                fi
-               dh_p_len=2*$(hex2dec "${tls_serverkeyexchange_ascii:0:4}")
-               offset=4+$dh_p_len
+               dh_p_len=$((2*$(hex2dec "${tls_serverkeyexchange_ascii:0:4}")))
+               offset=$((4+dh_p_len))
                if [[ $tls_serverkeyexchange_ascii_len -lt $offset ]]; then
                     debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
                     tmpfile_handle ${FUNCNAME[0]}.txt
@@ -16270,7 +16144,7 @@ parse_tls_serverhello() {
                # Subtract any leading 0 bytes
                for (( i=4; i < offset; i+=2 )); do
                     [[ "${tls_serverkeyexchange_ascii:i:2}" != "00" ]] && break
-                    dh_p_len=$dh_p_len-2
+                    dh_p_len=$((dh_p_len-2))
                done
                if [[ $i -ge $offset ]]; then
                     debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
@@ -16279,10 +16153,10 @@ parse_tls_serverhello() {
                fi
                dh_p="${tls_serverkeyexchange_ascii:i:dh_p_len}"
 
-               dh_bits=4*$dh_p_len
+               dh_bits=$((4*dh_p_len))
                msb=$(hex2dec "${tls_serverkeyexchange_ascii:i:2}")
                for (( mask=128; msb < mask; mask/=2 )); do
-                    dh_bits=$dh_bits-1
+                    dh_bits=$((dh_bits-1))
                done
 
                key_bitstring="$(get_dh_ephemeralkey "$tls_serverkeyexchange_ascii")"
@@ -16325,14 +16199,14 @@ parse_tls_serverhello() {
                          tmpfile_handle ${FUNCNAME[0]}.txt
                          return 1
                     fi
-                    len1=2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")
+                    len1=$((2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")))
                     offset+=$((len1+4))
                     if [[ $tls_serverkeyexchange_ascii_len -lt $((offset+4)) ]]; then
                          debugme echo "Malformed ServerKeyExchange Handshake message in ServerHello."
                          tmpfile_handle ${FUNCNAME[0]}.txt
                          return 1
                     fi
-                    len1=2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")
+                    len1=$((2*$(hex2dec "${tls_serverkeyexchange_ascii:offset:4}")))
                     offset+=$((len1+4))
                     if [[ $tls_serverkeyexchange_ascii_len -ge $((offset+4)) ]]; then
                          # The SignatureAndHashAlgorithm won't be present in an anonymous
@@ -16584,11 +16458,11 @@ generate_key_share_extension() {
      supported_groups_len=${#supported_groups}
      [[ $supported_groups_len -lt 16 ]] && return 1
 
-     len=2*$(hex2dec "${supported_groups:4:4}")
-     [[ $len+8 -ne $supported_groups_len ]] && return 1
+     len=$((2*$(hex2dec "${supported_groups:4:4}")))
+     [[ $((len+8)) -ne $supported_groups_len ]] && return 1
 
-     len=2*$(hex2dec "${supported_groups:8:4}")
-     [[ $len+12 -ne $supported_groups_len ]] && return 1
+     len=$((2*$(hex2dec "${supported_groups:8:4}")))
+     [[ $((len+12)) -ne $supported_groups_len ]] && return 1
 
      for (( i=12; i<supported_groups_len; i+=4 )); do
           group=$(hex2dec "${supported_groups:i:4}")
@@ -16622,7 +16496,7 @@ generate_key_share_extension() {
      done
      [[ -z "$key_shares" ]] && tm_out "" && return 0
 
-     len=${#key_shares}/3
+     len=$((${#key_shares}/3))
      list_len="$(printf "%04x" "$len")"
      len+=2
      extn_len="$(printf "%04x" "$len")"
@@ -16646,7 +16520,7 @@ prepare_tls_clienthello() {
      local new_socket=true
      local tls_word_reclayer="03, 01"      # the first TLS version number is the record layer and always 0301
                                            # -- except: SSLv3 and second ClientHello after HelloRetryRequest
-     local servername_hexstr len_servername len_servername_hex
+     local servername servername_hexstr len_servername len_servername_hex
      local hexdump_format_str part1 part2
      local all_extensions=""
      local -i i j len_ciph_suites_byte len_extension len_padding_extension len_all len_session_id
@@ -16838,14 +16712,14 @@ prepare_tls_clienthello() {
           code2network "$extra_extensions"
           len_all=${#NW_STR}
           for (( i=0; i < len_all; i+=16+4*0x$len_extension_hex )); do
-               part2=$i+4
+               part2=$((i+4))
                extn_type="${NW_STR:i:2}${NW_STR:part2:2}"
                extra_extensions_list+=" $extn_type "
-               j=$i+8
-               part2=$j+4
+               j=$((i+8))
+               part2=$((j+4))
                len_extension_hex="${NW_STR:j:2}${NW_STR:part2:2}"
                if [[ "$extn_type" == "000a" ]] && [[ 0x$tls_low_byte -gt 0x03 ]]; then
-                    j=14+4*0x$len_extension_hex
+                    j=$((14+4*0x$len_extension_hex))
                     supported_groups_c2n="${NW_STR:i:j}"
                fi
           done
@@ -17131,7 +17005,7 @@ resend_if_hello_retry_request() {
      fi
 
      # Check the length of the handshake message
-     msg_len=2*$(hex2dec "${tls_hello_ascii:6:4}")
+     msg_len=$((2*$(hex2dec "${tls_hello_ascii:6:4}")))
      if [[ $msg_len -gt $tls_hello_ascii_len-10 ]]; then
           debugme echo "malformed HelloRetryRequest"
           return 1
@@ -17139,11 +17013,11 @@ resend_if_hello_retry_request() {
      # The HelloRetryRequest message may be followed by something
      # else (e.g., a change cipher spec message). Ignore anything
      # that follows.
-     tls_hello_ascii_len=$msg_len+10
+     tls_hello_ascii_len=$((msg_len+10))
 
      # Check the length of the HelloRetryRequest message.
-     msg_len=2*$(hex2dec "${tls_hello_ascii:12:6}")
-     if [[ $msg_len -ne $tls_hello_ascii_len-18 ]]; then
+     msg_len=$((2*$(hex2dec "${tls_hello_ascii:12:6}")))
+     if [[ $msg_len -ne $((tls_hello_ascii_len-18)) ]]; then
           debugme echo "malformed HelloRetryRequest"
           return 1
      fi
@@ -17159,16 +17033,16 @@ resend_if_hello_retry_request() {
                extns_offset=22
           fi
      else
-          sid_len=2*$(hex2dec "${tls_hello_ascii:86:2}")
-          i=88+$sid_len
-          j=90+$sid_len
+          sid_len=$((2*$(hex2dec "${tls_hello_ascii:86:2}")))
+          i=$((88+sid_len))
+          j=$((90+sid_len))
           cipher_suite="${tls_hello_ascii:i:2},${tls_hello_ascii:j:2}"
-          extns_offset=94+$sid_len
+          extns_offset=$((94+sid_len))
      fi
 
      # Check the length of the extensions.
-     hrr_extns_len=2*$(hex2dec "${tls_hello_ascii:extns_offset:4}")
-     if [[ $hrr_extns_len -ne $tls_hello_ascii_len-$extns_offset-4 ]]; then
+     hrr_extns_len=$((2*$(hex2dec "${tls_hello_ascii:extns_offset:4}")))
+     if [[ $hrr_extns_len -ne $((tls_hello_ascii_len-$extns_offset-4)) ]]; then
           debugme echo "malformed HelloRetryRequest"
           return 1
      fi
@@ -17176,17 +17050,17 @@ resend_if_hello_retry_request() {
      # Parse HelloRetryRequest extensions
      for (( i=extns_offset+4; i < tls_hello_ascii_len; i+=8+len_extn )); do
           extn_type="${tls_hello_ascii:i:4}"
-          j=$i+4
-          len_extn=2*$(hex2dec "${tls_hello_ascii:j:4}")
+          j=$((i+4))
+          len_extn=$((2*$(hex2dec "${tls_hello_ascii:j:4}")))
           j+=4
-          if [[ $len_extn -gt $tls_hello_ascii_len-$j ]]; then
+          if [[ $len_extn -gt $((tls_hello_ascii_len-j)) ]]; then
                debugme echo "malformed HelloRetryRequest"
                return 1
           fi
           if [[ "$extn_type" == 002C ]]; then
                # If the HRR includes a cookie extension, then it needs to be
                # included in the next ClientHello.
-               j=8+$len_extn
+               j=$((8+len_extn))
                cookie="${tls_hello_ascii:i:j}"
           elif [[ "$extn_type" == 00$KEY_SHARE_EXTN_NR ]]; then
                # If the HRR includes a key_share extension, then it specifies the
@@ -17609,7 +17483,7 @@ send_app_data() {
 #       sequence number will not be correct.
 receive_app_data() {
      local plaintext=""
-     local tls_version cipher client_key client_iv server_key server_iv
+     local tls_version cipher client_key client_iv server_key server_iv content_type
      local aad ciphertext="" res="" data
      local -i client_seq server_seq len msg_len
      local include_headers=true
@@ -17976,8 +17850,9 @@ run_ticketbleed() {
      local len_sid="$(( ${#sid} / 4))"
      local xlen_sid="$(dec02hex $len_sid)"
      local -i len_tckt_tls=0 nr_sid_detected=0
+     local client_hello tls_hello_ascii
      local xlen_tckt_tls="" xlen_handshake_record_layer="" xlen_handshake_ssl_layer=""
-     local -i len_handshake_record_layer=0
+     local -i len_handshake_ssl_layer len_handshake_record_layer=0
      local i
      local -a memory sid_detected
      local early_exit=true
@@ -18316,7 +18191,7 @@ run_opossum() {
 run_renego() {
      local legacycmd="" proto="$OPTIMAL_PROTO"
      local sec_renego
-     local -i ret=0
+     local -i ret=0 restore_errfile
      local cve=""
      local cwe="CWE-310"
      local hint=""
@@ -18585,7 +18460,7 @@ run_crime() {
                fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
           fi
      else
-          if [[ $SERVICE == HTTP ]] || [[ "$CLIENT_AUTH" == required ]] || [[ ! -z "$MTLS" ]]; then
+          if [[ $SERVICE == HTTP ]] || [[ "$CLIENT_AUTH" == required ]] || [[ -n "$MTLS" ]]; then
                pr_svrty_high "VULNERABLE (NOT ok)"
                fileout "$jsonID" "HIGH" "VULNERABLE" "$cve" "$cwe" "$hint"
           else
@@ -19306,7 +19181,7 @@ run_freak() {
                return 0
                ;;
           1|2|3)
-               addtl_warning=" ($magenta""tested only with $nr_supported_ciphers out of 9 ciphers only!$off)" ;;
+               addtl_warning=" (tested only with $nr_supported_ciphers out of 9 ciphers only!)" ;;
           4|5|6|7)
                addtl_warning=" (tested with $nr_supported_ciphers/9 ciphers)" ;;
           8|9|10|11)
@@ -19344,7 +19219,12 @@ run_freak() {
           pr_svrty_critical "VULNERABLE (NOT ok)"; out ", uses EXPORT RSA ciphers"
           fileout "$jsonID" "CRITICAL" "VULNERABLE, uses EXPORT RSA ciphers" "$cve" "$cwe" "$hint"
      else
-          pr_svrty_best "not vulnerable (OK)"; out "$addtl_warning"
+          pr_svrty_best "not vulnerable (OK)"
+          if [[ -n "$addtl_warning" ]] && [[ $nr_supported_ciphers -le 3 ]]; then
+               out " ("; pr_warning "${addtl_warning:2:-1}"; out ")"
+          else
+               out "$addtl_warning"
+          fi
           fileout "$jsonID" "OK" "not vulnerable $addtl_warning" "$cve" "$cwe"
      fi
      outln
@@ -19360,7 +19240,7 @@ run_freak() {
                     for (( i=0; i < TLS_NR_CIPHERS; i++ )); do
                          [[ "$hexc" == ${TLS_CIPHER_HEXCODE[i]} ]] && break
                     done
-                    [[ $i -eq $TLS_NR_CIPHERS ]] && tm_out "$hexc " || tm_out "${TLS_CIPHER_OSSL_NAME[i]} "
+                    if [[ $i -eq $TLS_NR_CIPHERS ]]; then tm_out "$hexc "; else tm_out "${TLS_CIPHER_OSSL_NAME[i]} "; fi
                done
                tmln_out
           else
@@ -19506,7 +19386,7 @@ run_logjam() {
                     out "$spaces"
                     openssl_no_expdhciphers=true
                     ;;
-               1|2|3) addtl_warning=" ($magenta""tested w/ $nr_supported_ciphers/4 ciphers only!$off)" ;;
+               1|2|3) addtl_warning=" (tested w/ $nr_supported_ciphers/4 ciphers only!)" ;;
                4)   ;;
           esac
      fi
@@ -19531,7 +19411,7 @@ run_logjam() {
                     for (( i=0; i < TLS_NR_CIPHERS; i++ )); do
                          [[ "$hexc" == ${TLS_CIPHER_HEXCODE[i]} ]] && break
                     done
-                    [[ $i -eq $TLS_NR_CIPHERS ]] && tm_out "$hexc " || tm_out "${TLS_CIPHER_OSSL_NAME[i]} "
+                    if [[ $i -eq $TLS_NR_CIPHERS ]]; then tm_out "$hexc "; else tm_out "${TLS_CIPHER_OSSL_NAME[i]} "; fi
                done
                tmln_out
           else
@@ -19612,16 +19492,16 @@ run_logjam() {
                out_common_prime "$jsonID2" "$cve" "$cwe"
                if ! "$openssl_no_expdhciphers"; then
                     outln ","
-                    out "${spaces}but no DH EXPORT ciphers${addtl_warning}"
+                    out "${spaces}but no DH EXPORT ciphers"
                     fileout "$jsonID" "OK" "not vulnerable, no DH EXPORT ciphers,$addtl_warning" "$cve" "$cwe"
                fi
           elif [[ $subret -eq 3 ]]; then
-               pr_svrty_good "not vulnerable (OK):"; out " no DH EXPORT ciphers${addtl_warning}"
+               pr_svrty_good "not vulnerable (OK):"; out " no DH EXPORT ciphers"
                fileout "$jsonID" "OK" "not vulnerable, no DH EXPORT ciphers,$addtl_warning" "$cve" "$cwe"
                out ", no DH key detected with <= TLS 1.2"
                fileout "$jsonID2" "OK" "no DH key with <= TLS 1.2" "$cve" "$cwe"
           elif [[ $subret -eq 0 ]]; then
-               pr_svrty_good "not vulnerable (OK):"; out " no DH EXPORT ciphers${addtl_warning}"
+               pr_svrty_good "not vulnerable (OK):"; out " no DH EXPORT ciphers"
                fileout "$jsonID" "OK" "not vulnerable, no DH EXPORT ciphers,$addtl_warning" "$cve" "$cwe"
                # we issue a special warning if there's no common prime but the bit length is too low
                if [[ $DH_GROUP_LEN_P -le 1024 ]]; then
@@ -19637,8 +19517,11 @@ run_logjam() {
                     fileout "$jsonID2" "OK" "--" "$cve" "$cwe"
                fi
           elif [[ $ret -eq 1 ]]; then
-               pr_svrty_good "partly not vulnerable:"; out " no DH EXPORT ciphers${addtl_warning}"
+               pr_svrty_good "partly not vulnerable:"; out " no DH EXPORT ciphers"
                fileout "$jsonID" "OK" "not vulnerable, no DH EXPORT ciphers,$addtl_warning" "$cve" "$cwe"
+          fi
+          if [[ -n "$addtl_warning" ]]; then
+               out " ("; pr_warning "${addtl_warning:2:-1}"; out ")"
           fi
      fi
 
@@ -19651,7 +19534,7 @@ run_logjam() {
 
 # Decrypting RSA with Obsolete and Weakened eNcryption, more @ https://drownattack.com/
 run_drown() {
-     local -i nr_ciphers_detected ret=0
+     local -i lines nr_ciphers_detected ret=0
      local spaces="                                          "
      local cert_fingerprint_sha2=""
      local cve="CVE-2016-0800 CVE-2016-0703"
@@ -19737,8 +19620,8 @@ run_drown() {
 # Browser Exploit Against SSL/TLS: don't use CBC Ciphers in SSLv3 TLSv1.0
 run_beast(){
      local hexc dash cbc_cipher sslvers auth mac
-     local -a ciph hexcode normalized_hexcode kx enc export2
-     local proto proto_hex
+     local -a ciph hexcode normalized_hexcode rfc_ciph kx enc export2 ossl_supported ciphers_found sigalg
+     local proto proto_hex dhlen
      local -i i subret nr_ciphers=0 sclient_success=0
      local detected_cbc_ciphers="" ciphers_to_test
      local higher_proto_supported=""
@@ -19807,7 +19690,7 @@ run_beast(){
           done
      else
           # no sockets, openssl
-          while read hexc dash ciph[nr_ciphers] sslvers kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read hexc dash "ciph[nr_ciphers]" sslvers "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                if [[ ":${cbc_cipher_list}:" =~ :${ciph[nr_ciphers]}: ]]; then
                     ossl_supported[nr_ciphers]=true
                     if [[ "${hexc:2:2}" == "00" ]]; then
@@ -19988,9 +19871,11 @@ run_beast(){
                     fileout "${jsonID}_CBC_$(toupper $proto)" "MEDIUM" "$detected_cbc_ciphers" "$cve" "$cwe" "$hint"
                     ! "$first" && out "$spaces"
                     out "$(toupper $proto): "
-                    [[ -n "$higher_proto_supported" ]] && \
-                         pr_svrty_low "$(out_row_aligned_max_width "$detected_cbc_ciphers" "                                                 " $TERM_WIDTH)" || \
+                    if [[ -n "$higher_proto_supported" ]]; then
+                         pr_svrty_low "$(out_row_aligned_max_width "$detected_cbc_ciphers" "                                                 " $TERM_WIDTH)"
+                    else
                          pr_svrty_medium "$(out_row_aligned_max_width "$detected_cbc_ciphers" "                                                 " $TERM_WIDTH)"
+                    fi
                     outln
                     detected_cbc_ciphers=""  # empty for next round
                     first=false
@@ -20247,10 +20132,10 @@ run_winshock() {
 run_lucky13() {
      local spaces="                                           "
      local cbc_ciphers="ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:SRP-DSS-AES-256-CBC-SHA:SRP-RSA-AES-256-CBC-SHA:SRP-AES-256-CBC-SHA:RSA-PSK-AES256-CBC-SHA384:DHE-PSK-AES256-CBC-SHA384:DHE-PSK-AES256-CBC-SHA:ECDHE-PSK-CAMELLIA256-SHA384:RSA-PSK-CAMELLIA256-SHA384:DHE-PSK-CAMELLIA256-SHA384:PSK-AES256-CBC-SHA384:PSK-CAMELLIA256-SHA384:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA256:DH-RSA-AES256-SHA256:DH-DSS-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-DSS-AES256-SHA:DH-RSA-AES256-SHA:DH-DSS-AES256-SHA:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CAMELLIA256-SHA384:DHE-RSA-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA256:DH-RSA-CAMELLIA256-SHA256:DH-DSS-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-DSS-CAMELLIA256-SHA:DH-RSA-CAMELLIA256-SHA:DH-DSS-CAMELLIA256-SHA:AECDH-AES256-SHA:ADH-AES256-SHA256:ADH-AES256-SHA:ADH-CAMELLIA256-SHA256:ADH-CAMELLIA256-SHA:ECDH-RSA-AES256-SHA384:ECDH-ECDSA-AES256-SHA384:ECDH-RSA-AES256-SHA:ECDH-ECDSA-AES256-SHA:ECDH-RSA-CAMELLIA256-SHA384:ECDH-ECDSA-CAMELLIA256-SHA384:AES256-SHA256:AES256-SHA:CAMELLIA256-SHA256:ECDHE-PSK-AES256-CBC-SHA384:ECDHE-PSK-AES256-CBC-SHA:CAMELLIA256-SHA:RSA-PSK-AES256-CBC-SHA:PSK-AES256-CBC-SHA:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:SRP-DSS-AES-128-CBC-SHA:SRP-RSA-AES-128-CBC-SHA:SRP-AES-128-CBC-SHA:DHE-RSA-AES128-SHA256:DHE-DSS-AES128-SHA256:DH-RSA-AES128-SHA256:DH-DSS-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA:DH-RSA-AES128-SHA:DH-DSS-AES128-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA256:DH-RSA-CAMELLIA128-SHA256:DH-DSS-CAMELLIA128-SHA256:DHE-RSA-SEED-SHA:DHE-DSS-SEED-SHA:DH-RSA-SEED-SHA:DH-DSS-SEED-SHA:DHE-RSA-CAMELLIA128-SHA:DHE-DSS-CAMELLIA128-SHA:DH-RSA-CAMELLIA128-SHA:DH-DSS-CAMELLIA128-SHA:AECDH-AES128-SHA:ADH-AES128-SHA256:ADH-AES128-SHA:ADH-CAMELLIA128-SHA256:ADH-SEED-SHA:ADH-CAMELLIA128-SHA:ECDH-RSA-AES128-SHA256:ECDH-ECDSA-AES128-SHA256:ECDH-RSA-AES128-SHA:ECDH-ECDSA-AES128-SHA:ECDH-RSA-CAMELLIA128-SHA256:ECDH-ECDSA-CAMELLIA128-SHA256:AES128-SHA256:AES128-SHA:CAMELLIA128-SHA256:ECDHE-PSK-AES128-CBC-SHA256:ECDHE-PSK-AES128-CBC-SHA:RSA-PSK-AES128-CBC-SHA256:DHE-PSK-AES128-CBC-SHA256:DHE-PSK-AES128-CBC-SHA:SEED-SHA:CAMELLIA128-SHA:ECDHE-PSK-CAMELLIA128-SHA256:RSA-PSK-CAMELLIA128-SHA256:DHE-PSK-CAMELLIA128-SHA256:PSK-AES128-CBC-SHA256:PSK-CAMELLIA128-SHA256:IDEA-CBC-SHA:RSA-PSK-AES128-CBC-SHA:PSK-AES128-CBC-SHA:KRB5-IDEA-CBC-SHA:KRB5-IDEA-CBC-MD5:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:SRP-DSS-3DES-EDE-CBC-SHA:SRP-RSA-3DES-EDE-CBC-SHA:SRP-3DES-EDE-CBC-SHA:EDH-RSA-DES-CBC3-SHA:EDH-DSS-DES-CBC3-SHA:DH-RSA-DES-CBC3-SHA:DH-DSS-DES-CBC3-SHA:AECDH-DES-CBC3-SHA:ADH-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:ECDH-ECDSA-DES-CBC3-SHA:DES-CBC3-SHA:RSA-PSK-3DES-EDE-CBC-SHA:PSK-3DES-EDE-CBC-SHA:KRB5-DES-CBC3-SHA:KRB5-DES-CBC3-MD5:ECDHE-PSK-3DES-EDE-CBC-SHA:DHE-PSK-3DES-EDE-CBC-SHA:EXP1024-DHE-DSS-DES-CBC-SHA:EDH-RSA-DES-CBC-SHA:EDH-DSS-DES-CBC-SHA:DH-RSA-DES-CBC-SHA:DH-DSS-DES-CBC-SHA:ADH-DES-CBC-SHA:EXP1024-DES-CBC-SHA:DES-CBC-SHA:KRB5-DES-CBC-SHA:KRB5-DES-CBC-MD5:EXP-EDH-RSA-DES-CBC-SHA:EXP-EDH-DSS-DES-CBC-SHA:EXP-ADH-DES-CBC-SHA:EXP-DES-CBC-SHA:EXP-RC2-CBC-MD5:EXP-KRB5-RC2-CBC-SHA:EXP-KRB5-DES-CBC-SHA:EXP-KRB5-RC2-CBC-MD5:EXP-KRB5-DES-CBC-MD5:EXP-DH-DSS-DES-CBC-SHA:EXP-DH-RSA-DES-CBC-SHA"
-     cbc_ciphers_hex1="c0,28, c0,24, c0,14, c0,0a, c0,22, c0,21, c0,20, 00,b7, 00,b3, 00,91, c0,9b, c0,99, c0,97, 00,af, c0,95, 00,6b, 00,6a, 00,69, 00,68, 00,39, 00,38, 00,37, 00,36, c0,77, c0,73, 00,c4, 00,c3, 00,c2, 00,c1, 00,88, 00,87, 00,86, 00,85, c0,19, 00,6d, 00,3a, 00,c5, 00,89, c0,2a, c0,26, c0,0f, c0,05, c0,79, c0,75, 00,3d, 00,35, 00,c0, c0,38, c0,36, 00,84, 00,95, 00,8d, c0,3d, c0,3f, c0,41, c0,43, c0,45, c0,47, c0,49, c0,4b, c0,4d, c0,4f, c0,65, c0,67, c0,69, c0,71, c0,27, c0,23, c0,13, c0,09, c0,1f, c0,1e, c0,1d, 00,67, 00,40, 00,3f, 00,3e, 00,33, 00,32, 00,31, 00,30, c0,76, c0,72, 00,be, 00,bd, 00,bc, 00,bb, 00,9a, 00,99, 00,98, 00,97, 00,45, 00,44, 00,43, 00,42, c0,18, 00,6c, 00,34, 00,bf, 00,9b, 00,46, c0,29, c0,25, c0,0e, c0,04, c0,78, c0,74, 00,3c, 00,2f, 00,ba"
-     cbc_ciphers_hex2="c0,37, c0,35, 00,b6, 00,b2, 00,90, 00,96, 00,41, c0,9a, c0,98, c0,96, 00,ae, c0,94, 00,07, 00,94, 00,8c, 00,21, 00,25, c0,3c, c0,3e, c0,40, c0,42, c0,44, c0,46, c0,48, c0,4a, c0,4c, c0,4e, c0,64, c0,66, c0,68, c0,70, c0,12, c0,08, c0,1c, c0,1b, c0,1a, 00,16, 00,13, 00,10, 00,0d, c0,17, 00,1b, c0,0d, c0,03, 00,0a, 00,93, 00,8b, 00,1f, 00,23, c0,34, 00,8f, fe,ff, ff,e0, 00,63, 00,15, 00,12, 00,0f, 00,0c, 00,1a, 00,62, 00,09, 00,61, 00,1e, 00,22, fe,fe, ff,e1, 00,14, 00,11, 00,19, 00,08, 00,06, 00,27, 00,26, 00,2a, 00,29, 00,0b, 00,0e"
+     local cbc_ciphers_hex1="c0,28, c0,24, c0,14, c0,0a, c0,22, c0,21, c0,20, 00,b7, 00,b3, 00,91, c0,9b, c0,99, c0,97, 00,af, c0,95, 00,6b, 00,6a, 00,69, 00,68, 00,39, 00,38, 00,37, 00,36, c0,77, c0,73, 00,c4, 00,c3, 00,c2, 00,c1, 00,88, 00,87, 00,86, 00,85, c0,19, 00,6d, 00,3a, 00,c5, 00,89, c0,2a, c0,26, c0,0f, c0,05, c0,79, c0,75, 00,3d, 00,35, 00,c0, c0,38, c0,36, 00,84, 00,95, 00,8d, c0,3d, c0,3f, c0,41, c0,43, c0,45, c0,47, c0,49, c0,4b, c0,4d, c0,4f, c0,65, c0,67, c0,69, c0,71, c0,27, c0,23, c0,13, c0,09, c0,1f, c0,1e, c0,1d, 00,67, 00,40, 00,3f, 00,3e, 00,33, 00,32, 00,31, 00,30, c0,76, c0,72, 00,be, 00,bd, 00,bc, 00,bb, 00,9a, 00,99, 00,98, 00,97, 00,45, 00,44, 00,43, 00,42, c0,18, 00,6c, 00,34, 00,bf, 00,9b, 00,46, c0,29, c0,25, c0,0e, c0,04, c0,78, c0,74, 00,3c, 00,2f, 00,ba"
+     local cbc_ciphers_hex2="c0,37, c0,35, 00,b6, 00,b2, 00,90, 00,96, 00,41, c0,9a, c0,98, c0,96, 00,ae, c0,94, 00,07, 00,94, 00,8c, 00,21, 00,25, c0,3c, c0,3e, c0,40, c0,42, c0,44, c0,46, c0,48, c0,4a, c0,4c, c0,4e, c0,64, c0,66, c0,68, c0,70, c0,12, c0,08, c0,1c, c0,1b, c0,1a, 00,16, 00,13, 00,10, 00,0d, c0,17, 00,1b, c0,0d, c0,03, 00,0a, 00,93, 00,8b, 00,1f, 00,23, c0,34, 00,8f, fe,ff, ff,e0, 00,63, 00,15, 00,12, 00,0f, 00,0c, 00,1a, 00,62, 00,09, 00,61, 00,1e, 00,22, fe,fe, ff,e1, 00,14, 00,11, 00,19, 00,08, 00,06, 00,27, 00,26, 00,2a, 00,29, 00,0b, 00,0e"
      local has_dh_bits="$HAS_DH_BITS"
-     local -i nr_supported_ciphers=0 sclient_success
+     local -i nr_cbc_ciphers nr_supported_ciphers=0 sclient_success
      local using_sockets=true
      local cve="CVE-2013-0169"
      local cwe="CWE-310"
@@ -20323,11 +20208,11 @@ run_rc4() {
      local -i rc4_offered=0
      local -i nr_ciphers=0 nr_ossl_ciphers=0 nr_nonossl_ciphers=0 sclient_success=0
      local n auth mac hexc sslv2_ciphers_hex="" sslv2_ciphers_ossl="" s
-     local -a normalized_hexcode hexcode ciph sslvers kx enc export2 sigalg ossl_supported
+     local -a normalized_hexcode hexcode ciph rfc_ciph sslvers kx enc export2 sigalg ossl_supported
      local -i i
      local -a ciphers_found ciphers_found2 hexcode2 ciph2 rfc_ciph2
      local -i -a index
-     local dhlen available="" ciphers_to_test supported_sslv2_ciphers proto
+     local dhlen available="" cipher ciphers_to_test supported_sslv2_ciphers proto
      local has_dh_bits="$HAS_DH_BITS" rc4_detected=""
      local using_sockets=true
      local cve="CVE-2013-2566 CVE-2015-2808"
@@ -20385,7 +20270,7 @@ run_rc4() {
                fi
           done
      else
-          while read hexc n ciph[nr_ciphers] sslvers[nr_ciphers] kx[nr_ciphers] auth enc[nr_ciphers] mac export2[nr_ciphers]; do
+          while read hexc n "ciph[nr_ciphers]" "sslvers[nr_ciphers]" "kx[nr_ciphers]" auth "enc[nr_ciphers]" mac "export2[nr_ciphers]"; do
                if [[ "${ciph[nr_ciphers]}" =~ RC4 ]]; then
                     ciphers_found[nr_ciphers]=false
                     if [[ ${#hexc} -eq 9 ]]; then
@@ -21453,10 +21338,10 @@ find_openssl_binary() {
      OSSL_VER=$(awk -F' ' '{ print $2 }' <<< "${ossl_line1}")
      OSSL_VER_MAJOR="${OSSL_VER%%\.*}"
      OSSL_VER_MINOR="${OSSL_VER%%-*}"
-     OSSL_VER_MINOR="${OSSL_VER_MINOR#$OSSL_VER_MAJOR\.}"
+     OSSL_VER_MINOR="${OSSL_VER_MINOR#"$OSSL_VER_MAJOR"\.}"
      OSSL_VER_MINOR="${OSSL_VER_MINOR%%[a-zA-Z]*}"
      # like -bad -fips etc:
-     OSSL_VER_APPENDIX="${OSSL_VER#$OSSL_VER_MAJOR\.$OSSL_VER_MINOR}"
+     OSSL_VER_APPENDIX="${OSSL_VER#"$OSSL_VER_MAJOR"\."$OSSL_VER_MINOR"}"
      OSSL_VER_PLATFORM="$(awk '/^platform: / { print $2 }' < $TEMPDIR/openssl_version_all)"
      OSSL_BUILD_DATE="$(awk '/^built on/' < $TEMPDIR/openssl_version_all)"
      OSSL_BUILD_DATE=${OSSL_BUILD_DATE#*: }
@@ -21468,7 +21353,7 @@ find_openssl_binary() {
      # the year, remove it until the end and then re-add just the year
      for yr in {2014..2029} ; do
           if [[ $OSSL_SHORT_STR =~ \ $yr ]] ; then
-               OSSL_SHORT_STR=${OSSL_SHORT_STR%%$yr*}
+               OSSL_SHORT_STR=${OSSL_SHORT_STR%%"$yr"*}
                OSSL_SHORT_STR="${OSSL_SHORT_STR}${yr}"
                break
           fi
@@ -21510,7 +21395,7 @@ find_openssl_binary() {
      if [[ "$openssl_location" == ${PWD}/bin ]]; then
           OPENSSL_LOCATION="\$PWD/bin/$(basename "$openssl_location")"
      elif [[ "$openssl_location" =~ $cwd ]] && [[ "$cwd" != '.' ]]; then
-          OPENSSL_LOCATION="${openssl_location%%$cwd}"
+          OPENSSL_LOCATION="${openssl_location%%"$cwd"}"
      else
           OPENSSL_LOCATION="$openssl_location"
      fi
@@ -22176,7 +22061,7 @@ EOF
 
 
 prepare_arrays() {
-     local hexc mac ossl_ciph
+     local hexc n mac ossl_ciph
      local ossl_supported_tls="" ossl_supported_sslv2=""
      local -i i=0
 
@@ -22184,7 +22069,7 @@ prepare_arrays() {
           "$HAS_SSL2" && ossl_supported_sslv2="$($OPENSSL ciphers -ssl2 -V 'ALL:COMPLEMENTOFALL:@STRENGTH' 2>$ERRFILE)"
           ossl_supported_tls="$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL:@STRENGTH' 'ALL' "-no_ssl2 -V")"
           TLS13_OSSL_CIPHERS=""
-          while read hexc n TLS_CIPHER_OSSL_NAME[i] TLS_CIPHER_RFC_NAME[i] TLS_CIPHER_SSLVERS[i] TLS_CIPHER_KX[i] TLS_CIPHER_AUTH[i] TLS_CIPHER_ENC[i] mac TLS_CIPHER_EXPORT[i]; do
+          while read hexc n "TLS_CIPHER_OSSL_NAME[i]" "TLS_CIPHER_RFC_NAME[i]" "TLS_CIPHER_SSLVERS[i]" "TLS_CIPHER_KX[i]" "TLS_CIPHER_AUTH[i]" "TLS_CIPHER_ENC[i]" mac "TLS_CIPHER_EXPORT[i]"; do
                TLS_CIPHER_HEXCODE[i]="$hexc"
                TLS_CIPHER_OSSL_SUPPORTED[i]=false
                if [[ ${#hexc} -eq 9 ]]; then
@@ -22809,7 +22694,7 @@ get_caa_rrecord() {
           raw_caa="$(drill $1 type257 | awk '/'"^${1}"'.*CAA/ { print $5,$6,$7 }')"
      elif "$HAS_HOST"; then
           raw_caa="$(host -t type257 $1)"
-          if [[ "$raw_caa" =~ "has no CAA|has no TYPE257" ]]; then
+          if [[ "$raw_caa" =~ has\ no\ CAA|has\ no\ TYPE257 ]]; then
                raw_caa=""
           else
                raw_caa="${raw_caa/$1 has CAA record /}"
@@ -22936,7 +22821,7 @@ get_https_rrecord() {
           # empty if there's no such record
      elif "$HAS_HOST"; then
           raw_https="$(host -t type65 "$1")"
-          if [[ "$raw_https" =~ "has no HTTPS|has no TYPE65" ]]; then
+          if [[ "$raw_https" =~ has\ no\ HTTPS|has\ no\ TYPE65 ]]; then
                raw_https=""
           else
                raw_https="${raw_https/$1 has HTTPS record /}"
@@ -23065,7 +22950,7 @@ decode_https_rr_alpn() {
      while (( ptr < len )); do
           [[ -n "$alpn_str" ]] && alpn_str+=","        # add a comma in the >=2 round
           alpn_len=${entry:$ptr:2}
-          alpn_len=$(( ((10#$alpn_len)) * 2 ))         # also make sure it's a number
+          alpn_len=$(( (10#$alpn_len) * 2 ))         # also make sure it's a number
 
           ptr=$((ptr + 2))                             # len field is always 2 bytes
           alpn_wire=${entry:$ptr:$alpn_len}
@@ -23108,7 +22993,7 @@ decode_https_rr_ipv4() {
           #    after address 18,    16,       ... we need a comma
 
           if [[ $len -ne $((ptr + 2)) ]]; then
-               if [[ $(( ((ptr + 2 )) % 8 )) -eq 0 ]] ; then
+               if [[ $(( (ptr + 2 ) % 8 )) -eq 0 ]] ; then
                     ipv4_str+=","
                else
                     ipv4_str+="."
@@ -23164,7 +23049,7 @@ decode_https_rr_ipv6() {
           ipv6_str+="$ipv6_wire"
 
           if [[ $len -ne $((ptr + 4)) ]]; then
-               if [[ $(( ((ptr + 4)) % 32 )) -eq 0 ]]; then    # we have two bytes pointer 30+2=32
+               if [[ $(( (ptr + 4) % 32 )) -eq 0 ]]; then    # we have two bytes pointer 30+2=32
                     ipv6_str+=","
                else
                     ipv6_str+=":"
@@ -23292,6 +23177,7 @@ shouldwedo_ipv6() {
 determine_ip_addresses() {
      local ip4=""
      local ip6=""
+     local addr
 
      # first, try to get IP addresses from /etc/hosts
      # Local_A[AAA] is for our UI
@@ -23429,7 +23315,7 @@ determine_rdns() {
      # circumstances (see #1506) can show up here. The blacklist is taken from RFC 1912 ("Allowable characters in a
      # label for a host name are only ASCII, letters, digits, and the `-' character")
      while read -r line; do
-          line="$(tr -dc '[a-zA-Z0-9-_.]' <<< "$line")"
+          line="$(tr -dc 'a-zA-Z0-9-_.' <<< "$line")"
           [[ -z "$rdns" ]] && rdns="$line" || rdns="$rdns $line"
      done <<< "$rDNS"
      rDNS="$rdns"
@@ -23570,18 +23456,18 @@ extract_calist() {
           #     opaque certificate_request_context<0..2^8-1>;
           #     Extension extensions<2..2^16-1>;
           # } CertificateRequest;
-          len=2*$(hex2dec "${certreq:0:2}")
+          len=$((2*$(hex2dec "${certreq:0:2}")))
           certreq="${certreq:$((len+2))}"
-          len=2*$(hex2dec "${certreq:0:4}")
+          len=$((2*$(hex2dec "${certreq:0:4}")))
           certreq="${certreq:4}"
           while true; do
                [[ -z "$certreq" ]] && break
                type=$(hex2dec "${certreq:0:4}")
-               len=2*$(hex2dec "${certreq:4:4}")
+               len=$((2*$(hex2dec "${certreq:4:4}")))
                if [[ $type -eq 47 ]]; then
                     # This is the certificate_authorities extension
                     calist="${certreq:8:len}"
-                    len=2*$(hex2dec "${calist:0:4}")
+                    len=$((2*$(hex2dec "${calist:0:4}")))
                     calist="${calist:4:len}"
                     break
                fi
@@ -23594,21 +23480,21 @@ extract_calist() {
           #     supported_signature_algorithms<2^16-1>; - only present in TLS 1.2
           #     DistinguishedName certificate_authorities<0..2^16-1>;
           # } CertificateRequest;
-          len=2*$(hex2dec "${certreq:0:2}")
+          len=$((2*$(hex2dec "${certreq:0:2}")))
           certtypes="${certreq:2:len}"
           certreq="${certreq:$((len+2))}"
           if "$is_tls12"; then
-               len=2*$(hex2dec "${certreq:0:4}")
+               len=$((2*$(hex2dec "${certreq:0:4}")))
                sigalgs="${certreq:4:len}"
                certreq="${certreq:$((len+4))}"
           fi
-          len=2*$(hex2dec "${certreq:0:4}")
+          len=$((2*$(hex2dec "${certreq:0:4}")))
           calist="${certreq:4:len}"
      fi
      # Convert each DN to a string.
      while true; do
           [[ -z "$calist" ]] && break
-          len=2*$(hex2dec "${calist:0:4}")
+          len=$((2*$(hex2dec "${calist:0:4}")))
           dn="${calist:4:len}"
           calist_string+="$(print_dn "$dn")\n"
           calist="${calist:$((len+4))}"
@@ -24817,7 +24703,7 @@ run_mass_testing_parallel() {
                     "$INTERACTIVE" && echo -en "\r                                                             \r" 1>&2
                     get_next_message_testing_parallel_result "completed"
                     NEXT_PARALLEL_TEST_TO_FINISH+=1
-                    nr_active_tests=$nr_active_tests-1
+                    nr_active_tests=$((nr_active_tests-1))
                else
                     break
                fi
@@ -24830,7 +24716,7 @@ run_mass_testing_parallel() {
                          if [[ ${PARALLEL_TESTING_PID[i]} -ne 0 ]] && \
                             ! ps ${PARALLEL_TESTING_PID[i]} >/dev/null ; then
                               PARALLEL_TESTING_PID[i]=0
-                              nr_active_tests=$nr_active_tests-1
+                              nr_active_tests=$((nr_active_tests-1))
                               break
                          fi
                     done
@@ -24843,7 +24729,7 @@ run_mass_testing_parallel() {
                          "$INTERACTIVE" && echo -en "\r                                                             \r" 1>&2
                          get_next_message_testing_parallel_result "timeout"
                          NEXT_PARALLEL_TEST_TO_FINISH+=1
-                         nr_active_tests=$nr_active_tests-1
+                         nr_active_tests=$((nr_active_tests-1))
                          break
                     fi
                     # Wake up to increment the counter every second (so that the counter
@@ -24911,6 +24797,7 @@ run_rating() {
      local -i c1_worst c1_best
      local -i c3_worst c3_best c3_worst_cb c3_best_cb
      local old_ifs=$IFS sorted_reasons sorted_warnings
+     local reason warning
      local -i reason_nr=0 warning_nr=0
 
      outln "\n";
@@ -25436,7 +25323,7 @@ parse_cmd_line() {
                     ;;
                -x|-x=*|--single[-_]cipher|--single[-_]cipher=*)
                     do_cipher_match=true
-                    single_cipher=$(parse_opt_equal_sign "$1" "$2")
+                    SINGLE_CIPHER=$(parse_opt_equal_sign "$1" "$2")
                     [[ $? -eq 0 ]] && shift
                     ;;
                -t|-t=*|--starttls|--starttls=*)
@@ -26016,11 +25903,10 @@ parse_cmd_line() {
      done
 
      # Check if mTLS has been selected, and if the correct client auth PEM file has been provided by user
-     if [[ ! -z "$MTLS" ]]; then
+     if [[ -n "$MTLS" ]]; then
           if [[ -f $MTLS ]]; then
                grep -q 'BEGIN CERTIFICATE' "$MTLS" || fatal_cmd_line "\"$MTLS\" is not a client certificate file in PEM format" $ERR_RESOURCE
                grep -Eaq 'BEGIN PRIVATE KEY|BEGIN RSA PRIVATE KEY|BEGIN EC PRIVATE KEY' "$MTLS" || fatal_cmd_line "\"$MTLS\" the not encrypted private key is missing in the specified PEM file" $ERR_RESOURCE
-               MTLS=$MTLS
           else
                [[ -s "$MTLS" ]] || fatal_cmd_line "the specified client certificate file \"$MTLS\" does not exist" $ERR_RESOURCE
           fi
@@ -26191,7 +26077,7 @@ lets_roll() {
                # we will have an invalid JSON with no if statement
                ((section_number++))
                fileout_section_header $section_number false
-               run_cipher_match ${single_cipher}
+               run_cipher_match ${SINGLE_CIPHER}
                stopwatch run_cipher_match
           else
                fileout_section_header $section_number false && ((section_number++))
